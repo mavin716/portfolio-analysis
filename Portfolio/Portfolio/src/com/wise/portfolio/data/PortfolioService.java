@@ -2013,6 +2013,7 @@ public class PortfolioService {
 			}
 
 		}
+		
 		BigDecimal totalDeviation = totalCurrentPercentage.subtract(totalTargetPercentage);
 		BigDecimal totalAdjustedMinimumDeviation = totalCurrentPercentage
 				.subtract(totalAdjustedMinimumTargetPercentage);
