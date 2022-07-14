@@ -1977,43 +1977,49 @@ public class PortfolioService {
 		BigDecimal totalAdjustedMinimumTargetPercentage = BigDecimal.ZERO;
 
 		for (PortfolioFund fund : getFundsByCategory(portfolio, category)) {
+			BigDecimal fundTotalTargetPercentage = fund.getPercentageByCategory(FundCategory.TOTAL);
+			
+			// Current Value
 			totalCurrentValue = totalCurrentValue.add(fund.getValue());
+			totalCurrentValueByCategory = totalCurrentValueByCategory.add(fund.getValueByCategory(category));
+
+			// Current Percentage
 			totalCurrentPercentage = totalCurrentPercentage
 					.add(CurrencyHelper.calculatePercentage(fund.getValue(), portfolio.getTotalValue()));
-
-			totalCurrentValueByCategory = totalCurrentValueByCategory.add(fund.getValueByCategory(category));
-			totalCurrentPercentageByCategory = totalCurrentPercentage.add(
+			totalCurrentPercentageByCategory = totalCurrentPercentageByCategory.add(
 					CurrencyHelper.calculatePercentage(fund.getValueByCategory(category), portfolio.getTotalValue()));
 
+			// Target Percentage
 			totalTargetPercentageByCategory = totalTargetPercentageByCategory.add(
 					CurrencyHelper.calculatePercentage(fund.getValueByCategory(category), portfolio.getTotalValue()));
+			totalTargetPercentage = totalTargetPercentage.add(fundTotalTargetPercentage);
+
+			// Target Value
+			BigDecimal fundTargetValue = portfolio.getTotalValue()
+					.multiply(fundTotalTargetPercentage);
+			totalTargetValue = totalTargetValue.add(fundTargetValue);
+			totalTargetValueByCategory = totalTargetValueByCategory
+					.add(fund.getPercentageByCategory(category).multiply(portfolio.getTotalValue()));
 
 			BigDecimal fundDividendByCategory = fund.getDistributionsAfterDate(getFirstOfYearDate())
 					.multiply(fund.getPercentageByCategory(category));
 			totalDividendsByCategory = totalDividendsByCategory.add(fundDividendByCategory);
-			
+
 			totalYtdValueChangeByCategory = totalYtdValueChangeByCategory
 					.add(fund.getValue().subtract(getHistoricalValue(fund, getYtdDays())));
-			totalTargetPercentage = totalTargetPercentage.add(fund.getPercentageByCategory(FundCategory.TOTAL));
-			BigDecimal fundTotalPercentage = fund.getPercentageByCategory(FundCategory.TOTAL);
 
-			totalTargetValue = totalTargetValue.add(portfolio.getTotalValue().multiply(fundTotalPercentage));
-			totalTargetValueByCategory = totalTargetValueByCategory.add(
-					CurrencyHelper.calculatePercentage(fund.getValueByCategory(category), portfolio.getTotalValue()));
 			if (fund.getMinimumAmount() != null) {
 				totalAdjustedMinimumTargetValue = totalAdjustedMinimumTargetValue.add(fund.getMinimumAmount());
 				totalAdjustedMinimumTargetPercentage = CurrencyHelper
 						.calculatePercentage(totalAdjustedMinimumTargetValue, portfolio.getTotalValue());
 			} else {
-				totalAdjustedMinimumTargetValue = totalAdjustedMinimumTargetValue
-						.add(fund.getPercentageByCategory(category));
-				totalAdjustedMinimumTargetPercentage = CurrencyHelper
-						.calculatePercentage(totalAdjustedMinimumTargetValue, portfolio.getTotalValue());
+				totalAdjustedMinimumTargetValue = totalAdjustedMinimumTargetValue.add(fundTargetValue);
+				totalAdjustedMinimumTargetPercentage = totalAdjustedMinimumTargetPercentage.add(fundTotalTargetPercentage);
 
 			}
 
 		}
-		
+
 		BigDecimal totalDeviation = totalCurrentPercentage.subtract(totalTargetPercentage);
 		BigDecimal totalAdjustedMinimumDeviation = totalCurrentPercentage
 				.subtract(totalAdjustedMinimumTargetPercentage);
