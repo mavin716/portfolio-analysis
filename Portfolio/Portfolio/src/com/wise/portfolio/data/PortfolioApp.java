@@ -74,8 +74,8 @@ public class PortfolioApp
             portfolioService.saveHistoricalValue(portfolio, HISTORICAL_VALUES_FILE);
             
             String dest = "C:\\Users\\Margaret\\Documents\\portfolio.pdf";  
-            File file = new File(dest);
-            file.delete();
+            File portfolioPdfFile = new File(dest);
+            portfolioPdfFile.delete();
             PdfWriter writer = new PdfWriter(dest); 
             PdfDocument pdfDoc = new PdfDocument(writer);              
             Document document = new Document(pdfDoc, PageSize.LEDGER);    
@@ -99,10 +99,10 @@ public class PortfolioApp
              BigDecimal withdrawalAmount = new BigDecimal(2200);
             System.out.println("\n\nCalculate Withdrawal "+ CurrencyHelper.formatAsCurrencyString(withdrawalAmount));
           Map<String, BigDecimal> withdrawals = portfolioService.calculateWithdrawal(portfolio, withdrawalAmount, BigDecimal.ZERO, BigDecimal.ZERO);
+          //withdrawals.put("VWUAX", new BigDecimal(-500));
           withdrawals.put("VMRXX", new BigDecimal(-500));
           withdrawals.put("VMFXX", new BigDecimal(-500));
          portfolioService.printWithdrawalSpreadsheet(portfolio, withdrawals, document);
-
 
            // portfolioService.rebalanceFunds(portfolio, EXCHANGE_INCREMENT, portfolioService.calculateAdjustments(portfolio));
             //portfolioService.calculateAdjustments(portfolio);
@@ -120,7 +120,8 @@ public class PortfolioApp
             // Closing the document    
             document.close();              
             System.out.println("PDF Created");            
- 
+            portfolioService.sendMail(portfolioPdfFile);
+
 
         }
         catch (Exception e)
