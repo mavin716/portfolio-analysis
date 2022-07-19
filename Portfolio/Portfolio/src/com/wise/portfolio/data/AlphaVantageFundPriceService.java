@@ -55,7 +55,7 @@ public class AlphaVantageFundPriceService {
 
 			Series series = mapper.readValue(response.toString(), Series.class);
 			if (series.getMetadata() == null) {
-				System.out.println("No data returned:  " + response.toString());
+				System.out.println(response.toString());
 				if (retry) {
 					int tries = 6;
 					boolean success = false;
@@ -70,22 +70,18 @@ public class AlphaVantageFundPriceService {
 			PortfolioPriceHistory priceHistory = portfolio.getPriceHistory();
 			for (Entry<String, TimeSeries> entry : series.getTimeSeries().entrySet()) {
 
-				String dateString = entry.getKey();
+				LocalDate date = LocalDate.parse(entry.getKey()); 
+				System.out.println("date:  " + date.toString());
+				
 				TimeSeries timeSeries = entry.getValue();
-
-				LocalDate date = LocalDate.parse(dateString);
 				closingPrice = new BigDecimal(Float.valueOf(timeSeries.getClose()));
+				
 				priceHistory.addFundPrice(symbol, date, closingPrice);
 			}
 
 			httpclient.close();
 
-		} catch (ClientProtocolException e) {
-			e.printStackTrace();
-		} catch (IOException e) {
-			e.printStackTrace();
-		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
+		} catch (Exception e) {
 			e.printStackTrace();
 		}
 
