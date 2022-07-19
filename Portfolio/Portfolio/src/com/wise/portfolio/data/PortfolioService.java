@@ -79,7 +79,7 @@ public class PortfolioService {
 
 	private Map<String, Map<FundCategory, BigDecimal>> desiredFundAllocation = new HashMap<>();
 
-	private Integer[] rankDaysArray = { 1, 3, 5, 15, 30, 60, 90, 120, 180, 270, 365, 480, 560, 630, 660, 720, 840,
+	private Integer[] rankDaysArray = { 1, 3, 5, 15, 30, 60, 90, 120, 180, 270, 365, 480, 560, 630, 660, 720, 850,
 			940 };
 	private List<Integer> enhancedRankDaysList = new LinkedList<>();
 	private Portfolio portfolio;
@@ -2243,7 +2243,7 @@ public class PortfolioService {
 				new Cell()
 						.add(new Cell()
 								.add(CurrencyHelper.formatAsCurrencyString(minPricePair.getRight()) + "\n"
-										+ minPrice1YRPair.getLeft().format(dateFormatter))
+										+ minPricePair.getLeft().format(dateFormatter))
 								.setFontColor(minPriceFontColor))
 						.add(new Cell()
 								.add(CurrencyHelper.formatAsCurrencyString(minPrice1YRPair.getRight()) + "\n"
