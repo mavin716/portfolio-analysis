@@ -104,8 +104,8 @@ public class PortfolioApp
           withdrawals.put("VMFXX", new BigDecimal(-500));
          portfolioService.printWithdrawalSpreadsheet(portfolio, withdrawals, document);
 
-           // portfolioService.rebalanceFunds(portfolio, EXCHANGE_INCREMENT, portfolioService.calculateAdjustments(portfolio));
-            //portfolioService.calculateAdjustments(portfolio);
+            portfolioService.rebalanceFunds(portfolio, EXCHANGE_INCREMENT, portfolioService.calculateAdjustments(portfolio));
+            portfolioService.calculateAdjustments(portfolio);
  
 
             SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd'T'HHmmss.SSS");
