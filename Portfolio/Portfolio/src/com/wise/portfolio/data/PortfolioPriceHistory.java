@@ -188,14 +188,12 @@ public class PortfolioPriceHistory {
 				continue;
 			}
 
-			PortfolioFund fund;
-			if (funds.get(symbol) != null) {
-				fund = funds.get(symbol);
-			} else {
+			PortfolioFund fund =  funds.get(symbol);
+			if (fund == null) {
 				fund = new PortfolioFund();
 				fund.setSymbol(symbol);
+				fund.setName(PortfolioService.fundSymbolNameMap.get(symbol));
 			}
-			fund.setName(name);
 			Double shares = Float.valueOf(fundValues.get(3)) + fund.getShares();
 			fund.setShares(shares);
 			fund.setCurrentPrice(price);
@@ -262,9 +260,6 @@ public class PortfolioPriceHistory {
 					BigDecimal transactionSharePrice = new BigDecimal(fundTransaction.get(8));
 					BigDecimal principalAmount = new BigDecimal(fundTransaction.get(9));
 
-//					System.out.println("Fund: " + fund.getName() + " transaction type: " + transactionType + " amount: "
-//							+ principalAmount);
-
 					if (transactionType.startsWith("Reinvestment")) {
 						fund.addDistribution(tradeDate, transactionType, transactionShares, transactionSharePrice,
 								principalAmount, downloadFile);
@@ -296,6 +291,82 @@ public class PortfolioPriceHistory {
 
 	}
 
+	public void loadPortfolioHistoryFile(Portfolio portfolio, String historyFile) throws IOException {
+
+		final int NUM_COLUMNS = 6;
+		final String HEADING = "Investment Name";
+
+		if (!Files.exists(Paths.get(historyFile), LinkOption.NOFOLLOW_LINKS)) {
+			return;
+		}
+
+		Map<String, PortfolioFund> funds = portfolio.getFundMap();
+		if (funds == null) {
+			funds = new HashMap<>();
+		}
+		// initialize shares
+		for (Entry<String, PortfolioFund> entry : funds.entrySet()) {
+			PortfolioFund fund = entry.getValue();
+			fund.setShares(0);
+		}
+
+		// Read fund value lines into list of values of funds (verify correct number
+		// columns)
+		String[] headingLine = null;
+		List<List<String>> fundLines = null;
+		try (BufferedReader br = Files.newBufferedReader(Paths.get(historyFile), PortfolioService.INPUT_CHARSET)) {
+			headingLine = br.readLine().split(","); // first line is headings
+			if (headingLine == null) {
+				System.out.println("WARNING:  empty file:  " + historyFile);
+				return;
+			}
+
+			fundLines = br.lines().map(line -> Arrays.asList(line.split(",")))
+					.filter(line -> line.size() == NUM_COLUMNS).collect(Collectors.toList());
+		} catch (Exception e) {
+			System.out.println("Exception processing lines from downloadfile: " + e);
+			return;
+		}
+
+
+		for (List<String> fundValues : fundLines) {
+
+			String symbol = fundValues.remove(0);
+			if (symbol == null) {
+				System.out.println("symbol is null");
+				continue;
+			}
+			;
+			String name =  fundValues.remove(0);
+			
+			PortfolioFund fund;
+			if (funds.get(symbol) != null) {
+				fund = funds.get(symbol);
+			} else {
+				fund = new PortfolioFund();
+				fund.setSymbol(symbol);
+				fund.setName(name);
+			}
+
+
+			int dateIndex = 2;
+			for (String priceString : fundValues) {
+				String dateString = headingLine[dateIndex++];
+				LocalDate date = LocalDate.parse(dateString);
+				
+				BigDecimal price = new BigDecimal(priceString);
+				
+				addFundPrice(symbol, date, price);
+			}
+
+
+
+		}
+
+
+		portfolio.setFundMap(funds);
+
+	}
 	public void addFundPrice(String symbol, LocalDate date, BigDecimal price) {
 		Map<LocalDate, BigDecimal> fundPriceMap = fundPrices.get(symbol);
 		if (fundPriceMap == null) {
@@ -313,6 +384,11 @@ public class PortfolioPriceHistory {
 	public Pair<LocalDate, BigDecimal> getMinPrice(PortfolioFund fund) {
 
 		return fundsMinPrice.get(fund.getSymbol());
+	}
+
+	public BigDecimal getPriceRange(PortfolioFund fund) {
+
+		return getMaxPrice(fund).getRight().subtract(getMinPrice(fund).getRight());
 	}
 
 	public Pair<LocalDate, BigDecimal> getMaxPriceFromDate(PortfolioFund fund, LocalDate date) {

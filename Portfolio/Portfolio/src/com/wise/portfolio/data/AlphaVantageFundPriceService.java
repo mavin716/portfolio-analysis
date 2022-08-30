@@ -71,11 +71,11 @@ public class AlphaVantageFundPriceService {
 			for (Entry<String, TimeSeries> entry : series.getTimeSeries().entrySet()) {
 
 				LocalDate date = LocalDate.parse(entry.getKey()); 
-				System.out.println("date:  " + date.toString());
 				
 				TimeSeries timeSeries = entry.getValue();
-				closingPrice = new BigDecimal(Float.valueOf(timeSeries.getClose()));
-				
+				closingPrice = new BigDecimal(timeSeries.getClose());
+				System.out.println("date:  " + date.toString() + " closing price:  " + closingPrice);
+
 				priceHistory.addFundPrice(symbol, date, closingPrice);
 			}
 
