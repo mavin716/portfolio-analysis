@@ -362,6 +362,7 @@ public class MutualFundPerformance {
 //				System.out.println("historicalValue:  " + CurrencyHelper.formatAsCurrencyString(historicalValue));
 
 			}
+			
 			fundReturnMap.put(date, returns);
 		} else {
 //			System.out
