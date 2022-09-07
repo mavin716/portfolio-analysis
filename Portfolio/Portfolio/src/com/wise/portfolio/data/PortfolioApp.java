@@ -98,13 +98,20 @@ public class PortfolioApp {
 			// Transfer 500 into money market (included in withdrawal amount)
 			withdrawals.put("VMRXX", new BigDecimal(-500));
 			withdrawals.put("VMFXX", new BigDecimal(-500));
-			BigDecimal netWithdrawalAmount = MONTHLY_WITHDRAWAL_AMOUNT.subtract(new BigDecimal(1000));
+			BigDecimal netWithdrawalAmount = MONTHLY_WITHDRAWAL_AMOUNT.subtract(new BigDecimal(1200));
 			portfolioService.printWithdrawalSpreadsheet(portfolio, netWithdrawalAmount, withdrawals, document);
 
-			System.out.println("\n\nCalculate condo Withdrawal " + CurrencyHelper.formatAsCurrencyString(new BigDecimal(30000)));
-			withdrawals = portfolioService.calculateWithdrawal(portfolio, new BigDecimal(30000),
+			System.out.println("\n\nCalculate school tax  " + CurrencyHelper.formatAsCurrencyString(new BigDecimal(5300)));
+			withdrawals = portfolioService.calculateWithdrawal(portfolio, new BigDecimal(1200),
 					BigDecimal.ZERO, BigDecimal.ZERO);
-			netWithdrawalAmount = MONTHLY_WITHDRAWAL_AMOUNT.subtract(new BigDecimal(30000));
+			withdrawals.put("VMFXX", new BigDecimal(4100));
+			netWithdrawalAmount = new BigDecimal(5300);
+			portfolioService.printWithdrawalSpreadsheet(portfolio, netWithdrawalAmount, withdrawals, document);
+
+			System.out.println("\n\nCalculate condo Withdrawal " + CurrencyHelper.formatAsCurrencyString(new BigDecimal(40000)));
+			withdrawals = portfolioService.calculateWithdrawal(portfolio, new BigDecimal(40000),
+					BigDecimal.ZERO, BigDecimal.ZERO);
+			netWithdrawalAmount = new BigDecimal(40000);
 			portfolioService.printWithdrawalSpreadsheet(portfolio, netWithdrawalAmount, withdrawals, document);
 
 			portfolioService.rebalanceFunds(portfolio, EXCHANGE_INCREMENT,

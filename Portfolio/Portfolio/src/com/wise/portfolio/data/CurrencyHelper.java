@@ -27,5 +27,9 @@ public class CurrencyHelper {
 		return desiredCategoryPercentage == null ? String.format("%6s", "N/A%")
 				: String.format("%(6.3f", (desiredCategoryPercentage.multiply(new BigDecimal(100)))) + "%";
 	}
+	public static String formatPercentageString4(BigDecimal desiredCategoryPercentage) {
+		return desiredCategoryPercentage == null ? String.format("%6s", "N/A%")
+				: String.format("%(6.4f", (desiredCategoryPercentage.multiply(new BigDecimal(100)))) + "%";
+	}
 
 }
