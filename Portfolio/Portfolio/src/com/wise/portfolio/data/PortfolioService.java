@@ -20,6 +20,7 @@ import java.time.LocalTime;
 import java.time.Period;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.time.temporal.TemporalUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -1056,7 +1057,7 @@ public class PortfolioService {
 			System.out.println("Get price history for: " + entry.getValue().getShortName());
 
 //			AlphaVantageFundPriceService.loadFundHistoryFromAlphaVantage(portfolio, symbol, true);
-			AlphaVantageFundPriceService.loadFundHistoryFromAlphaVantage(portfolio, symbol, false);
+//			AlphaVantageFundPriceService.loadFundHistoryFromAlphaVantage(portfolio, symbol, false);
 		}
 
 		// Use earliest date for cost, not true cost but don't have enough history to
@@ -1142,7 +1143,6 @@ public class PortfolioService {
 				PortfolioFund fund = entry.getValue().getRight();
 				System.out.println("Fund:  " + fund.getShortName() + " dev "
 						+ CurrencyHelper.formatPercentageString4(fundDeviation));
-
 
 				BigDecimal fundWithdrawalIncrement = withdrawalIncrement;
 
@@ -1236,8 +1236,8 @@ public class PortfolioService {
 						BigDecimal availableFundValue = fund.getAvailableValue();
 						Map<FundCategory, BigDecimal> map = desiredFundAllocation.get(fund.getSymbol());
 						BigDecimal desiredFundPercentage = map.get(FundCategory.TOTAL);
-						BigDecimal desiredFundValue = portfolio.getTotalValue().subtract(portfolioAdjustment).multiply(desiredFundPercentage,
-								MathContext.UNLIMITED);
+						BigDecimal desiredFundValue = portfolio.getTotalValue().subtract(portfolioAdjustment)
+								.multiply(desiredFundPercentage, MathContext.UNLIMITED);
 						// If minimum is greater than available then only use amount greater than
 						// minimum
 						BigDecimal difference = availableFundValue.subtract(desiredFundValue);
@@ -1252,16 +1252,18 @@ public class PortfolioService {
 						}
 
 						BigDecimal fundTargetPercentage = fund.getPercentageByCategory(FundCategory.TOTAL);
-						BigDecimal targetValue = portfolio.getTotalValue().subtract(portfolioAdjustment).multiply(fundTargetPercentage);
+						BigDecimal targetValue = portfolio.getTotalValue().subtract(portfolioAdjustment)
+								.multiply(fundTargetPercentage);
 						if (fund.getMinimumAmount() != null) {
 							if (targetValue.compareTo(fund.getMinimumAmount()) < 0) {
-								fundTargetPercentage = fund.getMinimumAmount().divide(portfolio.getTotalValue().subtract(portfolioAdjustment), 12,
+								fundTargetPercentage = fund.getMinimumAmount().divide(
+										portfolio.getTotalValue().subtract(portfolioAdjustment), 12,
 										RoundingMode.HALF_UP);
 							}
 						}
 
-						BigDecimal currentPercentage = fund.getValue().divide(portfolio.getTotalValue().subtract(portfolioAdjustment), 12,
-								RoundingMode.HALF_UP);
+						BigDecimal currentPercentage = fund.getValue().divide(
+								portfolio.getTotalValue().subtract(portfolioAdjustment), 12, RoundingMode.HALF_UP);
 
 						BigDecimal deviation = currentPercentage.subtract(fundTargetPercentage);
 						return deviation;
@@ -1296,15 +1298,17 @@ public class PortfolioService {
 			}
 
 			BigDecimal fundTargetPercentage = fund.getPercentageByCategory(FundCategory.TOTAL);
-			BigDecimal targetValue = portfolio.getTotalValue().subtract(portfolioAdjustment).multiply(fundTargetPercentage);
+			BigDecimal targetValue = portfolio.getTotalValue().subtract(portfolioAdjustment)
+					.multiply(fundTargetPercentage);
 			if (fund.getMinimumAmount() != null) {
 				if (targetValue.compareTo(fund.getMinimumAmount()) < 0) {
-					fundTargetPercentage = fund.getMinimumAmount().divide(portfolio.getTotalValue().subtract(portfolioAdjustment), 12,
-							RoundingMode.HALF_UP);
+					fundTargetPercentage = fund.getMinimumAmount()
+							.divide(portfolio.getTotalValue().subtract(portfolioAdjustment), 12, RoundingMode.HALF_UP);
 				}
 			}
 
-			BigDecimal currentPercentage = fund.getValue().divide(portfolio.getTotalValue().subtract(portfolioAdjustment), 12, RoundingMode.HALF_UP);
+			BigDecimal currentPercentage = fund.getValue()
+					.divide(portfolio.getTotalValue().subtract(portfolioAdjustment), 12, RoundingMode.HALF_UP);
 
 			BigDecimal deviation = currentPercentage.subtract(fundTargetPercentage);
 
@@ -1863,7 +1867,7 @@ public class PortfolioService {
 
 	public void printSpreadsheet(Portfolio portfolio, Document document) {
 		// Creating a table object
-		float[] pointColumnWidths = { 15F, 5F, 5F, 5F, 5F, 5F, 5F, 25F, 5F, 5F, 5F, 5F, 5F, 5F, 5F, 5F };
+		float[] pointColumnWidths = { 15F, 2F, 4F, 4F, 5F, 5F, 5F, 5F, 25F, 5F, 5F, 5F, 5F, 5F, 5F, 5F, 5F };
 		Table table = new Table(pointColumnWidths);
 
 		table.setFontSize(14);
@@ -1878,6 +1882,7 @@ public class PortfolioService {
 		table.addHeaderCell(new Cell().add("Begin 2022\nPrice").setTextAlignment(TextAlignment.CENTER));
 		table.addHeaderCell(new Cell().add("YTD % Change").setTextAlignment(TextAlignment.CENTER));
 		table.addHeaderCell(new Cell().add("YTD Dividends").setTextAlignment(TextAlignment.CENTER));
+		table.addHeaderCell(new Cell().add("Last Year Dividends").setTextAlignment(TextAlignment.CENTER).setFontSize(12f));
 		table.addHeaderCell(new Cell().add("YTD\nReturns /\nWithd. /\nExch.").setTextAlignment(TextAlignment.CENTER));
 		table.addHeaderCell(new Cell().add("Share Price\n" + mostRecentSharePrice.format(dateFormatter))
 				.setTextAlignment(TextAlignment.CENTER));
@@ -1906,7 +1911,7 @@ public class PortfolioService {
 
 		// Bond Funds
 		table.addCell(new Cell().add("Bond Funds").setTextAlignment(TextAlignment.LEFT).setItalic());
-		table.addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell())
+		table.addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell())
 				.addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell())
 				.addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell());
 		for (PortfolioFund fund : this.getFundsByCategory(portfolio, FundCategory.BOND)) {
@@ -1917,7 +1922,7 @@ public class PortfolioService {
 		// Stock Funds
 		table.addCell(
 				new Cell().add("Stock Funds").setTextAlignment(TextAlignment.LEFT).setKeepWithNext(true).setItalic());
-		table.addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell())
+		table.addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell())
 				.addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell())
 				.addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell());
 		for (PortfolioFund fund : getFundsByCategory(portfolio, FundCategory.STOCK)) {
@@ -1927,7 +1932,7 @@ public class PortfolioService {
 
 		// Intl Funds
 		table.addCell(new Cell().add("Intl Funds").setTextAlignment(TextAlignment.LEFT).setItalic());
-		table.addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell())
+		table.addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell())
 				.addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell())
 				.addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell());
 		for (PortfolioFund fund : this.getFundsByCategory(portfolio, FundCategory.INTL)) {
@@ -2111,10 +2116,15 @@ public class PortfolioService {
 
 		// Post withdrawal value
 //		table.addCell(createTargetValueCell(fund, targetValueByCategory, targetTotalValue, minimumAdjustedTargetValue));
-		table.addCell(new Cell().add(CurrencyHelper.formatAsCurrencyString(postWithdrawalCategoryValue)));
+//		table.addCell(new Cell().add(CurrencyHelper.formatAsCurrencyString(postWithdrawalCategoryValue)));
+		table.addCell(createCurrentValueCell(fund.isFixedExpensesAccount(), postWithdrawalCategoryValue, postWithdrawalDeviation,
+				postWithdrawalFundValue, postWithdrawalTotalDeviation, minimumAdjustedTargetValue, postWithdrawalMinimumAdjustedDeviation));
 
 		// Post withdrawal %
-		table.addCell(new Cell().add(CurrencyHelper.formatPercentageString(postWithdrawalCategoryPercentage)));
+//		table.addCell(new Cell().add(CurrencyHelper.formatPercentageString(postWithdrawalCategoryPercentage)));
+		table.addCell(createCurrentPercentageCell(fund.isFixedExpensesAccount(), postWithdrawalCategoryPercentage,
+				targetCategoryPercentage, fundTotalTargetPercentage, adjustedMinimumTargetPerentage,
+				postWithdrawalTotalPercentage));
 
 		// Post withdrawal target value
 		BigDecimal postWithdrawalTargetValueByCategory = postWithdrawalPortfolioValue
@@ -2269,6 +2279,7 @@ public class PortfolioService {
 	private void addTotalsToTable(Portfolio portfolio, Table table) {
 
 		BigDecimal totalDividends = BigDecimal.ZERO;
+		BigDecimal totalLastYearDividends = BigDecimal.ZERO;
 		BigDecimal totalCurrentPercentage = BigDecimal.ZERO;
 		BigDecimal totalTargetPercentage = BigDecimal.ZERO;
 		BigDecimal total = portfolio.getTotalValue();
@@ -2278,6 +2289,8 @@ public class PortfolioService {
 		for (PortfolioFund fund : portfolio.getFundMap().values()) {
 			totalYtdWithdrawals = totalYtdWithdrawals.add(fund.getWithdrawalsUpToDate(getFirstOfYearDate()));
 			totalDividends = totalDividends.add(fund.getDistributionsAfterDate(getFirstOfYearDate()));
+			totalLastYearDividends = totalLastYearDividends.add(fund.getDistributionsBetweenDates(
+					getFirstOfYearDate().minus(1, ChronoUnit.YEARS), getFirstOfYearDate().minus(1, ChronoUnit.DAYS)));
 			totalYtdValueChange = totalYtdValueChange
 					.add(fund.getValue().subtract(getHistoricalValue(fund, getYtdDays())));
 			totalCurrentPercentage = totalCurrentPercentage
@@ -2295,7 +2308,8 @@ public class PortfolioService {
 		table.addCell(new Cell().add(""));
 		table.addCell(new Cell().add(""));
 		table.addCell(new Cell().add(""));
-		table.addCell(new Cell().add(CurrencyHelper.formatAsCurrencyString(totalDividends)));
+		table.addCell(new Cell().add(CurrencyHelper.formatAsCurrencyString(totalDividends)).setFontSize(12f));
+		table.addCell(new Cell().add(CurrencyHelper.formatAsCurrencyString(totalLastYearDividends)).setFontSize(12f));
 
 		// YTD Returns (withdrawals)
 		table.addCell(new Cell().setMargin(0f)
@@ -2379,7 +2393,7 @@ public class PortfolioService {
 
 		BigDecimal currentPrice = fund.getCurrentPrice();
 
-		performance.getPerformanceRateByDate(historicalDate);
+//		performance.getPerformanceRateByDate(historicalDate);
 		BigDecimal ytdPriceChange = performance.getYtdPriceChange();
 		// Does this include exchanges and withdrawals?
 		BigDecimal ytdValueChange = performance.getYtdValueChange();
@@ -2434,6 +2448,8 @@ public class PortfolioService {
 
 		// YTD Dividends
 		BigDecimal ytdDividends = fund.getDistributionsAfterDate(getFirstOfYearDate());
+		BigDecimal lastYearDividends = fund.getDistributionsBetweenDates(
+				getFirstOfYearDate().minus(1, ChronoUnit.YEARS), getFirstOfYearDate().minus(1, ChronoUnit.DAYS));
 
 		// Min/max prices
 		LocalDate oldestDate = LocalDate.now().minus(oldestDay, ChronoUnit.DAYS);
@@ -2510,7 +2526,10 @@ public class PortfolioService {
 				ytdPriceChange.multiply(new BigDecimal(10)).abs().floatValue()));
 
 		// YTD Dividends
-		table.addCell(new Cell().add(CurrencyHelper.formatAsCurrencyString(ytdDividends)));
+		table.addCell(new Cell().add(CurrencyHelper.formatAsCurrencyString(ytdDividends)).setFontSize(12f));
+
+		// Last Year Dividends
+		table.addCell(new Cell().add(CurrencyHelper.formatAsCurrencyString(lastYearDividends)).setFontSize(12f));
 
 		// YTD Returns (withdrawals and exchanges)
 		table.addCell(new Cell().setMargin(0f)
@@ -2707,6 +2726,8 @@ public class PortfolioService {
 		BigDecimal totalCurrentValueByCategory = BigDecimal.ZERO;
 		BigDecimal totalCurrentValue = BigDecimal.ZERO;
 		BigDecimal totalDividendsByCategory = BigDecimal.ZERO;
+		BigDecimal totalLastYearDividends = BigDecimal.ZERO;
+		
 		BigDecimal totalYtdValueChangeByCategory = BigDecimal.ZERO;
 		BigDecimal totalCurrentPercentage = BigDecimal.ZERO;
 		BigDecimal totalCurrentPercentageByCategory = BigDecimal.ZERO;
@@ -2750,6 +2771,9 @@ public class PortfolioService {
 					.multiply(fund.getPercentageByCategory(category));
 			totalDividendsByCategory = totalDividendsByCategory.add(fundDividendByCategory);
 
+			totalLastYearDividends = totalLastYearDividends.add(fund.getDistributionsBetweenDates(
+					getFirstOfYearDate().minus(1, ChronoUnit.YEARS), getFirstOfYearDate().minus(1, ChronoUnit.DAYS)));
+
 			MutualFundPerformance performance = new MutualFundPerformance(portfolio, fund);
 			totalYtdValueChangeByCategory = totalYtdValueChangeByCategory.add(performance.getYtdValueChange());
 			totalYtdWithdrawals = totalYtdWithdrawals.add(fund.getWithdrawalsUpToDate(getFirstOfYearDate()));
@@ -2779,13 +2803,15 @@ public class PortfolioService {
 		BigDecimal surpusDeficitByCategory = totalCurrentValueByCategory.subtract(totalTargetValueByCategory);
 		BigDecimal adjustedMinimumSurplusDeficit = totalCurrentValue.subtract(totalAdjustedMinimumTargetValue);
 
+		table.startNewRow();
 		table.addCell(new Cell().add("Category Total").setItalic());
 		table.addCell(new Cell().add(" "));
 		table.addCell(new Cell().add(""));
 		table.addCell(new Cell().add(""));
 		table.addCell(new Cell().add(""));
 		table.addCell(new Cell().add(""));
-		table.addCell(new Cell().add(CurrencyHelper.formatAsCurrencyString(totalDividendsByCategory)));
+		table.addCell(new Cell().add(CurrencyHelper.formatAsCurrencyString(totalDividendsByCategory)).setFontSize(12f));
+		table.addCell(new Cell().add(CurrencyHelper.formatAsCurrencyString(totalLastYearDividends)).setFontSize(12f));
 		Color totalYtdWithdrawalsFontColor = totalYtdWithdrawals.compareTo(BigDecimal.ZERO) > 0 ? Color.RED
 				: Color.BLACK;
 		Color totalYtdExchangesFontColor = totalYtdExchanges.compareTo(BigDecimal.ZERO) < 0 ? Color.RED : Color.GREEN;

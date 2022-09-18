@@ -2,6 +2,7 @@ package com.wise.portfolio.data;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.Period;
 import java.time.temporal.ChronoUnit;
@@ -83,7 +84,15 @@ public class MutualFundPerformance {
 	}
 
 	private static LocalDate getFirstOfYearDate() {
-		return LocalDate.of(LocalDate.now().getYear(), 1, 1);
+		LocalDate firstOfYearDate = LocalDate.of(LocalDate.now().getYear(), 1, 1);
+		
+		if (firstOfYearDate.getDayOfWeek() == DayOfWeek.SUNDAY) {
+			firstOfYearDate = firstOfYearDate.minusDays(2);
+		}
+		if (firstOfYearDate.getDayOfWeek() == DayOfWeek.SATURDAY) {
+			firstOfYearDate = firstOfYearDate.minusDays(1);
+		}
+		return firstOfYearDate;
 	}
 
 	private BigDecimal getClosestHistoricalPrice(PortfolioFund fund, LocalDate date, int days) {
@@ -262,7 +271,7 @@ public class MutualFundPerformance {
 	public BigDecimal getYtdValueChange() {
 		BigDecimal withdrawals = portfolioFund.getWithdrawalsUpToDate(getFirstOfYearDate());
 		BigDecimal exchanges = portfolioFund.getExchangeTotalFromDate(getFirstOfYearDate());
-		BigDecimal historicalValue = getHistoricalValue(portfolioFund, getYtdDays() + 1);
+		BigDecimal historicalValue = getHistoricalValue(portfolioFund, getYtdDays() + 2);
 		BigDecimal ytdValueChange = portfolioFund.getValue().subtract(historicalValue).add(withdrawals).add(exchanges);
 		return ytdValueChange;
 	}

@@ -137,6 +137,20 @@ public class PortfolioFund extends MutualFund {
 		return transactionsAmount.negate();
 	}
 
+	public BigDecimal getDistributionsBetweenDates(LocalDate startDate, LocalDate endDate) {
+		BigDecimal transactionsAmount = new BigDecimal(0);
+
+		for (Entry<LocalDate, Collection<Transaction>> entry : distributions.entrySet()) {
+			if (entry.getKey().isAfter(startDate) && entry.getKey().isBefore(endDate)) {
+				Collection<Transaction> transactionList = entry.getValue();
+				for (Transaction transaction : transactionList) {
+					transactionsAmount = transactionsAmount.add(transaction.getTransastionPrincipal());
+				}
+			}
+		}
+		return transactionsAmount.negate();
+	}
+
 	public BigDecimal getWithdrawalTotalForDate(LocalDate date) {
 		BigDecimal withdrawalAmount = new BigDecimal(0);
 
