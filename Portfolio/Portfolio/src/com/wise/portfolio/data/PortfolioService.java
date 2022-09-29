@@ -1,7 +1,11 @@
 package com.wise.portfolio.data;
 
+import java.awt.BasicStroke;
+import java.awt.Rectangle;
+import java.awt.Stroke;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -20,7 +24,6 @@ import java.time.LocalTime;
 import java.time.Period;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
-import java.time.temporal.TemporalUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -54,14 +57,38 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.poi.ss.formula.functions.Irr;
+import org.jfree.chart.ChartFactory;
+import org.jfree.chart.JFreeChart;
+import org.jfree.chart.axis.DateAxis;
+import org.jfree.chart.axis.NumberAxis;
+import org.jfree.chart.axis.ValueAxis;
+import org.jfree.chart.labels.StandardXYToolTipGenerator;
+import org.jfree.chart.labels.XYToolTipGenerator;
+import org.jfree.chart.plot.XYPlot;
+import org.jfree.chart.renderer.xy.XYItemRenderer;
+import org.jfree.chart.renderer.xy.XYLineAndShapeRenderer;
+import org.jfree.chart.renderer.xy.XYSplineRenderer;
+import org.jfree.chart.urls.StandardXYURLGenerator;
+import org.jfree.chart.urls.XYURLGenerator;
+import org.jfree.data.time.Day;
+import org.jfree.data.time.TimeSeries;
+import org.jfree.data.time.TimeSeriesCollection;
+import org.jfree.data.xy.XYDataset;
 
 import com.itextpdf.kernel.color.Color;
+import com.itextpdf.kernel.pdf.PdfDocument;
+import com.itextpdf.kernel.pdf.PdfReader;
+import com.itextpdf.kernel.pdf.xobject.PdfFormXObject;
 import com.itextpdf.layout.Document;
 import com.itextpdf.layout.element.AreaBreak;
 import com.itextpdf.layout.element.Cell;
+import com.itextpdf.layout.element.Image;
 import com.itextpdf.layout.element.Paragraph;
 import com.itextpdf.layout.element.Table;
 import com.itextpdf.layout.property.TextAlignment;
+import com.orsonpdf.PDFDocument;
+import com.orsonpdf.PDFGraphics2D;
+import com.orsonpdf.Page;
 import com.wise.portfolio.data.MutualFund.FundCategory;
 
 public class PortfolioService {
@@ -78,13 +105,17 @@ public class PortfolioService {
 
 	private Map<FundCategory, BigDecimal> desiredCategoryAllocation = new HashMap<>();
 
-	private Map<String, Map<FundCategory, BigDecimal>> desiredFundAllocation = new HashMap<>();
+	private Map<String, Map<FundCategory, BigDecimal>> desiredFundAllocationMaps = new HashMap<>();
 
 	private Integer[] rankDaysArray = { 1, 3, 5, 15, 30, 60, 90, 120, 180, 270, 365, 480, 560, 740, 830, 920, 1010 };
 	private List<Integer> enhancedRankDaysList = new LinkedList<>();
 	private Portfolio portfolio;
 
 	private static String YAHOO_MAIL_APP_PASSWORD = "hgcqlgrdhxdvgmjm";
+	private static java.awt.Color[] axisPaints = { java.awt.Color.RED, java.awt.Color.BLUE, java.awt.Color.GREEN,
+			java.awt.Color.ORANGE, java.awt.Color.MAGENTA, java.awt.Color.CYAN, java.awt.Color.YELLOW,
+			java.awt.Color.PINK, java.awt.Color.RED, java.awt.Color.BLUE, java.awt.Color.GREEN, java.awt.Color.ORANGE,
+			java.awt.Color.MAGENTA, java.awt.Color.CYAN, java.awt.Color.YELLOW };
 
 	public void sendMail(File portfolioPdfFile) {
 		final String to = "mavin14534@yahoo.com";
@@ -1054,7 +1085,7 @@ public class PortfolioService {
 			if (entry.getValue().getShares() == 0) {
 				continue;
 			}
-			System.out.println("Get price history for: " + entry.getValue().getShortName());
+			System.out.println("Get price history for: " + entry.getValue().getShortName() + " " + symbol);
 
 //			AlphaVantageFundPriceService.loadFundHistoryFromAlphaVantage(portfolio, symbol, true);
 //			AlphaVantageFundPriceService.loadFundHistoryFromAlphaVantage(portfolio, symbol, false);
@@ -1186,7 +1217,7 @@ public class PortfolioService {
 
 	public BigDecimal getFundDeviation(PortfolioFund fund) {
 		BigDecimal availableFundValue = fund.getAvailableValue();
-		Map<FundCategory, BigDecimal> map = desiredFundAllocation.get(fund.getSymbol());
+		Map<FundCategory, BigDecimal> map = desiredFundAllocationMaps.get(fund.getSymbol());
 		BigDecimal desiredFundPercentage = map.get(FundCategory.TOTAL);
 		BigDecimal desiredFundValue = portfolio.getTotalValue().multiply(desiredFundPercentage, MathContext.UNLIMITED);
 		// If minimum is greater than available then only use amount greater than
@@ -1221,7 +1252,6 @@ public class PortfolioService {
 			BigDecimal portfolioAdjustment) {
 
 		BigDecimal availableValue = portfolio.getTotalValue().subtract(portfolioAdjustment);
-		// availableValue = availableValue.subtract(portfolio.getPrespentValue());
 
 		Map<String, Pair<BigDecimal, PortfolioFund>> sortedDifferenceMap = new TreeMap<String, Pair<BigDecimal, PortfolioFund>>(
 				new Comparator<String>() {
@@ -1233,11 +1263,14 @@ public class PortfolioService {
 					}
 
 					private BigDecimal getFundDeviation(PortfolioFund fund) {
+
 						BigDecimal availableFundValue = fund.getAvailableValue();
-						Map<FundCategory, BigDecimal> map = desiredFundAllocation.get(fund.getSymbol());
-						BigDecimal desiredFundPercentage = map.get(FundCategory.TOTAL);
+
+						Map<FundCategory, BigDecimal> fundAllocation = desiredFundAllocationMaps.get(fund.getSymbol());
+						BigDecimal desiredFundPercentage = fundAllocation.get(FundCategory.TOTAL);
 						BigDecimal desiredFundValue = portfolio.getTotalValue().subtract(portfolioAdjustment)
 								.multiply(desiredFundPercentage, MathContext.UNLIMITED);
+
 						// If minimum is greater than available then only use amount greater than
 						// minimum
 						BigDecimal difference = availableFundValue.subtract(desiredFundValue);
@@ -1276,7 +1309,7 @@ public class PortfolioService {
 			if (symbol == null) {
 				continue;
 			}
-			Map<FundCategory, BigDecimal> map = desiredFundAllocation.get(symbol);
+			Map<FundCategory, BigDecimal> map = desiredFundAllocationMaps.get(symbol);
 			if (map == null) {
 				continue;
 			}
@@ -1375,15 +1408,19 @@ public class PortfolioService {
 
 		BigDecimal price = getPriceByDate(fund, date, true);
 		double shares = fund.getShares();
-		if (price != null && shares > 0) {
-			int tries = 30;
-			while (tries-- > 0) {
+		if (shares <= 0) {
+			return value;
+		}
+		int tries = 30;
+		while (tries-- > 0) {
+			if (price != null && price.compareTo(BigDecimal.ZERO) > 0) {
 				value = price.multiply(new BigDecimal(shares));
 				if (value != null) {
 					return value;
 				}
-				date = date.minus(1, ChronoUnit.DAYS);
 			}
+			date = date.minus(1, ChronoUnit.DAYS);
+			price = getPriceByDate(fund, date, true);
 		}
 
 		return value;
@@ -1511,7 +1548,7 @@ public class PortfolioService {
 	 * 
 	 */
 	public void loadFundAllocation(Portfolio portfolio, String allocationFile) throws Exception {
-		desiredFundAllocation = new HashMap<>();
+		desiredFundAllocationMaps = new HashMap<>();
 
 		BigDecimal totalCashPercentage = BigDecimal.ZERO;
 		BigDecimal totalBondPercentage = BigDecimal.ZERO;
@@ -1549,13 +1586,17 @@ public class PortfolioService {
 					fund.setPreSpent(prespent);
 				}
 			}
-			if (allocationValues.size() > 10) {
+			if (allocationValues.size() > 10 && allocationValues.get(10).length() > 0) {
 				String value = allocationValues.get(10);
 				fund.setLinkedFundSymbol(value);
 			}
 
-			if (allocationValues.size() > 11) {
+			if (allocationValues.size() > 11 && allocationValues.get(11).length() > 0) {
 				fund.setFixedExpensesAccount(true);
+			}
+
+			if (allocationValues.size() > 12 && allocationValues.get(11).length() > 0) {
+				fund.setClosed(true);
 			}
 
 			BigDecimal fundTotalPercentage = cashPercentage.add(stockPercentage).add(bondPercentage).add(intlPercentage)
@@ -1591,7 +1632,7 @@ public class PortfolioService {
 			desiredCategoryFundAllocation.put(FundCategory.STOCK, stockPercentage);
 			desiredCategoryFundAllocation.put(FundCategory.BOND, bondPercentage);
 			desiredCategoryFundAllocation.put(FundCategory.INTL, intlPercentage);
-			desiredFundAllocation.put(fund.getSymbol(), desiredCategoryFundAllocation);
+			desiredFundAllocationMaps.put(fund.getSymbol(), desiredCategoryFundAllocation);
 
 		}
 
@@ -1817,7 +1858,7 @@ public class PortfolioService {
 			if (minAmount != null && currentValue.compareTo(minAmount) < 0) {
 				fundTotalPercentage = minAmount.divide(portfolio.getTotalValue(), 4, RoundingMode.UP);
 			} else {
-				fundTotalPercentage = desiredFundAllocation.get(symbol).get(FundCategory.TOTAL);
+				fundTotalPercentage = desiredFundAllocationMaps.get(symbol).get(FundCategory.TOTAL);
 			}
 
 		} catch (Exception e) {
@@ -1865,6 +1906,234 @@ public class PortfolioService {
 		return Double.NaN;
 	}
 
+	public void prinPerformanceLineGraphs(Portfolio portfolio, List<String> fundSynbols, Document document,
+			PdfDocument pdfDocument, LocalDate startDate, LocalDate endDate) {
+
+		JFreeChart lineChart = ChartFactory.createTimeSeriesChart(null, null, null,
+				createFundPriceHistoryDataset(portfolio, fundSynbols, startDate, endDate), true, false, false);
+
+		// TODO Attempt to configure stroke to be darker, doesn't seem to work....
+		XYPlot plot = (XYPlot) lineChart.getPlot();
+		XYItemRenderer r = plot.getRenderer();
+		if (r instanceof XYLineAndShapeRenderer) {
+			XYLineAndShapeRenderer renderer = (XYLineAndShapeRenderer) r;
+			renderer.setDefaultStroke(new BasicStroke(5.0f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_BEVEL), false);
+			renderer.setDefaultOutlineStroke(new BasicStroke(5.0f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_BEVEL));
+		}
+
+		addChartToDocument(lineChart, pdfDocument, document);
+
+	}
+
+	private void addChartToDocument(JFreeChart lineChart, PdfDocument pdfDocument, Document document) {
+		// Draw the chart into a transition PDF
+		PDFDocument doc = new PDFDocument();
+		Rectangle bounds = new Rectangle(1200, 760);
+		Page page = doc.createPage(bounds);
+		PDFGraphics2D g2 = page.getGraphics2D();
+		lineChart.draw(g2, bounds);
+
+		// Add the graph PDF image into the document
+		try {
+			PdfReader reader = new PdfReader(new ByteArrayInputStream(doc.getPDFBytes()));
+			PdfDocument chartDoc = new PdfDocument(reader);
+			PdfFormXObject chart = chartDoc.getFirstPage().copyAsFormXObject(pdfDocument);
+			chartDoc.close();
+			Image chartImage = new Image(chart);
+			document.add(chartImage);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+
+	public void prinBalanceLineGraphs(Portfolio portfolio, Document document, PdfDocument pdfDocument,
+			LocalDate startDate, LocalDate endDate) {
+
+		List<TimeSeriesCollection> datasets = new ArrayList<>();
+		datasets.add(createBalanceDataset(portfolio, startDate, endDate));
+		datasets.add(createDividendDataset(portfolio, startDate, endDate));
+		JFreeChart lineChart = createTimeSeriesChart("Balance", null, null, datasets, true, true, false);
+
+		// TODO Attempt to configure stroke to be darker, doesn't seem to work....
+//		XYPlot plot = (XYPlot) lineChart.getPlot();
+//		XYItemRenderer r = plot.getRenderer();
+//		if (r instanceof XYLineAndShapeRenderer) {
+//			XYLineAndShapeRenderer renderer = (XYLineAndShapeRenderer) r;
+//			renderer.setDefaultStroke(new BasicStroke(5.0f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_BEVEL), false);
+//			renderer.setDefaultOutlineStroke(new BasicStroke(5.0f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_BEVEL));
+//		}
+
+		addChartToDocument(lineChart, pdfDocument, document);
+
+	}
+
+	public static JFreeChart createTimeSeriesChart(String title, String timeAxisLabel, String valueAxisLabel,
+			List<TimeSeriesCollection> datasets, boolean legend, boolean tooltips, boolean urls) {
+
+		ValueAxis timeAxis = new DateAxis(timeAxisLabel);
+		timeAxis.setLowerMargin(0.02); // reduce the default margins
+		timeAxis.setUpperMargin(0.02);
+
+		XYPlot plot = new XYPlot();
+		plot.setDomainAxis(timeAxis);
+
+		
+		for (int i = 0; i < datasets.size(); i++) {
+			plot.setDataset(i, datasets.get(i));
+			NumberAxis valueAxis = new NumberAxis(valueAxisLabel);
+			valueAxis.setAxisLinePaint(axisPaints[i]);
+			valueAxis.setLabelPaint(axisPaints[i]);
+			valueAxis.setTickLabelPaint(axisPaints[i]);
+			valueAxis.setTickMarkPaint(axisPaints[i]);
+			valueAxis.setAutoRangeIncludesZero(false); // override default
+			plot.setRangeAxis(i, valueAxis);
+
+			// Map the data to the appropriate axis
+			plot.mapDatasetToRangeAxis(i, i);
+			
+			XYSplineRenderer renderer = new XYSplineRenderer();
+			renderer.setDefaultPaint( axisPaints[i]);
+//			renderer.setSeriesPaint(i, axisPaints[i]);
+//			renderer.setSeriesFillPaint(i, axisPaints[i]);
+//			renderer.setSeriesOutlinePaint(i, axisPaints[i]);
+			plot.setRenderer(i, renderer);
+			
+		}
+		
+
+
+
+		JFreeChart chart = new JFreeChart(title, JFreeChart.DEFAULT_TITLE_FONT, plot, legend);
+		ChartFactory.getChartTheme().apply(chart);
+		return chart;
+
+	}
+
+	public void printFundBalanceLineGraphs(Portfolio portfolio, String title, List<String> fundSynbols,
+			Document document, PdfDocument pdfDocument, LocalDate startDate, LocalDate endDate) {
+
+		List<TimeSeriesCollection> datasets = createFundBalanceDataset(portfolio, fundSynbols, startDate, endDate);
+		JFreeChart lineChart = createTimeSeriesChart(title, null, null, datasets, true, true, false);
+
+//		JFreeChart lineChart = ChartFactory.createTimeSeriesChart(title, null, null,
+//				createFundBalanceDataset(portfolio, fundSynbols, startDate, endDate), true, false, false);
+
+		// TODO Attempt to configure stroke to be darker, doesn't seem to work....
+//		XYPlot plot = (XYPlot) lineChart.getPlot();
+//		XYItemRenderer r = plot.getRenderer();
+//		if (r instanceof XYLineAndShapeRenderer) {
+//			XYLineAndShapeRenderer renderer = (XYLineAndShapeRenderer) r;
+//			renderer.setDefaultStroke(new BasicStroke(5.0f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_BEVEL), false);
+//			renderer.setDefaultOutlineStroke(new BasicStroke(5.0f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_BEVEL));
+//		}
+
+		addChartToDocument(lineChart, pdfDocument, document);
+
+	}
+
+	private List<TimeSeriesCollection> createFundBalanceDataset(Portfolio portfolio, List<String> fundSynbols,
+			LocalDate startDate, LocalDate endDate) {
+
+		List<TimeSeriesCollection> datasets = new ArrayList<TimeSeriesCollection>();
+
+		for (String symbol : fundSynbols) {
+
+			TimeSeriesCollection dataset = new TimeSeriesCollection();
+			PortfolioFund fund = portfolio.getFund(symbol);
+			LocalDate graphDate = portfolio.getPriceHistory().getOldestDay();
+			TimeSeries timeSeries = new TimeSeries(fund.getShortName());
+			while (!graphDate.isAfter(LocalDate.now())) {
+
+				BigDecimal fundBalanceByDate = portfolio.getPriceHistory().getValueByDate(fund, graphDate, true);
+				if (fundBalanceByDate != null && fundBalanceByDate.compareTo(BigDecimal.ZERO) > 0) {
+					timeSeries.add(new Day(graphDate.getDayOfMonth(), graphDate.getMonthValue(), graphDate.getYear()),
+							fundBalanceByDate);
+				}
+				graphDate = graphDate.plusDays(1);
+			}
+			dataset.addSeries(timeSeries);
+			datasets.add(dataset);
+		}
+		return datasets;
+	}
+
+	private TimeSeriesCollection createFundPriceHistoryDataset(Portfolio portfolio, List<String> fundSynbols,
+			LocalDate startDate, LocalDate endDate) {
+
+		TimeSeriesCollection dataset = new TimeSeriesCollection();
+
+		for (String symbol : fundSynbols) {
+			PortfolioFund fund = portfolio.getFund(symbol);
+
+			TimeSeries timeSeries = new TimeSeries(fund.getShortName());
+			for (Entry<LocalDate, BigDecimal> fundPriceEntry : portfolio.getPriceHistory().getFundPrices().get(symbol)
+					.entrySet()) {
+
+				LocalDate priceHistoryDate = fundPriceEntry.getKey();
+				if (startDate != null) {
+					if (priceHistoryDate.isBefore(startDate)) {
+						continue;
+					}
+				}
+				if (endDate != null) {
+					if (priceHistoryDate.isAfter(endDate)) {
+						continue;
+					}
+				}
+				timeSeries.add(new Day(priceHistoryDate.getDayOfMonth(), priceHistoryDate.getMonthValue(),
+						priceHistoryDate.getYear()), fundPriceEntry.getValue());
+			}
+			dataset.addSeries(timeSeries);
+
+		}
+		return dataset;
+	}
+
+	private TimeSeriesCollection createBalanceDataset(Portfolio portfolio, LocalDate startDate, LocalDate endDate) {
+		TimeSeriesCollection dataset = new TimeSeriesCollection();
+		TimeSeries timeSeries = new TimeSeries("Balance");
+		LocalDate graphDate = portfolio.getPriceHistory().getOldestDay();
+		while (!graphDate.isAfter(LocalDate.now())) {
+			BigDecimal totalByDate = getTotalValueByDate(portfolio, graphDate);
+			if (totalByDate != null && totalByDate.compareTo(BigDecimal.ZERO) > 0) {
+				if (totalByDate.compareTo(new BigDecimal(500000)) < 0) {
+					continue;
+				}
+				timeSeries.add(new Day(graphDate.getDayOfMonth(), graphDate.getMonthValue(), graphDate.getYear()),
+						totalByDate);
+
+			}
+			graphDate = graphDate.plusDays(1);
+		}
+		dataset.addSeries(timeSeries);
+
+		return dataset;
+	}
+
+	private TimeSeriesCollection createDividendDataset(Portfolio portfolio, LocalDate startDate, LocalDate endDate) {
+		TimeSeriesCollection dataset = new TimeSeriesCollection();
+
+		TimeSeries dividendTimeSeries = new TimeSeries("Dividends");
+		PortfolioPriceHistory priceHistory = portfolio.getPriceHistory();
+		LocalDate graphDate = portfolio.getPriceHistory().getOldestDay();
+		BigDecimal cumulativeDividends = BigDecimal.ZERO;
+		while (!graphDate.isAfter(LocalDate.now())) {
+			final LocalDate date = graphDate;
+			BigDecimal dividendsByDate = portfolio.getFundMap().values().stream()
+					.map(f -> f.getDistributionsForDate(date)).reduce(BigDecimal.ZERO, BigDecimal::add);
+			if (dividendsByDate != null && dividendsByDate.compareTo(BigDecimal.ZERO) > 0) {
+				cumulativeDividends = cumulativeDividends.add(dividendsByDate);
+				dividendTimeSeries.add(new Day(date.getDayOfMonth(), date.getMonthValue(), date.getYear()),
+						cumulativeDividends);
+
+			}
+			graphDate = graphDate.plusDays(1);
+		}
+		dataset.addSeries(dividendTimeSeries);
+		return dataset;
+	}
+
 	public void printSpreadsheet(Portfolio portfolio, Document document) {
 		// Creating a table object
 		float[] pointColumnWidths = { 15F, 2F, 4F, 4F, 5F, 5F, 5F, 5F, 25F, 5F, 5F, 5F, 5F, 5F, 5F, 5F, 5F };
@@ -1882,7 +2151,8 @@ public class PortfolioService {
 		table.addHeaderCell(new Cell().add("Begin 2022\nPrice").setTextAlignment(TextAlignment.CENTER));
 		table.addHeaderCell(new Cell().add("YTD % Change").setTextAlignment(TextAlignment.CENTER));
 		table.addHeaderCell(new Cell().add("YTD Dividends").setTextAlignment(TextAlignment.CENTER));
-		table.addHeaderCell(new Cell().add("Last Year Dividends").setTextAlignment(TextAlignment.CENTER).setFontSize(12f));
+		table.addHeaderCell(
+				new Cell().add("Last Year Dividends").setTextAlignment(TextAlignment.CENTER).setFontSize(12f));
 		table.addHeaderCell(new Cell().add("YTD\nReturns /\nWithd. /\nExch.").setTextAlignment(TextAlignment.CENTER));
 		table.addHeaderCell(new Cell().add("Share Price\n" + mostRecentSharePrice.format(dateFormatter))
 				.setTextAlignment(TextAlignment.CENTER));
@@ -1911,9 +2181,10 @@ public class PortfolioService {
 
 		// Bond Funds
 		table.addCell(new Cell().add("Bond Funds").setTextAlignment(TextAlignment.LEFT).setItalic());
-		table.addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell())
+		table.addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell())
 				.addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell())
-				.addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell());
+				.addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell())
+				.addCell(new Cell());
 		for (PortfolioFund fund : this.getFundsByCategory(portfolio, FundCategory.BOND)) {
 			addFundsToTable(portfolio, fund, table, FundCategory.BOND);
 		}
@@ -1922,9 +2193,10 @@ public class PortfolioService {
 		// Stock Funds
 		table.addCell(
 				new Cell().add("Stock Funds").setTextAlignment(TextAlignment.LEFT).setKeepWithNext(true).setItalic());
-		table.addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell())
+		table.addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell())
 				.addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell())
-				.addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell());
+				.addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell())
+				.addCell(new Cell());
 		for (PortfolioFund fund : getFundsByCategory(portfolio, FundCategory.STOCK)) {
 			addFundsToTable(portfolio, fund, table, FundCategory.STOCK);
 		}
@@ -1932,9 +2204,10 @@ public class PortfolioService {
 
 		// Intl Funds
 		table.addCell(new Cell().add("Intl Funds").setTextAlignment(TextAlignment.LEFT).setItalic());
-		table.addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell())
+		table.addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell())
 				.addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell())
-				.addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell());
+				.addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell()).addCell(new Cell())
+				.addCell(new Cell());
 		for (PortfolioFund fund : this.getFundsByCategory(portfolio, FundCategory.INTL)) {
 			addFundsToTable(portfolio, fund, table, FundCategory.INTL);
 		}
@@ -2117,8 +2390,9 @@ public class PortfolioService {
 		// Post withdrawal value
 //		table.addCell(createTargetValueCell(fund, targetValueByCategory, targetTotalValue, minimumAdjustedTargetValue));
 //		table.addCell(new Cell().add(CurrencyHelper.formatAsCurrencyString(postWithdrawalCategoryValue)));
-		table.addCell(createCurrentValueCell(fund.isFixedExpensesAccount(), postWithdrawalCategoryValue, postWithdrawalDeviation,
-				postWithdrawalFundValue, postWithdrawalTotalDeviation, minimumAdjustedTargetValue, postWithdrawalMinimumAdjustedDeviation));
+		table.addCell(createCurrentValueCell(fund.isFixedExpensesAccount(), postWithdrawalCategoryValue,
+				postWithdrawalDeviation, postWithdrawalFundValue, postWithdrawalTotalDeviation,
+				minimumAdjustedTargetValue, postWithdrawalMinimumAdjustedDeviation));
 
 		// Post withdrawal %
 //		table.addCell(new Cell().add(CurrencyHelper.formatPercentageString(postWithdrawalCategoryPercentage)));
@@ -2727,7 +3001,7 @@ public class PortfolioService {
 		BigDecimal totalCurrentValue = BigDecimal.ZERO;
 		BigDecimal totalDividendsByCategory = BigDecimal.ZERO;
 		BigDecimal totalLastYearDividends = BigDecimal.ZERO;
-		
+
 		BigDecimal totalYtdValueChangeByCategory = BigDecimal.ZERO;
 		BigDecimal totalCurrentPercentage = BigDecimal.ZERO;
 		BigDecimal totalCurrentPercentageByCategory = BigDecimal.ZERO;

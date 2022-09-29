@@ -10,6 +10,15 @@ import java.util.TreeMap;
 
 public class PortfolioFund extends MutualFund {
 
+	private boolean isClosed = false;
+	public boolean isClosed() {
+		return isClosed;
+	}
+
+	public void setClosed(boolean isClosed) {
+		this.isClosed = isClosed;
+	}
+
 	private double shares = 0;
 	private BigDecimal preSpent = BigDecimal.ZERO;
 	private String oldFundSymbol;
