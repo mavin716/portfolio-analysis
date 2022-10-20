@@ -31,7 +31,7 @@ public class PortfolioApp {
 	private static final String HISTORICAL_VALUES_FILE = "historicalvalues.csv";
 	private static final String PORTFOLIO_PDF_FILE = "C:\\Users\\Margaret\\Documents\\portfolio.pdf";
 
-	private static final BigDecimal MONTHLY_WITHDRAWAL_AMOUNT = new BigDecimal(1700);
+	private static final BigDecimal MONTHLY_WITHDRAWAL_AMOUNT = new BigDecimal(2200);
 
 	private static final BigDecimal EXCHANGE_INCREMENT = new BigDecimal(100);
 
@@ -63,9 +63,6 @@ public class PortfolioApp {
 			// Load fund allocation file
 			portfolioService.loadFundAllocation(portfolio, ALLOCATION_FILE);
 
-			// System.out.println("Total portfolio value: " +
-			// formatAsCurrencyString(portfolio.getTotalValue()));
-
 			// save all prices in spreadsheet
 			portfolioService.saveHistoricalPrices(portfolio, HISTORICAL_PRICES_FILE);
 			portfolioService.saveHistoricalValue(portfolio, HISTORICAL_VALUES_FILE);
@@ -77,6 +74,20 @@ public class PortfolioApp {
 			PdfDocument pdfDoc = new PdfDocument(writer);
 			Document document = new Document(pdfDoc, PageSize.LEDGER);
 			document.setMargins(10f, 10f, 10f, 10f);
+
+			System.out.println(
+					"\n\nCalculate Withdrawal " + CurrencyHelper.formatAsCurrencyString(MONTHLY_WITHDRAWAL_AMOUNT));
+			Map<String, BigDecimal> withdrawals = portfolioService.calculateWithdrawal(portfolio,
+					MONTHLY_WITHDRAWAL_AMOUNT, BigDecimal.ZERO, BigDecimal.ZERO);
+			// Transfer 500 into money market (included in withdrawal amount)
+			withdrawals.put("VMRXX", new BigDecimal(-500));
+			withdrawals.put("VMFXX", new BigDecimal(-500));
+			BigDecimal netWithdrawalAmount = MONTHLY_WITHDRAWAL_AMOUNT.subtract(new BigDecimal(1000));
+			portfolioService.printWithdrawalSpreadsheet(portfolio, netWithdrawalAmount, withdrawals, document);
+
+			pdfDoc.addNewPage();
+			portfolioService.printSpreadsheet(portfolio, document);
+
 
 			// Add price performance graphs, 
 			LocalDate startDate = null;
@@ -203,9 +214,6 @@ public class PortfolioApp {
 				}
 			}
 			portfolioService.prinPerformanceLineGraphs(portfolio, fundSynbols, document, pdfDoc, startDate, endDate);
-			pdfDoc.addNewPage();
-			portfolioService.printSpreadsheet(portfolio, document);
-
 			// Print fund Trends
 			// portfolioService.printTrends(portfolio);
 
@@ -215,16 +223,6 @@ public class PortfolioApp {
 //            Map<String, BigDecimal> adjustments = portfolioService.calculateAdjustments(portfolio);
 //           System.out.println("Rebalance funds");
 //           portfolioService.rebalanceFunds(portfolio, EXCHANGE_INCREMENT, adjustments);
-
-			System.out.println(
-					"\n\nCalculate Withdrawal " + CurrencyHelper.formatAsCurrencyString(MONTHLY_WITHDRAWAL_AMOUNT));
-			Map<String, BigDecimal> withdrawals = portfolioService.calculateWithdrawal(portfolio,
-					MONTHLY_WITHDRAWAL_AMOUNT, BigDecimal.ZERO, BigDecimal.ZERO);
-			// Transfer 500 into money market (included in withdrawal amount)
-			withdrawals.put("VMRXX", new BigDecimal(-500));
-//			withdrawals.put("VMFXX", new BigDecimal(-500));
-			BigDecimal netWithdrawalAmount = MONTHLY_WITHDRAWAL_AMOUNT.subtract(new BigDecimal(1200));
-			portfolioService.printWithdrawalSpreadsheet(portfolio, netWithdrawalAmount, withdrawals, document);
 
 //			System.out.println(
 //					"\n\nCalculate condo Withdrawal " + CurrencyHelper.formatAsCurrencyString(new BigDecimal(40000)));
