@@ -83,7 +83,7 @@ public class Portfolio {
 	}
 
 	private void loadTotalValue() {
-		totalValue = fundMap.values().stream().map(PortfolioFund::getValue)
+		totalValue = fundMap.values().stream().filter(fund -> !fund.isClosed()).map(PortfolioFund::getValue)
 				.reduce(new BigDecimal(0, MathContext.DECIMAL32), (total, fundValue) -> total = total.add(fundValue))
 				.setScale(2, BigDecimal.ROUND_UP);
 	}

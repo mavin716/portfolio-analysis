@@ -6,6 +6,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.text.NumberFormat;
 import java.text.SimpleDateFormat;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
@@ -29,11 +30,13 @@ public class PortfolioApp {
 	private static final String FUND_SYMBOLS_MAP_FILE = "allocation.csv";
 	private static final String HISTORICAL_PRICES_FILE = "historical.csv";
 	private static final String HISTORICAL_VALUES_FILE = "historicalvalues.csv";
+	private static final String HISTORICAL_SHARES_FILE = "historicalshares.csv";
 	private static final String PORTFOLIO_PDF_FILE = "C:\\Users\\Margaret\\Documents\\portfolio.pdf";
 
 	private static final BigDecimal MONTHLY_WITHDRAWAL_AMOUNT = new BigDecimal(2200);
 
 	private static final BigDecimal EXCHANGE_INCREMENT = new BigDecimal(100);
+
 
 	public static String formatAsCurrencyString(BigDecimal n) {
 		return NumberFormat.getCurrencyInstance().format(n);
@@ -66,6 +69,7 @@ public class PortfolioApp {
 			// save all prices in spreadsheet
 			portfolioService.saveHistoricalPrices(portfolio, HISTORICAL_PRICES_FILE);
 			portfolioService.saveHistoricalValue(portfolio, HISTORICAL_VALUES_FILE);
+			portfolioService.saveHistoricalShares(portfolio, HISTORICAL_SHARES_FILE);
 
 			// Create PDF output file
 			File portfolioPdfFile = new File(PORTFOLIO_PDF_FILE);
@@ -86,72 +90,97 @@ public class PortfolioApp {
 			portfolioService.printWithdrawalSpreadsheet(portfolio, netWithdrawalAmount, withdrawals, document);
 
 			pdfDoc.addNewPage();
-			portfolioService.printSpreadsheet(portfolio, document);
+			portfolioService.printPerformanceTable(portfolio, document);
 
 
 			// Add price performance graphs, 
-			LocalDate startDate = null;
-			LocalDate endDate = null;
-			
 			pdfDoc.addNewPage();
-			portfolioService.prinBalanceLineGraphs(portfolio,  document, pdfDoc, startDate, endDate);
-			
+			portfolioService.prinBalanceLineGraphs(portfolio,  document, pdfDoc, null, null);
+
+			pdfDoc.addNewPage();
+			portfolioService.prinBalanceLineGraphs(portfolio,  document, pdfDoc, LocalDate.of(LocalDate.now().getYear(), 1, 1), LocalDate.now());
+
 			pdfDoc.addNewPage();
 			PortfolioPriceHistory portfolioPriceHistory = portfolio.getPriceHistory();
 			List<String> fundSynbols = new ArrayList<String>();
 			for (PortfolioFund fund : portfolio.getFundMap().values()) {
 				if (fund.isFixedExpensesAccount()) continue;
 				LocalDate maxDate = portfolioPriceHistory.getMaxPrice(fund).getKey();
-				BigDecimal maxPriceFundValue = portfolioPriceHistory.getValueByDate(fund, maxDate, true);
+				BigDecimal maxPriceFundValue = portfolioPriceHistory.getFundValueByDate(fund, maxDate, true);
 				if (maxPriceFundValue.compareTo(new BigDecimal(100000)) > 0) {
 					fundSynbols.add(fund.getSymbol());
 				}
 			}
-			portfolioService.printFundBalanceLineGraphs(portfolio, "Funds (balance > 100K)", fundSynbols,  document, pdfDoc, startDate, endDate);
+			portfolioService.printFundBalanceLineGraphs(portfolio, "Funds (balance > 100K)", fundSynbols,  document, pdfDoc, null, null);
+			portfolioService.printFundBalanceLineGraphs(portfolio, "YTD Funds (balance > 100K)", fundSynbols,  document, pdfDoc, LocalDate.of(LocalDate.now().getYear(), 1, 1), LocalDate.now());
 			
 			fundSynbols = new ArrayList<String>();
 			for (PortfolioFund fund : portfolio.getFundMap().values()) {
 				if (fund.isFixedExpensesAccount() || fund.isClosed()) continue;
 				LocalDate maxDate = portfolioPriceHistory.getMaxPrice(fund).getKey();
-				BigDecimal maxPriceFundValue = portfolioPriceHistory.getValueByDate(fund, maxDate, true);
+				BigDecimal maxPriceFundValue = portfolioPriceHistory.getFundValueByDate(fund, maxDate, true);
 				if (maxPriceFundValue.compareTo(new BigDecimal(100000)) <= 0  && maxPriceFundValue.compareTo(new BigDecimal(50000)) > 0) {
 					fundSynbols.add(fund.getSymbol());
 				}
 			}
-			portfolioService.printFundBalanceLineGraphs(portfolio, "Funds (100K > balance > 50K)", fundSynbols,  document, pdfDoc, startDate, endDate);
+			portfolioService.printFundBalanceLineGraphs(portfolio, "Funds (100K > balance > 50K)", fundSynbols,  document, pdfDoc, null, null);
+			portfolioService.printFundBalanceLineGraphs(portfolio, "YTD Funds (100K > balance > 50K)", fundSynbols,  document, pdfDoc, LocalDate.of(LocalDate.now().getYear(), 1, 1), LocalDate.now());
 
 			fundSynbols = new ArrayList<String>();
 			for (PortfolioFund fund : portfolio.getFundMap().values()) {
 				if (fund.isFixedExpensesAccount() || fund.isClosed()) continue;
 				LocalDate maxDate = portfolioPriceHistory.getMaxPrice(fund).getKey();
-				BigDecimal maxPriceFundValue = portfolioPriceHistory.getValueByDate(fund, maxDate, true);
-				if (maxPriceFundValue.compareTo(new BigDecimal(50000)) <= 0  && maxPriceFundValue.compareTo(new BigDecimal(30000)) > 0) {
+				BigDecimal maxPriceFundValue = portfolioPriceHistory.getFundValueByDate(fund, maxDate, true);
+				if (maxPriceFundValue.compareTo(new BigDecimal(50000)) <= 0  && maxPriceFundValue.compareTo(new BigDecimal(40000)) > 0) {
 					fundSynbols.add(fund.getSymbol());
 				}
 			}
-			portfolioService.printFundBalanceLineGraphs(portfolio, "Funds (50K > balance > 30K)", fundSynbols,  document, pdfDoc, startDate, endDate);
+			portfolioService.printFundBalanceLineGraphs(portfolio, "Funds (50K > balance > 40K)", fundSynbols,  document, pdfDoc, null, null);
+			portfolioService.printFundBalanceLineGraphs(portfolio, "YTD Funds (50K > balance > 40K)", fundSynbols,  document, pdfDoc, LocalDate.of(LocalDate.now().getYear(), 1, 1), LocalDate.now());
 
 			fundSynbols = new ArrayList<String>();
 			for (PortfolioFund fund : portfolio.getFundMap().values()) {
 				if (fund.isFixedExpensesAccount() || fund.isClosed()) continue;
 				LocalDate maxDate = portfolioPriceHistory.getMaxPrice(fund).getKey();
-				BigDecimal maxPriceFundValue = portfolioPriceHistory.getValueByDate(fund, maxDate, true);
-				if (maxPriceFundValue.compareTo(new BigDecimal(30000)) <= 0  && maxPriceFundValue.compareTo(new BigDecimal(20000)) > 0) {
+				BigDecimal maxPriceFundValue = portfolioPriceHistory.getFundValueByDate(fund, maxDate, true);
+				if (maxPriceFundValue.compareTo(new BigDecimal(40000)) <= 0  && maxPriceFundValue.compareTo(new BigDecimal(30000)) > 0) {
 					fundSynbols.add(fund.getSymbol());
 				}
 			}
-			portfolioService.printFundBalanceLineGraphs(portfolio, "Funds (30K > balance > 20K)", fundSynbols,  document, pdfDoc, startDate, endDate);
+			portfolioService.printFundBalanceLineGraphs(portfolio, "Funds (40K > balance > 30K)", fundSynbols,  document, pdfDoc, null, null);
 
 			fundSynbols = new ArrayList<String>();
 			for (PortfolioFund fund : portfolio.getFundMap().values()) {
 				if (fund.isFixedExpensesAccount() || fund.isClosed()) continue;
 				LocalDate maxDate = portfolioPriceHistory.getMaxPrice(fund).getKey();
-				BigDecimal maxPriceFundValue = portfolioPriceHistory.getValueByDate(fund, maxDate, true);
+				BigDecimal maxPriceFundValue = portfolioPriceHistory.getFundValueByDate(fund, maxDate, true);
+				if (maxPriceFundValue.compareTo(new BigDecimal(30000)) <= 0  && maxPriceFundValue.compareTo(new BigDecimal(25000)) > 0) {
+					fundSynbols.add(fund.getSymbol());
+				}
+			}
+			portfolioService.printFundBalanceLineGraphs(portfolio, "Funds (30K > balance > 25K)", fundSynbols,  document, pdfDoc, null, null);
+
+			fundSynbols = new ArrayList<String>();
+			for (PortfolioFund fund : portfolio.getFundMap().values()) {
+				if (fund.isFixedExpensesAccount() || fund.isClosed()) continue;
+				LocalDate maxDate = portfolioPriceHistory.getMaxPrice(fund).getKey();
+				BigDecimal maxPriceFundValue = portfolioPriceHistory.getFundValueByDate(fund, maxDate, true);
+				if (maxPriceFundValue.compareTo(new BigDecimal(25000)) <= 0  && maxPriceFundValue.compareTo(new BigDecimal(20000)) > 0) {
+					fundSynbols.add(fund.getSymbol());
+				}
+			}
+			portfolioService.printFundBalanceLineGraphs(portfolio, "Funds (25K > balance > 20K)", fundSynbols,  document, pdfDoc, null, null);
+
+			fundSynbols = new ArrayList<String>();
+			for (PortfolioFund fund : portfolio.getFundMap().values()) {
+				if (fund.isFixedExpensesAccount() || fund.isClosed()) continue;
+				LocalDate maxDate = portfolioPriceHistory.getMaxPrice(fund).getKey();
+				BigDecimal maxPriceFundValue = portfolioPriceHistory.getFundValueByDate(fund, maxDate, true);
 				if (maxPriceFundValue.compareTo(new BigDecimal(20000)) <= 0) {
 					fundSynbols.add(fund.getSymbol());
 				}
 			}
-			portfolioService.printFundBalanceLineGraphs(portfolio, "Funds (20K > balance)", fundSynbols,  document, pdfDoc, startDate, endDate);
+			portfolioService.printFundBalanceLineGraphs(portfolio, "Funds (20K > balance)", fundSynbols,  document, pdfDoc, null, null);
 
 			fundSynbols = new ArrayList<String>();
 			for (PortfolioFund fund : portfolio.getFundMap().values()) {
@@ -159,7 +188,7 @@ public class PortfolioApp {
 					fundSynbols.add(fund.getSymbol());
 				}
 			}
-			portfolioService.printFundBalanceLineGraphs(portfolio, "Fixed Expenses Funds", fundSynbols,  document, pdfDoc, startDate, endDate);
+			portfolioService.printFundBalanceLineGraphs(portfolio, "Fixed Expenses Funds", fundSynbols,  document, pdfDoc, null, null);
 
 			// Separate by current price (e.g., > 200, 100 - 200, 50 = 100, under 50
 			pdfDoc.addNewPage();
@@ -170,7 +199,7 @@ public class PortfolioApp {
 					fundSynbols.add(fund.getSymbol());
 				}
 			}
-			portfolioService.prinPerformanceLineGraphs(portfolio, fundSynbols, document, pdfDoc, startDate, endDate);
+			portfolioService.prinPerformanceLineGraphs(portfolio, fundSynbols, document, pdfDoc, null, null);
 
 			pdfDoc.addNewPage();
 			fundSynbols = new ArrayList<String>();
@@ -181,7 +210,7 @@ public class PortfolioApp {
 					fundSynbols.add(fund.getSymbol());
 				}
 			}
-			portfolioService.prinPerformanceLineGraphs(portfolio, fundSynbols, document, pdfDoc, startDate, endDate);
+			portfolioService.prinPerformanceLineGraphs(portfolio, fundSynbols, document, pdfDoc, null, null);
 
 			pdfDoc.addNewPage();
 			fundSynbols = new ArrayList<String>();
@@ -192,7 +221,7 @@ public class PortfolioApp {
 					fundSynbols.add(fund.getSymbol());
 				}
 			}
-			portfolioService.prinPerformanceLineGraphs(portfolio, fundSynbols, document, pdfDoc, startDate, endDate);
+			portfolioService.prinPerformanceLineGraphs(portfolio, fundSynbols, document, pdfDoc, null, null);
 
 			pdfDoc.addNewPage();
 			fundSynbols = new ArrayList<String>();
@@ -203,7 +232,7 @@ public class PortfolioApp {
 					fundSynbols.add(fund.getSymbol());
 				}
 			}
-			portfolioService.prinPerformanceLineGraphs(portfolio, fundSynbols, document, pdfDoc, startDate, endDate);
+			portfolioService.prinPerformanceLineGraphs(portfolio, fundSynbols, document, pdfDoc, null, null);
 			pdfDoc.addNewPage();
 			fundSynbols = new ArrayList<String>();
 			for (PortfolioFund fund : portfolio.getFundMap().values()) {
@@ -213,7 +242,7 @@ public class PortfolioApp {
 					fundSynbols.add(fund.getSymbol());
 				}
 			}
-			portfolioService.prinPerformanceLineGraphs(portfolio, fundSynbols, document, pdfDoc, startDate, endDate);
+			portfolioService.prinPerformanceLineGraphs(portfolio, fundSynbols, document, pdfDoc, null, null);
 			// Print fund Trends
 			// portfolioService.printTrends(portfolio);
 
@@ -233,6 +262,9 @@ public class PortfolioApp {
 //
 			portfolioService.rebalanceFunds(portfolio, EXCHANGE_INCREMENT,
 					portfolioService.calculateAdjustments(portfolio));
+			pdfDoc.addNewPage();
+			portfolioService.printPerformanceTable(portfolio, document);
+
 			portfolioService.calculateAdjustments(portfolio);
 
 			SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd'T'HHmmss.SSS");
@@ -246,7 +278,33 @@ public class PortfolioApp {
 			// Closing the document
 			document.close();
 			System.out.println("PDF Created");
-			portfolioService.sendMail(portfolioPdfFile);
+			
+			LocalDate lastBusinessDay = LocalDate.now();
+			if (LocalTime.now().getHour() < 19)
+			{
+				lastBusinessDay = lastBusinessDay.minusDays(1);
+			}
+			if (lastBusinessDay.getDayOfWeek() == DayOfWeek.SATURDAY) {
+				lastBusinessDay = lastBusinessDay.minusDays(1);
+			}
+			LocalDate previousBusinessDay = lastBusinessDay.minusDays(1);
+			if (previousBusinessDay.getDayOfWeek() == DayOfWeek.SUNDAY) {
+				previousBusinessDay = previousBusinessDay.minusDays(1);
+			}
+			if (previousBusinessDay.getDayOfWeek() == DayOfWeek.SATURDAY) {
+				previousBusinessDay = previousBusinessDay.minusDays(1);
+			}
+
+			BigDecimal currentTotalValue = portfolioService.getTotalValueByDate(portfolio, lastBusinessDay);
+			BigDecimal previousTotalValue = portfolioService.getTotalValueByDate(portfolio, previousBusinessDay);
+			BigDecimal difference = currentTotalValue.subtract(previousTotalValue);
+			String subject = "YEAH";
+			if (difference.compareTo(BigDecimal.ZERO) < 0)
+			{
+				subject = "NOOO";
+			}
+			String textBody = "Change:  " + formatAsCurrencyString(difference) + " Total:  " + formatAsCurrencyString(portfolio.getTotalValue());
+			portfolioService.sendMail(subject, textBody, portfolioPdfFile);
 
 		} catch (Exception e) {
 			System.out.println("Exception e: " + e.getMessage());

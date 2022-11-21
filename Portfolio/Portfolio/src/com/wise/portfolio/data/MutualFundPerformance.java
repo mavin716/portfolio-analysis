@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.Period;
 import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
@@ -43,7 +44,7 @@ public class MutualFundPerformance {
 
 		BigDecimal historicalPrice = portfolioPriceHistory.getPriceByDate(portfolioFund, historicalDate, false);
 		Float historicalShares = portfolioPriceHistory.getSharesByDate(portfolioFund, historicalDate, false);
-		BigDecimal historicalValue = portfolioPriceHistory.getValueByDate(portfolioFund, historicalDate, false);
+		BigDecimal historicalValue = portfolioPriceHistory.getFundValueByDate(portfolioFund, historicalDate, false);
 		BigDecimal returns = getReturnsByDate(historicalDate, false);
 		if (historicalPrice == null || historicalShares == null || historicalValue == null || returns == null) {
 			return 0f;
@@ -53,7 +54,8 @@ public class MutualFundPerformance {
 			// check for linked account
 			PortfolioFund oldFund = portfolioFund.getOldFund(portfolio);
 			if (oldFund != null) {
-				historicalPrice = portfolioPriceHistory.getPriceByDate(oldFund, portfolioFund.getOldFundConverted(), false);
+				historicalPrice = portfolioPriceHistory.getPriceByDate(oldFund, portfolioFund.getOldFundConverted(),
+						false);
 				if (historicalPrice == null) {
 					return 0f;
 				}
@@ -67,7 +69,7 @@ public class MutualFundPerformance {
 
 		BigDecimal currentValue = portfolioFund.getValue();
 		if (currentValue.intValue() == 0 || historicalValue.intValue() == 0) {
-			return null;
+			return 0f;
 		}
 
 		// Adjust for dividends
@@ -85,7 +87,7 @@ public class MutualFundPerformance {
 
 	private static LocalDate getFirstOfYearDate() {
 		LocalDate firstOfYearDate = LocalDate.of(LocalDate.now().getYear(), 1, 1);
-		
+
 		if (firstOfYearDate.getDayOfWeek() == DayOfWeek.SUNDAY) {
 			firstOfYearDate = firstOfYearDate.minusDays(2);
 		}
@@ -160,7 +162,6 @@ public class MutualFundPerformance {
 	public Pair<LocalDate, BigDecimal> getMaxPricePair() {
 		return portfolioPriceHistory.getMaxPriceFromDate(portfolioFund, portfolioPriceHistory.getOldestDay());
 	}
-
 
 	public BigDecimal getFirstOfYearPrice() {
 		return firstOfYearPrice;
@@ -262,6 +263,36 @@ public class MutualFundPerformance {
 	private Float deviation;
 	private Map<FundCategory, BigDecimal> surplusDeficit;
 
+	public BigDecimal getDayPriceChange() {
+
+		LocalDate lastBusinessDay = LocalDate.now();
+		if (LocalTime.now().getHour() < 19) {
+			lastBusinessDay = lastBusinessDay.minusDays(1);
+		}
+
+		if (lastBusinessDay.getDayOfWeek() == DayOfWeek.SUNDAY) {
+			lastBusinessDay = lastBusinessDay.minusDays(1);
+		}
+		if (lastBusinessDay.getDayOfWeek() == DayOfWeek.SATURDAY) {
+			lastBusinessDay = lastBusinessDay.minusDays(1);
+		}
+		LocalDate previousBusinessDay = lastBusinessDay.minusDays(1);
+		if (previousBusinessDay.getDayOfWeek() == DayOfWeek.SUNDAY) {
+			previousBusinessDay = previousBusinessDay.minusDays(1);
+		}
+		if (previousBusinessDay.getDayOfWeek() == DayOfWeek.SATURDAY) {
+			previousBusinessDay = previousBusinessDay.minusDays(1);
+		}
+
+		BigDecimal previousTotal = getPriceByDate(portfolioFund, previousBusinessDay, true);
+		BigDecimal dayPriceChange = BigDecimal.ZERO;
+		if (previousTotal != null) {
+			dayPriceChange = CurrencyHelper.calculatePercentage(portfolioFund.getCurrentPrice().subtract(previousTotal),
+					previousTotal);
+		}
+		return dayPriceChange;
+	}
+
 	public BigDecimal getYtdPriceChange() {
 		BigDecimal ytdPriceChange = CurrencyHelper.calculatePercentage(
 				portfolioFund.getCurrentPrice().subtract(getFirstOfYearPrice()), getFirstOfYearPrice());
@@ -342,7 +373,8 @@ public class MutualFundPerformance {
 	// difference.
 	public BigDecimal getReturnsByDate(LocalDate date, boolean isExactDate) {
 
-		Map<LocalDate, BigDecimal> fundReturnMap = portfolioPriceHistory.getFundReturns().get(portfolioFund.getSymbol());
+		Map<LocalDate, BigDecimal> fundReturnMap = portfolioPriceHistory.getFundReturns()
+				.get(portfolioFund.getSymbol());
 		if (fundReturnMap == null) {
 			fundReturnMap = new HashMap<>();
 			portfolioPriceHistory.getFundReturns().put(portfolioFund.getSymbol(), fundReturnMap);
@@ -355,7 +387,7 @@ public class MutualFundPerformance {
 			BigDecimal exchanges = portfolioFund.getExchangeTotalFromDate(date);
 			BigDecimal dividends = portfolioFund.getDistributionsAfterDate(date);
 			BigDecimal currentValue = portfolioFund.getValue();
-			BigDecimal historicalValue = portfolioPriceHistory.getValueByDate(portfolioFund, date, isExactDate);
+			BigDecimal historicalValue = portfolioPriceHistory.getFundValueByDate(portfolioFund, date, isExactDate);
 			if (currentValue != null && historicalValue != null) {
 				returns = currentValue.add(withdrawals).add(exchanges).subtract(historicalValue).subtract(conversions);
 //				System.out.println("fund:  " + fund.getShortName() + " date:  " + date);
@@ -371,7 +403,7 @@ public class MutualFundPerformance {
 //				System.out.println("historicalValue:  " + CurrencyHelper.formatAsCurrencyString(historicalValue));
 
 			}
-			
+
 			fundReturnMap.put(date, returns);
 		} else {
 //			System.out

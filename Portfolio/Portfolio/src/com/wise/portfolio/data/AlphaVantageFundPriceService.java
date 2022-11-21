@@ -25,10 +25,12 @@ public class AlphaVantageFundPriceService {
 
 	public static boolean loadFundHistoryFromAlphaVantage(Portfolio portfolio, String symbol, boolean retry) throws IOException {
 
+		LocalDate earliestDate = LocalDate.now();
+		
 		BigDecimal closingPrice = BigDecimal.ZERO;
 		CloseableHttpClient httpclient = HttpClients.createDefault();
-		String url = ALPHA_VANTAGE_URL + "?function=TIME_SERIES_DAILY&outputsize=compact&symbol=" + symbol + "&apikey="
-				+ ALPHA_VANTAGE_APIKEY;
+		String url = ALPHA_VANTAGE_URL + "?function=TIME_SERIES_DAILY_ADJUSTED&outputsize=compact&symbol=" + symbol + "&apikey="
+				+ ALPHA_VANTAGE_APIKEY + "&outputsize=full";
 		HttpGet httpget = new HttpGet(url);
 		try {
 			HttpResponse httpresponse = httpclient.execute(httpget);
@@ -71,19 +73,27 @@ public class AlphaVantageFundPriceService {
 			for (Entry<String, TimeSeries> entry : series.getTimeSeries().entrySet()) {
 
 				LocalDate date = LocalDate.parse(entry.getKey()); 
+				if (date.isBefore(earliestDate)) {
+					earliestDate = date;
+				}
 				
 				TimeSeries timeSeries = entry.getValue();
 				closingPrice = new BigDecimal(timeSeries.getClose());
 				System.out.println("date:  " + date.toString() + " closing price:  " + closingPrice);
 
 				priceHistory.addFundPrice(symbol, date, closingPrice);
+				
 			}
 
 			httpclient.close();
-
+			if (earliestDate.isBefore(priceHistory.getOldestDay())) 
+			{
+				priceHistory.setOldestDay(earliestDate);				
+			}
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+
 
 		return true;
 	}
