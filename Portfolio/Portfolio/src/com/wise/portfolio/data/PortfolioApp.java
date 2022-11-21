@@ -52,7 +52,7 @@ public class PortfolioApp {
 			Portfolio portfolio = portfolioService.createPortfolio();
 
 			// Load history download files
-			portfolioService.loadPriceHistory(portfolio, DOWNLOAD_FILENAME_PREFIX);
+			portfolioService.loadPortfolio(portfolio, DOWNLOAD_FILENAME_PREFIX);
 
 			// Load current download file
 			// If current download file timestamp before 6pm, then the fund prices are from

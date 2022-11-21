@@ -1020,7 +1020,7 @@ public class PortfolioService {
 	 * 
 	 * @throws IOException
 	 */
-	public void loadPriceHistory(Portfolio portfolio, String downloadFileNamePrefix) throws IOException {
+	public void loadPortfolio(Portfolio portfolio, String downloadFileNamePrefix) throws IOException {
 
 		// Load all download files
 		LocalDate earliestDate = portfolio.getPriceHistory().getOldestDay();
