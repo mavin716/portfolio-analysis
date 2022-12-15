@@ -159,8 +159,16 @@ public class MutualFundPerformance {
 		return portfolioPriceHistory.getMinPriceFromDate(portfolioFund, portfolioPriceHistory.getOldestDay());
 	}
 
+	public Pair<LocalDate, BigDecimal> getMinPricePairFromDate(LocalDate date) {
+		return portfolioPriceHistory.getMinPriceFromDate(portfolioFund, date);
+	}
+
 	public Pair<LocalDate, BigDecimal> getMaxPricePair() {
 		return portfolioPriceHistory.getMaxPriceFromDate(portfolioFund, portfolioPriceHistory.getOldestDay());
+	}
+
+	public Pair<LocalDate, BigDecimal> getMaxPricePairFromDate(LocalDate date) {
+		return portfolioPriceHistory.getMaxPriceFromDate(portfolioFund, date);
 	}
 
 	public BigDecimal getFirstOfYearPrice() {

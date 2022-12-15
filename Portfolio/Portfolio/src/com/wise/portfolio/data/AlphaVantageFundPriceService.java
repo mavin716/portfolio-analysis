@@ -23,14 +23,15 @@ public class AlphaVantageFundPriceService {
 	private static final String ALPHA_VANTAGE_URL = "https://www.alphavantage.co/query";
 	private static final String ALPHA_VANTAGE_APIKEY = "85MODZ3M0IN6CT0R";
 
-	public static boolean loadFundHistoryFromAlphaVantage(Portfolio portfolio, String symbol, boolean retry) throws IOException {
+	public static boolean loadFundHistoryFromAlphaVantage(Portfolio portfolio, String symbol, boolean retry)
+			throws IOException {
 
 		LocalDate earliestDate = LocalDate.now();
-		
+
 		BigDecimal closingPrice = BigDecimal.ZERO;
 		CloseableHttpClient httpclient = HttpClients.createDefault();
-		String url = ALPHA_VANTAGE_URL + "?function=TIME_SERIES_DAILY_ADJUSTED&outputsize=compact&symbol=" + symbol + "&apikey="
-				+ ALPHA_VANTAGE_APIKEY + "&outputsize=full";
+		String url = ALPHA_VANTAGE_URL + "?function=TIME_SERIES_MONTHLY&outputsize=compact&symbol=" + symbol
+				+ "&apikey=" + ALPHA_VANTAGE_APIKEY + "&outputsize=full";
 		HttpGet httpget = new HttpGet(url);
 		try {
 			HttpResponse httpresponse = httpclient.execute(httpget);
@@ -72,28 +73,27 @@ public class AlphaVantageFundPriceService {
 			PortfolioPriceHistory priceHistory = portfolio.getPriceHistory();
 			for (Entry<String, TimeSeries> entry : series.getTimeSeries().entrySet()) {
 
-				LocalDate date = LocalDate.parse(entry.getKey()); 
+				LocalDate date = LocalDate.parse(entry.getKey());
 				if (date.isBefore(earliestDate)) {
 					earliestDate = date;
 				}
-				
+
 				TimeSeries timeSeries = entry.getValue();
 				closingPrice = new BigDecimal(timeSeries.getClose());
-				System.out.println("date:  " + date.toString() + " closing price:  " + closingPrice);
+//				System.out.println("date:  " + date.toString() + " closing price:  "
+//						+ CurrencyHelper.formatAsCurrencyString(closingPrice));
 
 				priceHistory.addFundPrice(symbol, date, closingPrice);
-				
+
 			}
 
 			httpclient.close();
-			if (earliestDate.isBefore(priceHistory.getOldestDay())) 
-			{
-				priceHistory.setOldestDay(earliestDate);				
+			if (earliestDate.isBefore(priceHistory.getOldestDay())) {
+				priceHistory.setOldestDay(earliestDate);
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-
 
 		return true;
 	}
