@@ -156,7 +156,7 @@ public class MutualFundPerformance {
 	}
 
 	public Pair<LocalDate, BigDecimal> getMinPricePair() {
-		return portfolioPriceHistory.getMinPriceFromDate(portfolioFund, portfolioPriceHistory.getOldestDay());
+		return portfolioPriceHistory.getMinPriceFromDate(portfolioFund, portfolioPriceHistory.getOldestDate());
 	}
 
 	public Pair<LocalDate, BigDecimal> getMinPricePairFromDate(LocalDate date) {
@@ -164,7 +164,7 @@ public class MutualFundPerformance {
 	}
 
 	public Pair<LocalDate, BigDecimal> getMaxPricePair() {
-		return portfolioPriceHistory.getMaxPriceFromDate(portfolioFund, portfolioPriceHistory.getOldestDay());
+		return portfolioPriceHistory.getMaxPriceFromDate(portfolioFund, portfolioPriceHistory.getOldestDate());
 	}
 
 	public Pair<LocalDate, BigDecimal> getMaxPricePairFromDate(LocalDate date) {
@@ -397,7 +397,7 @@ public class MutualFundPerformance {
 			BigDecimal currentValue = portfolioFund.getValue();
 			BigDecimal historicalValue = portfolioPriceHistory.getFundValueByDate(portfolioFund, date, isExactDate);
 			if (currentValue != null && historicalValue != null) {
-				returns = currentValue.add(withdrawals).add(exchanges).subtract(historicalValue).subtract(conversions);
+				returns = currentValue.add(dividends).add(withdrawals).add(exchanges).subtract(historicalValue).subtract(conversions);
 //				System.out.println("fund:  " + fund.getShortName() + " date:  " + date);
 //				System.out.println("currentValue:  " + CurrencyHelper.formatAsCurrencyString(currentValue));
 //				System.out.println("historicalValue:  " + CurrencyHelper.formatAsCurrencyString(historicalValue));

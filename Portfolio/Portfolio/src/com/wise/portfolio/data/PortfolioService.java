@@ -15,11 +15,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.Period;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -36,6 +38,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -55,20 +58,15 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.poi.ss.formula.functions.Irr;
-import org.jfree.chart.ChartFactory;
 import org.jfree.chart.JFreeChart;
 import org.jfree.chart.axis.DateAxis;
 import org.jfree.chart.axis.NumberAxis;
 import org.jfree.chart.axis.ValueAxis;
-import org.jfree.chart.plot.CategoryPlot;
 import org.jfree.chart.plot.XYPlot;
-import org.jfree.chart.renderer.category.MinMaxCategoryRenderer;
 import org.jfree.chart.renderer.xy.ClusteredXYBarRenderer;
-import org.jfree.chart.renderer.xy.StackedXYBarRenderer;
 import org.jfree.chart.renderer.xy.XYBarRenderer;
 import org.jfree.chart.renderer.xy.XYItemRenderer;
 import org.jfree.chart.renderer.xy.XYLineAndShapeRenderer;
-import org.jfree.chart.renderer.xy.XYSplineRenderer;
 import org.jfree.chart.util.ShapeUtils;
 import org.jfree.data.time.Day;
 import org.jfree.data.time.MovingAverage;
@@ -97,9 +95,9 @@ public class PortfolioService {
 	public static final Charset INPUT_CHARSET = StandardCharsets.ISO_8859_1;
 	public static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("MM/dd/yy");
 	public static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("MM/dd/yy hh:mm a");
+	public static final DateTimeFormatter JUST_TIME_FORMATTER = DateTimeFormatter.ofPattern("hh:mm a");
 
 	private LocalDate mostRecentSharePriceDay = LocalDate.of(2000, 1, 1);
-	private int oldestDay = 640;
 	private String basePath;
 
 	public static Map<String, String> fundSymbolNameMap = new HashMap<>();
@@ -109,7 +107,7 @@ public class PortfolioService {
 	private Map<String, Map<FundCategory, BigDecimal>> desiredFundAllocationMaps = new HashMap<>();
 
 	private Integer[] rankDaysArray = { 1, 3, 5, 15, 30, 60, 90, 120, 180, 270, 365, 480, 560, 740, 830, 920, 1010 };
-	private List<Integer> enhancedRankDaysList = new LinkedList<>();
+	private List<Long> enhancedRankDaysList = new LinkedList<>();
 	private Portfolio portfolio;
 
 	private static final String HISTORICAL_PRICES_FILE = "historical.csv";
@@ -404,7 +402,7 @@ public class PortfolioService {
 		document.add(new Paragraph("Ranking by 365 day change"));
 		printFundsRanking(document, portfolio, fundRanking, new CompareByPerformanceDays(365), 365);
 
-		int ytdDays = getYtdDays();
+		long ytdDays = getYtdDays();
 		document.add(new Paragraph("Ranking by YTD change (" + ytdDays + ")"));
 		printFundsRanking(document, portfolio, fundRanking, new CompareByPerformanceDays(ytdDays), ytdDays);
 		document.add(new Paragraph("Ranking by 480 day change"));
@@ -429,6 +427,7 @@ public class PortfolioService {
 		printFundsRanking(document, portfolio, fundRanking, new CompareByPerformanceDays(1010), 1010);
 
 		document.add(new Paragraph("Ranking by oldest day change"));
+		int oldestDay = portfolio.getPriceHistory().getOldestDay();
 		printFundsRanking(document, portfolio, fundRanking, new CompareByPerformanceDays(oldestDay), oldestDay);
 
 		document.add(new Paragraph("Ranking by compounding difference of ranking"));
@@ -454,9 +453,9 @@ public class PortfolioService {
 		LocalDate maxPriceDate = performance.getMaxPricePair().getKey();
 		LocalDate minPriceDate = performance.getMinPricePair().getKey();
 		Period period = maxPriceDate.until(LocalDate.now());
-		Integer maxPriceDays = period.getYears() * 365 + period.getMonths() * 30 + period.getDays();
+		int maxPriceDays = period.getDays();
 		period = minPriceDate.until(LocalDate.now());
-		Integer minPriceDays = period.getYears() * 365 + period.getMonths() * 30 + period.getDays();
+		int minPriceDays = period.getDays();
 
 		document.add(new Paragraph("Ranking by min price"));
 		printFundsRanking(document, portfolio, fundRanking, new CompareByPerformanceDays(minPriceDays), minPriceDays);
@@ -472,13 +471,13 @@ public class PortfolioService {
 
 	private class CompareByPerformanceDays implements Comparator<PortfolioFund> {
 
-		public CompareByPerformanceDays(int days) {
+		public CompareByPerformanceDays(long days2) {
 			super();
 
-			this.days = days;
+			this.days = days2;
 
 			LocalDate date = LocalDate.now();
-			date = date.minusDays(days);
+			date = date.minusDays(days2);
 			if (date.getDayOfWeek() == DayOfWeek.SUNDAY) {
 				this.days++;
 				date = date.minusDays(1);
@@ -490,7 +489,7 @@ public class PortfolioService {
 
 		}
 
-		private int days;
+		private long days;
 
 		@Override
 		public int compare(PortfolioFund f1, PortfolioFund f2) {
@@ -513,7 +512,7 @@ public class PortfolioService {
 	}
 
 	private void printFundsRanking(Document document, Portfolio portfolio, Map<String, LinkedList<Integer>> fundRanking,
-			Comparator<PortfolioFund> c, int days) {
+			Comparator<PortfolioFund> c, long oldestDay) {
 
 		// Creating a table
 		float[] pointColumnWidths = { 10F, 5F, 5F, 5F, 5F, 5F, 5F, 5F, 5F, 5F, 5F, 5F, 5F, 5F, 5F, 5F, 5F, 5F, 5F, 5F,
@@ -524,11 +523,11 @@ public class PortfolioService {
 		table.addHeaderCell(new Cell().add("Fund").setTextAlignment(TextAlignment.CENTER));
 		table.addHeaderCell(new Cell().add("Returns").setTextAlignment(TextAlignment.CENTER));
 
-		for (Integer rankdays : enhancedRankDaysList) {
+		for (Long rankdays : enhancedRankDaysList) {
 
 			Cell cell1 = new Cell(); // Creating a cell
 			LocalDate historicalDate = LocalDate.now().minusDays(rankdays);
-			if (rankdays.equals(new Integer(days))) {
+			if (rankdays.equals(new Long(oldestDay))) {
 				cell1.add(String.format("%3d", rankdays) + "*");
 			} else {
 				cell1.add(String.format("%3d", rankdays));
@@ -549,11 +548,12 @@ public class PortfolioService {
 		}
 
 		// Print fund ranking text for each fund
-		fundStream.forEach(f -> addFundRankingToTalbe(table, f, fundRanking.get(f.getSymbol()), days));
+		fundStream.forEach(f -> addFundRankingToTalbe(table, f, fundRanking.get(f.getSymbol()), oldestDay));
 
 		BigDecimal totalChange = portfolio.getFundMap().values().stream()
-				.map(f -> f.getValue().subtract(getHistoricalValue(f, days))).reduce(BigDecimal.ZERO, BigDecimal::add);
-		LocalDate historicalDate = LocalDate.now().minusDays(days);
+				.map(f -> f.getValue().subtract(getHistoricalValue(f, oldestDay)))
+				.reduce(BigDecimal.ZERO, BigDecimal::add);
+		LocalDate historicalDate = LocalDate.now().minusDays(oldestDay);
 		BigDecimal totalWithdrawal = portfolio.getFundMap().values().stream()
 				.map(f -> f.getWithdrawalsUpToDate(historicalDate)).reduce(BigDecimal.ZERO, BigDecimal::add);
 		BigDecimal returns = totalChange.add(totalWithdrawal);
@@ -577,7 +577,7 @@ public class PortfolioService {
 
 	}
 
-	private BigDecimal getHistoricalValue(PortfolioFund fund, int days) {
+	private BigDecimal getHistoricalValue(PortfolioFund fund, long days) {
 		BigDecimal historicalValue = BigDecimal.ZERO;
 
 		LocalDate historicalDate = LocalDate.now().minusDays(days);
@@ -594,12 +594,12 @@ public class PortfolioService {
 		return historicalValue;
 	}
 
-	private void addFundRankingToTalbe(Table table, PortfolioFund fund, List<Integer> rankingDays, int days) {
+	private void addFundRankingToTalbe(Table table, PortfolioFund fund, List<Integer> rankingDays, long oldestDay2) {
 
 		try {
 			MutualFundPerformance fundPerformance = new MutualFundPerformance(portfolio, fund);
 
-			LocalDate historicalDate = getClosestHistoricalDate(days);
+			LocalDate historicalDate = getClosestHistoricalDate(oldestDay2);
 			BigDecimal returns = fundPerformance.getReturnsByDate(historicalDate, false);
 			if (returns == null) {
 				returns = new BigDecimal(0);
@@ -614,7 +614,7 @@ public class PortfolioService {
 			// TODO If symbol stored instead of fund data then can calculate data on fly
 			List<Pair<Integer, Pair<Integer, MutualFundPerformance>>> ranks = new LinkedList<>();
 			for (int rankDayIndex = 0; rankDayIndex < rankingDays.size(); rankDayIndex++) {
-				int rankDays = enhancedRankDaysList.get(rankDayIndex);
+				long rankDays = enhancedRankDaysList.get(rankDayIndex);
 
 				Float historicalRate = null;
 				LocalDate rankHistoricalDate = getClosestHistoricalDate(rankDays);
@@ -801,15 +801,15 @@ public class PortfolioService {
 		}
 
 		// Create dynamic rank days list to include ytd and oldest day
-		int ytdDays = getYtdDays();
-		Period period = maxPriceDate.until(LocalDate.now());
-		Integer maxPriceDays = period.getYears() * 365 + period.getMonths() * 30 + period.getDays();
-		period = minPriceDate.until(LocalDate.now());
-		Integer minPriceDays = period.getYears() * 365 + period.getMonths() * 30 + period.getDays();
+		long ytdDays = getYtdDays();
+
+		//
+		Long maxPriceDays = maxPriceDate.until(LocalDate.now(), ChronoUnit.DAYS);
+		Long minPriceDays = minPriceDate.until(LocalDate.now(), ChronoUnit.DAYS);
 		for (int i = 0; i < rankDaysArray.length; i++) {
 
 			if (i > 1 && ytdDays > rankDaysArray[i - 1] && ytdDays < rankDaysArray[i]) {
-				enhancedRankDaysList.add(ytdDays);
+				enhancedRankDaysList.add(Long.valueOf(ytdDays));
 			}
 			if (i > 1 && maxPriceDays > rankDaysArray[i - 1] && maxPriceDays < rankDaysArray[i]) {
 				enhancedRankDaysList.add(maxPriceDays);
@@ -817,15 +817,15 @@ public class PortfolioService {
 			if (i > 1 && minPriceDays > rankDaysArray[i - 1] && minPriceDays < rankDaysArray[i]) {
 				enhancedRankDaysList.add(minPriceDays);
 			}
-			enhancedRankDaysList.add(rankDaysArray[i]);
+			enhancedRankDaysList.add(Long.valueOf(rankDaysArray[i]));
 		}
-		enhancedRankDaysList.add(oldestDay);
+		enhancedRankDaysList.add(Long.valueOf(portfolio.getPriceHistory().getOldestDay()));
 
 		AtomicInteger rank = new AtomicInteger();
-		for (int numDays : enhancedRankDaysList) {
+		for (long numDays : enhancedRankDaysList) {
 			// @TODO if no change for today then don't add to fundRanking (messes up
 			// weighted order), instead use 3 day
-			int days = numDays;
+			long days = numDays;
 			if (!oneDayRanking && numDays == 1) {
 				days = numDays + 2;
 			}
@@ -1030,8 +1030,11 @@ public class PortfolioService {
 	 */
 	public void loadPortfolio(Portfolio portfolio, String downloadFileNamePrefix) throws IOException {
 
+		PerformanceService.setPortfolio(portfolio);
+		PerformanceService.setPriceHistory(portfolio.getPriceHistory());
+		
 		// Load all download files
-		LocalDate earliestDate = portfolio.getPriceHistory().getOldestDay();
+		LocalDate earliestDate = portfolio.getPriceHistory().getOldestDate();
 		try (Stream<Path> stream = Files.list(Paths.get(basePath))) {
 
 			List<String> filenames = stream.filter(p -> p.getFileName().toString().startsWith(downloadFileNamePrefix))
@@ -1040,7 +1043,7 @@ public class PortfolioService {
 			BigDecimal yesterdayWithdrawals = BigDecimal.ZERO;
 			PortfolioPriceHistory priceHistory = portfolio.getPriceHistory();
 			for (String filename : filenames) {
-				LocalDate date = getDownloadFileDate(filename);
+				LocalDateTime date = getDownloadFileDate(filename, true);
 
 				if (date == null) {
 					// Not a valid download file
@@ -1056,21 +1059,22 @@ public class PortfolioService {
 				// continue;
 //				}
 //				fileDates.add(date);
-				if (date.isBefore(earliestDate)) {
-					earliestDate = date;
+				if (date.toLocalDate().isBefore(earliestDate)) {
+					earliestDate = date.toLocalDate();
 
 				}
-				priceHistory.loadPortfolioDownloadFile(portfolio, date, basePath + "\\" + filename);
+				LocalDate dateOnly = date.toLocalDate();
+				priceHistory.loadPortfolioDownloadFile(portfolio, dateOnly, basePath + "\\" + filename);
 
 				BigDecimal withdrawals = BigDecimal.ZERO;
 				for (PortfolioFund fund : portfolio.getFundMap().values()) {
 					if (fund != null) {
-						BigDecimal todayWithdrawals = fund.getWithdrawalTotalForDate(date);
+						BigDecimal todayWithdrawals = fund.getWithdrawalTotalForDate(dateOnly);
 						// Check if Sell transaction didn't get included in yesterdays download but
 						// trade date was yesterday
 						if (todayWithdrawals.compareTo(BigDecimal.ZERO) == 0
 								&& yesterdayWithdrawals.compareTo(BigDecimal.ZERO) == 0) {
-							todayWithdrawals = fund.getWithdrawalTotalForDate(date.minusDays(1));
+							todayWithdrawals = fund.getWithdrawalTotalForDate(dateOnly.minusDays(1));
 						}
 						withdrawals = withdrawals.add(todayWithdrawals);
 					}
@@ -1079,17 +1083,13 @@ public class PortfolioService {
 				BigDecimal income = BigDecimal.ZERO;
 				for (PortfolioFund fund : portfolio.getFundMap().values()) {
 					if (fund != null) {
-						income = income.add(fund.getDistributionsForDate(date));
+						income = income.add(fund.getDistributionsForDate(dateOnly));
 					}
 				}
 
 			}
-			priceHistory.setOldestDay(earliestDate);
+			priceHistory.setOldestDate(earliestDate);
 		}
-
-		// Calculate oldest day
-		Period period = earliestDate.until(LocalDate.now());
-		oldestDay = period.getYears() * 365 + period.getMonths() * 30 + period.getDays();
 
 		if (portfolio.getPriceHistory().getMostRecentDay().isAfter(mostRecentSharePriceDay)) {
 			mostRecentSharePriceDay = portfolio.getPriceHistory().getMostRecentDay();
@@ -1115,29 +1115,56 @@ public class PortfolioService {
 
 	}
 
-	private LocalDate getDownloadFileDate(String filename) {
-		LocalDate date = null;
-		LocalTime time = null;
-		if (filename.length() == 39) {
-			String datestring = filename.substring(14, 24);
-			// Get time and create policy for multiple files on oneday, morning vs. night
-			date = LocalDate.parse(datestring);
-			StringBuffer timestring = new StringBuffer(filename.substring(25, 31));
-			timestring.insert(2, ":");
-			timestring.insert(5, ":");
-			// Get time and create policy for multiple files on oneday, morning vs. night
-			time = LocalTime.parse(timestring);
-			LocalTime cutoffTime = LocalTime.of(18, 0);
-			if (time.isBefore(cutoffTime)) {
+	private LocalDateTime getDownloadFileDate(String filename, boolean adjust) {
+
+		LocalDateTime date = null;
+		File file = new File(basePath + "\\" + filename);
+		try {
+			BasicFileAttributes attr = Files.readAttributes(file.toPath(), BasicFileAttributes.class);
+
+			date = LocalDateTime.ofEpochSecond(attr.creationTime().to(TimeUnit.SECONDS), 0,
+					ZonedDateTime.now().getOffset());
+
+			// time = LocalTime.ofNanoOfDay(attr.creationTime().to(TimeUnit.NANOSECONDS));
+//			System.out.println("File creation date:   " + date.format(DATE_FORMATTER));
+//			System.out.println("File creation time:   " + time.format(JUST_TIME_FORMATTER));
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			return LocalDateTime.now();
+		}
+//		LocalDate fileNameDate = null;
+//		LocalTime fileNameTime = null;
+//		if (filename.length() == 39) {
+//			String datestring = filename.substring(14, 24);
+//			// Get time and create policy for multiple files on oneday, morning vs. night
+//			fileNameDate = LocalDate.parse(datestring);
+//			StringBuffer timestring = new StringBuffer(filename.substring(25, 31));
+//			timestring.insert(2, ":");
+//			timestring.insert(5, ":");
+//			// Get time and create policy for multiple files on oneday, morning vs. night
+//			fileNameTime = LocalTime.parse(timestring);
+//			LocalTime cutoffTime = LocalTime.of(18, 0);
+//			if (fileNameTime.isBefore(cutoffTime)) {
+//				fileNameDate = date.minusDays(1);
+//			}
+//			System.out.println("File name date:   " + fileNameDate.format(DATE_FORMATTER));
+//			System.out.println("File name time:   " + fileNameTime.format(TIME_FORMATTER));
+//
+//		} else if (filename.length() == 15) {
+//			// Assume this is the current downlaod for today
+//			fileNameDate = LocalDate.now();
+//		} else {
+//			System.out.println("Ignore, filename has Invalid format:  " + filename + " size: " + filename.length());
+//		}
+
+		if (adjust) {
+			LocalTime cutoffTime = LocalTime.of(15, 0);
+			if (date.toLocalTime().isBefore(cutoffTime)) {
 				date = date.minusDays(1);
 			}
-
-		} else if (filename.length() == 15) {
-			// Assume this is the current downlaod for today
-			date = LocalDate.now();
-		} else {
-			System.out.println("Ignore, filename has Invalid format:  " + filename + " size: " + filename.length());
 		}
+
 		return date;
 	}
 
@@ -1156,13 +1183,31 @@ public class PortfolioService {
 	}
 
 	public Map<String, BigDecimal> calculateWithdrawal(Portfolio portfolio, BigDecimal withdrawalAmount,
-			BigDecimal cashReservesWithdrawalAmount, BigDecimal federalMMWithdrawalAmount, BigDecimal netWithdrawalAmount) {
+			BigDecimal cashReservesTransferAmount, BigDecimal cashReservesWithdrawalAmount,
+			BigDecimal federalMMTransferAmount, BigDecimal federalMMWithdrawalAmount) {
 
 		Map<String, BigDecimal> withdrawalMap = new LinkedHashMap<>();
+		if (cashReservesWithdrawalAmount.compareTo(BigDecimal.ZERO) > 0
+				|| federalMMWithdrawalAmount.compareTo(BigDecimal.ZERO) > 0) {
+			withdrawalMap.put("VMRXX", cashReservesWithdrawalAmount);
+			withdrawalMap.put("VMFXX", federalMMWithdrawalAmount);
+		}
+		else if (cashReservesTransferAmount.compareTo(BigDecimal.ZERO) > 0
+				|| federalMMTransferAmount.compareTo(BigDecimal.ZERO) > 0) {
+			withdrawalMap.put("VMRXX", BigDecimal.ZERO.subtract(cashReservesTransferAmount));
+			withdrawalMap.put("VMFXX", BigDecimal.ZERO.subtract(federalMMTransferAmount));
+		}
 
+		BigDecimal actualWithdrawalAount = withdrawalAmount;
+		actualWithdrawalAount = actualWithdrawalAount.subtract(cashReservesWithdrawalAmount);
+		actualWithdrawalAount = actualWithdrawalAount.subtract(federalMMWithdrawalAmount);
+		actualWithdrawalAount = actualWithdrawalAount.add(cashReservesTransferAmount);
+		actualWithdrawalAount = actualWithdrawalAount.add(federalMMTransferAmount);
+
+		// BigDecimal
 		// Create map sorted by descending value of deviation
 		Map<String, Pair<BigDecimal, PortfolioFund>> sortedDifferenceMap = createSortedDeviationMap(portfolio,
-				netWithdrawalAmount);
+				actualWithdrawalAount);
 
 		// Initialize deviation to start
 		BigDecimal nextDeviation = BigDecimal.ZERO;
@@ -1172,29 +1217,28 @@ public class PortfolioService {
 		}
 
 		// withdrawl increment is one percent of fund value
-		BigDecimal withdrawalIncrement = portfolio.getTotalValue().divide(new BigDecimal(10000), 0,
-				RoundingMode.DOWN);
+		BigDecimal withdrawalIncrement = portfolio.getTotalValue().divide(new BigDecimal(10000), 0, RoundingMode.DOWN);
 		// Round up to nearest 5
 		withdrawalIncrement = withdrawalIncrement.divide(new BigDecimal(5), 0, RoundingMode.HALF_DOWN)
 				.setScale(2, RoundingMode.HALF_DOWN).multiply(new BigDecimal(5));
 
 		System.out.println("Starting deviation:  " + CurrencyHelper.formatPercentageString4(nextDeviation));
 		BigDecimal runningWithdrawal = BigDecimal.ZERO;
-		while (runningWithdrawal.compareTo(withdrawalAmount) < 0) {
+		while (runningWithdrawal.compareTo(actualWithdrawalAount) < 0) {
 			for (String fundSymbol : sortedDifferenceMap.keySet()) {
-				
+
 				Pair<BigDecimal, PortfolioFund> fundDifferencePair = sortedDifferenceMap.get(fundSymbol);
 				BigDecimal fundDeviation = fundDifferencePair.getLeft();
 				PortfolioFund fund = fundDifferencePair.getRight();
-				
-				System.out.println("Fund:  " + fund.getShortName() + " starting dev "
-						+ CurrencyHelper.formatPercentageString4(fundDeviation));
+
+//				System.out.println("Fund:  " + fund.getShortName() + " starting dev "
+//						+ CurrencyHelper.formatPercentageString4(fundDeviation));
 
 				BigDecimal fundWithdrawalIncrement = withdrawalIncrement;
 
 				if (fundDeviation.compareTo(nextDeviation) >= 0) {
-					if (runningWithdrawal.add(fundWithdrawalIncrement).compareTo(withdrawalAmount) > 0) {
-						fundWithdrawalIncrement = withdrawalAmount.subtract(runningWithdrawal);
+					if (runningWithdrawal.add(fundWithdrawalIncrement).compareTo(actualWithdrawalAount) > 0) {
+						fundWithdrawalIncrement = actualWithdrawalAount.subtract(runningWithdrawal);
 					}
 					BigDecimal runningFundWithdrawalAmount = withdrawalMap.get(fund.getSymbol());
 					if (runningFundWithdrawalAmount == null) {
@@ -1209,7 +1253,8 @@ public class PortfolioService {
 					runningFundWithdrawalAmount = runningFundWithdrawalAmount.add(fundWithdrawalIncrement);
 
 					BigDecimal newFundBalance = fund.getValue().subtract(runningFundWithdrawalAmount);
-					BigDecimal newFundDeviation = getFundNewBalanceDeviation(fund, newFundBalance, netWithdrawalAmount);
+					BigDecimal newFundDeviation = getFundNewBalanceDeviation(fund, newFundBalance,
+							actualWithdrawalAount);
 					System.out.println("Fund:  " + fund.getShortName() + " New Fund Balance:  "
 							+ CurrencyHelper.formatAsCurrencyString(newFundBalance) + " New Fund Deviation:  "
 							+ CurrencyHelper.formatPercentageString4(newFundDeviation));
@@ -1222,7 +1267,7 @@ public class PortfolioService {
 
 					runningWithdrawal = runningWithdrawal.add(fundWithdrawalIncrement);
 					System.out.println("runningWithdrawal " + CurrencyHelper.formatAsCurrencyString(runningWithdrawal));
-					if (runningWithdrawal.compareTo(withdrawalAmount) == 0) {
+					if (runningWithdrawal.compareTo(actualWithdrawalAount) == 0) {
 						break;
 					}
 				}
@@ -1479,8 +1524,9 @@ public class PortfolioService {
 		prices.add(-cost.doubleValue());
 
 		// Add remaining prices
+		int oldestDay = portfolio.getPriceHistory().getOldestDay();
 		for (int i = 1; i < oldestDay; i++) {
-			int day = oldestDay - i;
+			long day = oldestDay - i;
 			BigDecimal value = getClosestHistoricalPrice(fund, today.minusDays(day - 1), 30);
 			if (value != null && value.compareTo(BigDecimal.ZERO) != 0) {
 				prices.add(value.doubleValue());
@@ -1501,16 +1547,16 @@ public class PortfolioService {
 		return irr;
 	}
 
-	public LocalDate getClosestHistoricalDate(int trendDays) {
-		LocalDate historicalDate = LocalDate.now().minusDays(trendDays);
+	public LocalDate getClosestHistoricalDate(long rankDays) {
+		LocalDate historicalDate = LocalDate.now().minusDays(rankDays);
 
 		// Find the nearest date
 		if (historicalDate.getDayOfWeek() == DayOfWeek.SUNDAY) {
-			trendDays--;
+			rankDays--;
 			historicalDate = historicalDate.minusDays(1);
 		}
 		if (historicalDate.getDayOfWeek() == DayOfWeek.SATURDAY) {
-			trendDays--;
+			rankDays--;
 			historicalDate = historicalDate.minusDays(1);
 		}
 
@@ -1526,7 +1572,7 @@ public class PortfolioService {
 				}
 			}
 		}
-		return LocalDate.now().minusDays(trendDays);
+		return LocalDate.now().minusDays(rankDays);
 
 	}
 
@@ -1833,7 +1879,6 @@ public class PortfolioService {
 			headingLineStringBuilder.append("\n");
 			writer.write(headingLineStringBuilder.toString());
 
-			Map<LocalDate, BigDecimal> totalsByDate = new TreeMap<>();
 			// Write fund lines for each date
 			for (PortfolioFund fund : portfolio.getFundMap().values()) {
 				String symbol = fund.getSymbol();
@@ -1884,15 +1929,21 @@ public class PortfolioService {
 	 */
 	public Map<String, BigDecimal> calculateAdjustments(Portfolio portfolio) throws Exception {
 		// Map of <Symbol, Adjustment>
-		Map<String, BigDecimal> adjustments = new TreeMap<>();
+		Map<String, BigDecimal> rawAdjustments = new TreeMap<>();
 
 		BigDecimal totalValue = portfolio.getTotalValue();
 		BigDecimal totalAdjustments = BigDecimal.ZERO;
 		BigDecimal totalCurrentPercentage = BigDecimal.ZERO;
 		BigDecimal totalDesiredPercentage = BigDecimal.ZERO;
 
+		Map<String, Pair<BigDecimal, PortfolioFund>> sortedDifferenceMap = createSortedDeviationMap(portfolio,
+				BigDecimal.ZERO);
+
+		Map<String, BigDecimal> runningBalances = new HashMap<>();
+
 		for (PortfolioFund fund : getFundsSortedByDifferenceInValue(portfolio)) {
 			BigDecimal currentFundValue = fund.getValue();
+			runningBalances.put(fund.getSymbol(), currentFundValue);
 			BigDecimal currentPercentage = CurrencyHelper.calculatePercentage(currentFundValue, totalValue);
 			totalCurrentPercentage = totalCurrentPercentage.add(currentPercentage);
 			BigDecimal desiredValue = getDesiredFundValue(portfolio, fund.getSymbol());
@@ -1918,10 +1969,95 @@ public class PortfolioService {
 //				}
 //			}
 
-			adjustments.put(fund.getSymbol(), fundAdjustment);
+			rawAdjustments.put(fund.getSymbol(), fundAdjustment);
 			totalAdjustments = totalAdjustments.add(fundAdjustment);
 
 		}
+		Pair<Map<String, BigDecimal>, Map<String, BigDecimal>> surplusDeficitPair = createSurplusDeficitPair(
+				rawAdjustments);
+
+		Map<String, BigDecimal> adjustments = new HashMap<>();
+		BigDecimal exchangeIncrement = new BigDecimal(100);
+		Map<String, BigDecimal> surplusFundMap = surplusDeficitPair.getLeft();
+		Map<String, BigDecimal> deficitFundMap = surplusDeficitPair.getRight();
+		for (Entry<String, BigDecimal> surplusEntry : surplusFundMap.entrySet()) {
+			String exchangeFromFundSymbol = surplusEntry.getKey();
+			BigDecimal exchangeFromValue = surplusEntry.getValue().divide(new BigDecimal(2), RoundingMode.DOWN);
+			if (exchangeFromValue.compareTo(new BigDecimal(500)) < 0) {
+				continue;
+			}
+			System.out.println(String.format("%-60s", fundSymbolNameMap.get(exchangeFromFundSymbol))
+					+ "Surplus amount:  " + CurrencyHelper.formatAsCurrencyString(surplusEntry.getValue())
+					+ ", exchange from value (1/2 surplus):  "
+					+ CurrencyHelper.formatAsCurrencyString(exchangeFromValue));
+
+			int exchangeFromIncrements = exchangeFromValue.divide(exchangeIncrement).intValue();
+			if (exchangeFromIncrements > 0) {
+				// look for deficits to exchange to
+				for (Entry<String, BigDecimal> deficitToEntry : deficitFundMap.entrySet()) {
+					String exchangeToFundSymbol = deficitToEntry.getKey();
+					PortfolioFund fund = portfolio.getFund(exchangeToFundSymbol);
+					if (fund.isFixedExpensesAccount()) {
+						System.out.println(String.format("%-24s", fund.getShortName())
+								+ "fixed expense fund, don't include in reallocation");
+						continue;
+					}
+					BigDecimal exchangeToValue = deficitToEntry.getValue();
+					System.out.println(String.format("%-24s", fundSymbolNameMap.get(exchangeToFundSymbol))
+							+ "Deficit amount:  " + CurrencyHelper.formatAsCurrencyString(exchangeToValue));
+
+					int exchangeToIncrements = exchangeToValue.divide(exchangeIncrement).intValue();
+					if (exchangeToIncrements > 0) {
+						// determine exchange value for this transaction
+						BigDecimal exchangeValue = exchangeIncrement
+								.multiply(new BigDecimal(Math.min(exchangeFromIncrements, exchangeToIncrements)));
+
+						System.out.println("\nExchange:  " + CurrencyHelper.formatAsCurrencyString(exchangeValue)
+								+ " from:  " + String.format("%-24s", fundSymbolNameMap.get(exchangeFromFundSymbol))
+								+ " to:  " + String.format("%-24s", fundSymbolNameMap.get(exchangeToFundSymbol))
+								+ "\n");
+
+						BigDecimal fundExchangeFromValue = adjustments.get(exchangeFromFundSymbol);
+						if (fundExchangeFromValue == null) {
+							fundExchangeFromValue = BigDecimal.ZERO;
+						}
+						adjustments.put(exchangeFromFundSymbol, fundExchangeFromValue.add(exchangeValue));
+						runningBalances.put(exchangeFromFundSymbol,
+								runningBalances.get(exchangeFromFundSymbol).subtract(exchangeValue));
+						// portfolio.adjustValue(exchangeFromFundSymbol, exchangeValue.negate());
+						BigDecimal fundExchangeToValue = adjustments.get(exchangeToFundSymbol);
+						if (fundExchangeToValue == null) {
+							fundExchangeToValue = BigDecimal.ZERO;
+						}
+						adjustments.put(exchangeToFundSymbol, fundExchangeToValue.add(exchangeValue.negate()));
+						runningBalances.put(exchangeToFundSymbol,
+								runningBalances.get(exchangeToFundSymbol).add(exchangeValue));
+						// portfolio.adjustValue(exchangeToFundSymbol, exchangeValue);
+
+						System.out.println(String.format("%-60s", fundSymbolNameMap.get(exchangeFromFundSymbol))
+								+ "Adjusted value:  " + CurrencyHelper
+										.formatAsCurrencyString(portfolio.getFund(exchangeFromFundSymbol).getValue()));
+						System.out.println(String.format("%-60s", fundSymbolNameMap.get(exchangeToFundSymbol))
+								+ "Adjusted value:  " + CurrencyHelper
+										.formatAsCurrencyString(portfolio.getFund(exchangeToFundSymbol).getValue()));
+
+						System.out.println("\n");
+						exchangeFromValue = exchangeFromValue.subtract(exchangeValue);
+						surplusEntry.setValue(exchangeFromValue);
+						exchangeFromIncrements = exchangeFromValue.divide(exchangeIncrement).intValue();
+
+						exchangeToValue = exchangeToValue.subtract(exchangeValue);
+						deficitToEntry.setValue(exchangeToValue);
+						exchangeToIncrements = exchangeToValue.divide(exchangeIncrement).intValue();
+
+					}
+					if (exchangeFromIncrements == 0) {
+						break;
+					}
+				}
+			}
+		}
+
 		return adjustments;
 
 	}
@@ -2010,7 +2146,7 @@ public class PortfolioService {
 				false);
 
 		// TODO Attempt to configure stroke to be darker, doesn't seem to work....
-		XYPlot plot = (XYPlot) lineChart.getPlot();
+//		XYPlot plot = (XYPlot) lineChart.getPlot();
 //		XYItemRenderer r = plot.getRenderer();
 //		if (r instanceof XYLineAndShapeRenderer) {
 //			XYLineAndShapeRenderer renderer = (XYLineAndShapeRenderer) r;
@@ -2032,7 +2168,7 @@ public class PortfolioService {
 
 			LocalDate graphDate = startDate;
 			if (graphDate == null) {
-				graphDate = portfolio.getPriceHistory().getOldestDay();
+				graphDate = portfolio.getPriceHistory().getOldestDate();
 			}
 			if (endDate == null) {
 				endDate = LocalDate.now();
@@ -2217,7 +2353,7 @@ public class PortfolioService {
 
 			LocalDate graphDate = startDate;
 			if (graphDate == null) {
-				graphDate = portfolio.getPriceHistory().getOldestDay();
+				graphDate = portfolio.getPriceHistory().getOldestDate();
 			}
 			if (endDate == null) {
 				endDate = LocalDate.now();
@@ -2252,7 +2388,7 @@ public class PortfolioService {
 			PortfolioFund fund = portfolio.getFund(symbol);
 			LocalDate graphDate = startDate;
 			if (graphDate == null) {
-				graphDate = portfolio.getPriceHistory().getOldestDay();
+				graphDate = portfolio.getPriceHistory().getOldestDate();
 			}
 			if (endDate == null) {
 				endDate = LocalDate.now();
@@ -2351,7 +2487,7 @@ public class PortfolioService {
 		TimeSeries timeSeries = new TimeSeries("Portfolio Balance");
 
 		if (startDate == null) {
-			startDate = portfolio.getPriceHistory().getOldestDay();
+			startDate = portfolio.getPriceHistory().getOldestDate();
 		}
 		if (endDate == null) {
 			endDate = LocalDate.now();
@@ -2377,7 +2513,7 @@ public class PortfolioService {
 		TimeSeries dividendTimeSeries = new TimeSeries("Dividends");
 		BigDecimal cumulativeDividends = BigDecimal.ZERO;
 		if (startDate == null) {
-			startDate = portfolio.getPriceHistory().getOldestDay();
+			startDate = portfolio.getPriceHistory().getOldestDate();
 		}
 		if (endDate == null) {
 			endDate = LocalDate.now();
@@ -2405,7 +2541,7 @@ public class PortfolioService {
 		TimeSeries withdrawalTimeSeries = new TimeSeries("Withdrawals");
 		BigDecimal cumulativeWithdrawals = BigDecimal.ZERO;
 		if (startDate == null) {
-			startDate = portfolio.getPriceHistory().getOldestDay();
+			startDate = portfolio.getPriceHistory().getOldestDate();
 		}
 		if (endDate == null) {
 			endDate = LocalDate.now();
@@ -2430,7 +2566,7 @@ public class PortfolioService {
 	}
 
 	public void printPerformanceTable(Portfolio portfolio, Document document) {
-		// Creating a table object
+
 		float[] pointColumnWidths = { 15F, 2F, 4F, 4F, 5F, 5F, 5F, 5F, 5F, 25F, 5F, 5F, 5F, 5F, 5F, 5F, 5F, 5F };
 		Table table = new Table(pointColumnWidths);
 
@@ -2438,15 +2574,14 @@ public class PortfolioService {
 		table.setTextAlignment(TextAlignment.RIGHT);
 
 		// Print table headings
-		table.addHeaderCell(new Cell().add("Fund (report run at " + LocalDateTime.now().format(TIME_FORMATTER) + ")")
-				.setTextAlignment(TextAlignment.LEFT));
+		table.addHeaderCell(new Cell().add("Fund").setTextAlignment(TextAlignment.LEFT));
 		table.addHeaderCell(new Cell().add("%"));
 		table.addHeaderCell(new Cell().add("High Share Price/\n1yr High Price").setTextAlignment(TextAlignment.CENTER));
 		table.addHeaderCell(new Cell().add("Low Share Price/\n1yr Low Price").setTextAlignment(TextAlignment.CENTER));
-		table.addHeaderCell(new Cell().add("Begin 2022\nPrice").setTextAlignment(TextAlignment.CENTER));
-		table.addHeaderCell(new Cell().add("Day % Change").setTextAlignment(TextAlignment.CENTER));
-		table.addHeaderCell(new Cell().add("YTD % Change/\n1 yr/\n3 yr annualized/\n5 yr ann.")
+		table.addHeaderCell(new Cell().add("Begin " + LocalDate.now().getYear() + "\nPrice")
 				.setTextAlignment(TextAlignment.CENTER));
+		table.addHeaderCell(new Cell().add("Day % Change").setTextAlignment(TextAlignment.CENTER));
+		table.addHeaderCell(new Cell().add("YTD % Change/\n1 yr/\n3 yr").setTextAlignment(TextAlignment.CENTER));
 		table.addHeaderCell(new Cell().add("YTD Dividends").setTextAlignment(TextAlignment.CENTER));
 		table.addHeaderCell(
 				new Cell().add("Last Year Dividends").setTextAlignment(TextAlignment.CENTER).setFontSize(12f));
@@ -2518,8 +2653,65 @@ public class PortfolioService {
 
 	}
 
-	public void printWithdrawalSpreadsheet(Portfolio portfolio, BigDecimal netWithdrawalAmount,
+	public void printAuxPerformanceTable(Portfolio portfolio, Document document) {
+
+		float[] pointColumnWidths = { 5F, 5F, 5F, 4F, 4F, 5F, 5F, 5F, 5F, 5F, 5F, 5F, 5F, 5F };
+		Table table = new Table(pointColumnWidths);
+
+		table.setFontSize(12);
+		table.setTextAlignment(TextAlignment.RIGHT);
+
+		// Print table headings
+		table.addHeaderCell(new Cell().add("Current Value").setTextAlignment(TextAlignment.CENTER));
+		table.addHeaderCell(new Cell().add("Start of Year Value").setTextAlignment(TextAlignment.CENTER));
+		table.addHeaderCell(new Cell().add("Start of Last Year Value").setTextAlignment(TextAlignment.CENTER));
+		table.addHeaderCell(new Cell().add("Last Year % Change/\n1 yr/\n3 yr").setTextAlignment(TextAlignment.CENTER));
+		table.addHeaderCell(new Cell().add("Day % Change").setTextAlignment(TextAlignment.CENTER));
+		table.addHeaderCell(new Cell().add("YTD % Change/\n1 yr/\n3 yr").setTextAlignment(TextAlignment.CENTER));
+		table.addHeaderCell(new Cell().add("YTD Dividends").setTextAlignment(TextAlignment.CENTER));
+		table.addHeaderCell(
+				new Cell().add("Last Year Dividends").setTextAlignment(TextAlignment.CENTER).setFontSize(12f));
+		table.addHeaderCell(new Cell().add("YTD\nReturns /\nWithd. /\nExch.").setTextAlignment(TextAlignment.CENTER));
+		table.addHeaderCell(new Cell().add("Last Year Returns /\nWithd. /\nExch.")
+				.setTextAlignment(TextAlignment.CENTER).setFontSize(12f));
+		table.addHeaderCell(new Cell().add("YTD Fed Withholding").setTextAlignment(TextAlignment.CENTER));
+		table.addHeaderCell(new Cell().add("Last Year Fed Withholding").setTextAlignment(TextAlignment.CENTER));
+		table.addHeaderCell(new Cell().add("YTD State Withholding").setTextAlignment(TextAlignment.CENTER));
+		table.addHeaderCell(new Cell().add("Last Year State Withholding").setTextAlignment(TextAlignment.CENTER));
+
+		PortfolioPerformanceData performanceData = PerformanceService.calculatePerformanceData(portfolio);
+
+
+		table.addCell(new Cell().add(CurrencyHelper.formatAsCurrencyString(performanceData.getPortfolioCurrentValue())));
+		table.addCell(new Cell().add(CurrencyHelper.formatAsCurrencyString(performanceData.getPortfolioFirstOfYearValue()))); //
+		table.addCell(new Cell().add(CurrencyHelper.formatAsCurrencyString(performanceData.getPortfolioFirstOfLastYearValue()))); //
+
+		table.addCell(new Cell().add(CurrencyHelper.formatPercentageString(performanceData.getPortfolioPreviousDayValueChange()))); // Day % change
+		table.addCell(new Cell().add(new Cell().setMargin(0f).add(CurrencyHelper.formatPercentageString(performanceData.getPortfolioYtdReturns()))
+				.setBackgroundColor(calculatePercentageFontColor(performanceData.getPortfolioYtdReturns()),
+						performanceData.getPortfolioYtdReturns().multiply(new BigDecimal(10)).abs().floatValue())
+				.add(new Cell().setMargin(0f).add(CurrencyHelper.formatPercentageString(performanceData.getPortfolioYearAgoReturns()))
+						.setBackgroundColor(calculatePercentageFontColor(performanceData.getPortfolioYearAgoReturns()),
+								performanceData.getPortfolioYearAgoReturns().multiply(new BigDecimal(10)).abs().floatValue()))
+				.add(new Cell().setMargin(0f).add(CurrencyHelper.formatPercentageString(performanceData.getPortfolioThreeYearsAgoReturns()))
+						.setBackgroundColor(calculatePercentageFontColor(performanceData.getPortfolioThreeYearsAgoReturns()),
+								performanceData.getPortfolioThreeYearsAgoReturns().multiply(new BigDecimal(10)).abs().floatValue())))); // YTD % Change
+		table.addCell(new Cell().add(CurrencyHelper.formatAsCurrencyString(performanceData.getPortfolioYtdFederalWithholding())).setFontSize(12f));
+		table.addCell(
+				new Cell().add(CurrencyHelper.formatAsCurrencyString(performanceData.getPortfolioLastYearFederalWithholding())).setFontSize(12f));
+		table.addCell(new Cell().add(CurrencyHelper.formatAsCurrencyString(performanceData.getPortfolioYtdStateWithholding())).setFontSize(12f));
+		table.addCell(new Cell().add(CurrencyHelper.formatAsCurrencyString(performanceData.getPortfolioLastYearStateWithholding())).setFontSize(12f));
+
+		document.add(table);
+		document.add(new AreaBreak());
+
+	}
+
+	public void printWithdrawalSpreadsheet(String title, Portfolio portfolio, BigDecimal netWithdrawalAmount,
 			Map<String, BigDecimal> withdrawals, Document document) {
+
+		document.add(new Paragraph(title));
+
 		// Creating a table object
 		float[] pointColumnWidths = { 8F, 5F, 5F, 5F, 5F, 5F, 10F, 5F, 5F, 5F, 5F, 5F, 5F };
 		Table table = new Table(pointColumnWidths);
@@ -2850,51 +3042,64 @@ public class PortfolioService {
 
 	private void addTotalsToTable(Portfolio portfolio, Table table) {
 
-		BigDecimal totalDividends = BigDecimal.ZERO;
-		BigDecimal totalLastYearDividends = BigDecimal.ZERO;
-		BigDecimal totalCurrentPercentage = BigDecimal.ZERO;
-		BigDecimal totalTargetPercentage = BigDecimal.ZERO;
-		BigDecimal total = portfolio.getTotalValue();
-		BigDecimal totalYtdValueChange = BigDecimal.ZERO;
-		BigDecimal totalYtdWithdrawals = BigDecimal.ZERO;
-		BigDecimal totalFirstOfYearValue = BigDecimal.ZERO;
-		BigDecimal totalPreviousDayValue = BigDecimal.ZERO;
-		BigDecimal totalPreviousValueChange = BigDecimal.ZERO;
-		BigDecimal totalYearAgoValue = BigDecimal.ZERO;
-		BigDecimal totalYearAgoWithdrawals = BigDecimal.ZERO;
+		BigDecimal portfolioCurrentValue = portfolio.getTotalValue();
+
+		BigDecimal portfolioYtdDividends = BigDecimal.ZERO;
+		BigDecimal portfolioLastYearDividends = BigDecimal.ZERO;
+		BigDecimal portfolioTotalCurrentPercentage = BigDecimal.ZERO;
+		BigDecimal portfolioTotalTargetPercentage = BigDecimal.ZERO;
+		BigDecimal portfolioYtdValueChange = BigDecimal.ZERO;
+		BigDecimal portfolioYtdWithdrawals = BigDecimal.ZERO;
+		BigDecimal portfolioFirstOfYearValue = BigDecimal.ZERO;
+		BigDecimal portfolioPreviousDayValue = BigDecimal.ZERO;
+		BigDecimal portfolioPreviousValueChange = BigDecimal.ZERO;
+		BigDecimal portfolioYearAgoValue = BigDecimal.ZERO;
+		BigDecimal portfolioYearAgoWithdrawals = BigDecimal.ZERO;
+		BigDecimal portfolioThreeYearAgoValue = BigDecimal.ZERO;
+		BigDecimal portfolioThreeYearAgoWithdrawals = BigDecimal.ZERO;
 
 		for (PortfolioFund fund : portfolio.getFundMap().values()) {
-			totalPreviousDayValue = totalPreviousDayValue.add(getHistoricalValue(fund, 1));
+			
+			portfolioPreviousDayValue = portfolioPreviousDayValue.add(getHistoricalValue(fund, 1));
 
-			totalYtdWithdrawals = totalYtdWithdrawals.add(fund.getWithdrawalsUpToDate(getFirstOfYearDate()));
-			totalDividends = totalDividends.add(fund.getDistributionsAfterDate(getFirstOfYearDate()));
-			totalLastYearDividends = totalLastYearDividends.add(fund.getDistributionsBetweenDates(
+			portfolioYtdWithdrawals = portfolioYtdWithdrawals.add(fund.getWithdrawalsUpToDate(getFirstOfYearDate()));
+			portfolioYtdDividends = portfolioYtdDividends.add(fund.getDistributionsAfterDate(getFirstOfYearDate()));
+			portfolioLastYearDividends = portfolioLastYearDividends.add(fund.getDistributionsBetweenDates(
 					getFirstOfYearDate().minus(1, ChronoUnit.YEARS), getFirstOfYearDate().minus(1, ChronoUnit.DAYS)));
 
 			BigDecimal fundFirstOfYearValue = getHistoricalValue(fund, getYtdDays());
-			totalFirstOfYearValue = totalFirstOfYearValue.add(fundFirstOfYearValue);
-			totalYtdValueChange = totalYtdValueChange.add(fund.getValue().subtract(fundFirstOfYearValue));
+			portfolioFirstOfYearValue = portfolioFirstOfYearValue.add(fundFirstOfYearValue);
+			portfolioYtdValueChange = portfolioYtdValueChange.add(fund.getValue().subtract(fundFirstOfYearValue));
 
 			BigDecimal fundYearAgoValue = getHistoricalValue(fund, 365);
-			totalYearAgoValue = totalYearAgoValue.add(fundYearAgoValue);
+			portfolioYearAgoValue = portfolioYearAgoValue.add(fundYearAgoValue);
 
-			totalYearAgoWithdrawals = totalYearAgoWithdrawals
+			BigDecimal fundThreeYearAgoValue = getHistoricalValue(fund, 365 * 3);
+			portfolioThreeYearAgoValue = portfolioThreeYearAgoValue.add(fundThreeYearAgoValue);
+
+			portfolioYearAgoWithdrawals = portfolioYearAgoWithdrawals
 					.add(fund.getWithdrawalsUpToDate(LocalDate.now().minusYears(1)));
+			portfolioThreeYearAgoWithdrawals = portfolioThreeYearAgoWithdrawals
+					.add(fund.getWithdrawalsUpToDate(LocalDate.now().minusYears(3)));
 
-			totalCurrentPercentage = totalCurrentPercentage
+			portfolioTotalCurrentPercentage = portfolioTotalCurrentPercentage
 					.add(CurrencyHelper.calculatePercentage(fund.getValue(), portfolio.getTotalValue()));
-			totalTargetPercentage = totalTargetPercentage.add(fund.getPercentageByCategory(FundCategory.TOTAL));
+			portfolioTotalTargetPercentage = portfolioTotalTargetPercentage.add(fund.getPercentageByCategory(FundCategory.TOTAL));
 
 		}
 
-		totalPreviousValueChange = CurrencyHelper.calculatePercentage(
-				portfolio.getTotalValue().subtract(totalPreviousDayValue), portfolio.getTotalValue());
-		totalFirstOfYearValue = totalFirstOfYearValue.subtract(totalYtdWithdrawals);
-		BigDecimal ytdReturns = portfolio.getTotalValue().subtract(totalFirstOfYearValue)
+		portfolioPreviousValueChange = CurrencyHelper.calculatePercentage(
+				portfolio.getTotalValue().subtract(portfolioPreviousDayValue), portfolio.getTotalValue());
+		portfolioFirstOfYearValue = portfolioFirstOfYearValue.subtract(portfolioYtdWithdrawals);
+		BigDecimal ytdReturns = portfolio.getTotalValue().subtract(portfolioFirstOfYearValue)
 				.divide(portfolio.getTotalValue(), 4, RoundingMode.HALF_DOWN);
 
-		totalYearAgoValue = totalYearAgoValue.subtract(totalYearAgoWithdrawals);
-		BigDecimal yearAgoReturns = portfolio.getTotalValue().subtract(totalYearAgoValue)
+		portfolioYearAgoValue = portfolioYearAgoValue.subtract(portfolioYearAgoWithdrawals);
+		BigDecimal yearAgoReturns = portfolio.getTotalValue().subtract(portfolioYearAgoValue)
+				.divide(portfolio.getTotalValue(), 4, RoundingMode.HALF_DOWN);
+
+		portfolioThreeYearAgoValue = portfolioThreeYearAgoValue.subtract(portfolioThreeYearAgoWithdrawals);
+		BigDecimal threeYearAgoReturns = portfolio.getTotalValue().subtract(portfolioThreeYearAgoValue)
 				.divide(portfolio.getTotalValue(), 4, RoundingMode.HALF_DOWN);
 
 		table.addCell(new Cell().add("Grand Total").setBold());
@@ -2902,28 +3107,31 @@ public class PortfolioService {
 		table.addCell(new Cell().add("")); // High share price
 		table.addCell(new Cell().add("")); // Low share price n/a
 		table.addCell(new Cell().add("")); // Begin year price n/a
-		table.addCell(new Cell().add(CurrencyHelper.formatPercentageString(totalPreviousValueChange))); // Day % change
+		table.addCell(new Cell().add(CurrencyHelper.formatPercentageString(portfolioPreviousValueChange))); // Day % change
 		table.addCell(new Cell().add(new Cell().setMargin(0f).add(CurrencyHelper.formatPercentageString(ytdReturns))
 				.setBackgroundColor(calculatePercentageFontColor(ytdReturns),
 						ytdReturns.multiply(new BigDecimal(10)).abs().floatValue())
 				.add(new Cell().setMargin(0f).add(CurrencyHelper.formatPercentageString(yearAgoReturns))
 						.setBackgroundColor(calculatePercentageFontColor(yearAgoReturns),
+								yearAgoReturns.multiply(new BigDecimal(10)).abs().floatValue()))
+				.add(new Cell().setMargin(0f).add(CurrencyHelper.formatPercentageString(threeYearAgoReturns))
+						.setBackgroundColor(calculatePercentageFontColor(threeYearAgoReturns),
 								yearAgoReturns.multiply(new BigDecimal(10)).abs().floatValue())))); // YTD % Change
-		table.addCell(new Cell().add(CurrencyHelper.formatAsCurrencyString(totalDividends)).setFontSize(12f));
-		table.addCell(new Cell().add(CurrencyHelper.formatAsCurrencyString(totalLastYearDividends)).setFontSize(12f));
+		table.addCell(new Cell().add(CurrencyHelper.formatAsCurrencyString(portfolioYtdDividends)).setFontSize(12f));
+		table.addCell(new Cell().add(CurrencyHelper.formatAsCurrencyString(portfolioLastYearDividends)).setFontSize(12f));
 
 		// YTD Returns (withdrawals)
 		table.addCell(new Cell().setMargin(0f)
-				.add(new Cell().setMargin(0f).add(CurrencyHelper.formatAsCurrencyString(totalYtdValueChange))
-						.setFontColor(calculateCurrencyFontColor(totalYtdValueChange)))
-				.add(new Cell().setMargin(0f).add(CurrencyHelper.formatAsCurrencyString(totalYtdWithdrawals))
+				.add(new Cell().setMargin(0f).add(CurrencyHelper.formatAsCurrencyString(portfolioYtdValueChange))
+						.setFontColor(calculateCurrencyFontColor(portfolioYtdValueChange)))
+				.add(new Cell().setMargin(0f).add(CurrencyHelper.formatAsCurrencyString(portfolioYtdWithdrawals))
 //						.setFontColor(ytdWithdrawalsFontColor)
 				));
 		table.addCell(new Cell().add(""));
 		table.addCell(new Cell().add(""));
-		table.addCell(new Cell().add(CurrencyHelper.formatAsCurrencyString(total)));
-		table.addCell(new Cell().add(CurrencyHelper.formatPercentageString(totalCurrentPercentage)));
-		table.addCell(new Cell().add(CurrencyHelper.formatPercentageString(totalTargetPercentage)));
+		table.addCell(new Cell().add(CurrencyHelper.formatAsCurrencyString(portfolioCurrentValue)));
+		table.addCell(new Cell().add(CurrencyHelper.formatPercentageString(portfolioTotalCurrentPercentage)));
+		table.addCell(new Cell().add(CurrencyHelper.formatPercentageString(portfolioTotalTargetPercentage)));
 		table.addCell(new Cell().add(""));
 		table.addCell(new Cell().add(""));
 		table.addCell(new Cell().add(""));
@@ -2946,6 +3154,9 @@ public class PortfolioService {
 		for (BigDecimal withdrawal : withdrawals.values()) {
 			totalWithdrawals = totalWithdrawals.add(withdrawal);
 		}
+		BigDecimal federalIncomeTax = totalWithdrawals.multiply(new BigDecimal(.10));
+		BigDecimal stateIncomeTax = totalWithdrawals.multiply(new BigDecimal(.05));
+		BigDecimal netWithdrawalAmount = totalWithdrawals.subtract(federalIncomeTax).subtract(stateIncomeTax);
 
 		table.addCell(new Cell().add("Grand Total").setBold());
 
@@ -2968,7 +3179,10 @@ public class PortfolioService {
 		table.addCell(new Cell().add("n/a"));
 
 		// Withdrawals
-		table.addCell(new Cell().add(CurrencyHelper.formatAsCurrencyString(totalWithdrawals)));
+		table.addCell(new Cell().add(new Cell().add(CurrencyHelper.formatAsCurrencyString(totalWithdrawals)))
+				.add(new Cell().add("federal " + CurrencyHelper.formatAsCurrencyString(federalIncomeTax)))
+				.add(new Cell().add("state " + CurrencyHelper.formatAsCurrencyString(stateIncomeTax)))
+				.add(new Cell().add("net " + CurrencyHelper.formatAsCurrencyString(netWithdrawalAmount))));
 
 		// Post Withdrawal Value
 		table.addCell(new Cell().add(CurrencyHelper.formatAsCurrencyString(total.subtract(totalWithdrawals))));
@@ -2995,7 +3209,7 @@ public class PortfolioService {
 		BigDecimal dayPriceChange = performance.getDayPriceChange();
 
 		LocalDate fiftyTwoWeeksAgo = LocalDate.now().minus(1, ChronoUnit.YEARS);
-		Float fiftyTwoWeekPriceChange = performance.getPerformanceRateByDate(fiftyTwoWeeksAgo);
+		Float fiftyTwoWeekPerformanceRate = performance.getPerformanceRateByDate(fiftyTwoWeeksAgo);
 
 		LocalDate threeYearsAgo = LocalDate.now().minus(3, ChronoUnit.YEARS);
 		Float threeYearPriceChange = performance.getPerformanceRateByDate(threeYearsAgo);
@@ -3004,13 +3218,13 @@ public class PortfolioService {
 			annualizedThreeYearPriceChange = threeYearPriceChange / 3;
 		}
 
-		LocalDate fiveYearsAgo = LocalDate.now().minus(5, ChronoUnit.YEARS);
-		Float fiveYearPriceChange = performance.getPerformanceRateByDate(fiveYearsAgo);
-		Float annualizedFiveYearPriceChange = 0f;
-		if (fiveYearPriceChange != null) {
-			annualizedFiveYearPriceChange = fiveYearPriceChange / 5;
-		}
-		BigDecimal ytdPriceChange = performance.getYtdPriceChange();
+//		LocalDate fiveYearsAgo = LocalDate.now().minus(5, ChronoUnit.YEARS);
+//		Float fiveYearPriceChange = performance.getPerformanceRateByDate(fiveYearsAgo);
+//		Float annualizedFiveYearPriceChange = 0f;
+//		if (fiveYearPriceChange != null) {
+//			annualizedFiveYearPriceChange = fiveYearPriceChange / 5;
+//		}
+		Float ytdPerformanceRate = performance.getPerformanceRateByDate(getFirstOfYearDate());
 		// Does this include exchanges and withdrawals?
 		BigDecimal ytdValueChange = performance.getYtdValueChange();
 		BigDecimal ytdWithdrawals = fund.getWithdrawalsUpToDate(getFirstOfYearDate());
@@ -3067,11 +3281,11 @@ public class PortfolioService {
 		BigDecimal lastYearDividends = fund.getDistributionsBetweenDates(
 				getFirstOfYearDate().minus(1, ChronoUnit.YEARS), getFirstOfYearDate().minus(1, ChronoUnit.DAYS));
 
-		// Min/max prices
-		LocalDate oldestDate = LocalDate.now().minus(oldestDay, ChronoUnit.DAYS);
-		LocalDate fiveYrsAgoDate = LocalDate.now().minus(oldestDay, ChronoUnit.DAYS);
-		Pair<LocalDate, BigDecimal> maxPricePair = priceHistory.getMaxPriceFromDate(fund, fiveYrsAgoDate);
-		Pair<LocalDate, BigDecimal> minPricePair = priceHistory.getMinPriceFromDate(fund, fiveYrsAgoDate);
+		// Min/max priceso
+		// LocalDate oldestDate = LocalDate.now().minusDays(oldestDay);
+		LocalDate earliestDate = priceHistory.getOldestDate();
+		Pair<LocalDate, BigDecimal> maxPricePair = priceHistory.getMaxPriceFromDate(fund, earliestDate);
+		Pair<LocalDate, BigDecimal> minPricePair = priceHistory.getMinPriceFromDate(fund, earliestDate);
 		Pair<LocalDate, BigDecimal> maxPrice1YRPair = priceHistory.getMaxPriceFromDate(fund, fiftyTwoWeeksAgo);
 		Pair<LocalDate, BigDecimal> minPrice1YRPair = priceHistory.getMinPriceFromDate(fund, fiftyTwoWeeksAgo);
 		Color minPrice1YRFontColor = Color.BLACK;
@@ -3144,12 +3358,12 @@ public class PortfolioService {
 
 		// YTD / 1 year / 3 yr annualized Price Change
 		table.addCell(new Cell().setMargin(0f)
-				.add(new Cell().add(CurrencyHelper.formatPercentageString(ytdPriceChange)).setBackgroundColor(
-						calculatePercentageFontColor(ytdPriceChange),
-						ytdPriceChange.multiply(new BigDecimal(10)).abs().floatValue()))
-				.add(new Cell().add(CurrencyHelper.formatPercentageString(fiftyTwoWeekPriceChange)).setBackgroundColor(
-						calculatePercentageFontColor(new BigDecimal(fiftyTwoWeekPriceChange)),
-						new BigDecimal(fiftyTwoWeekPriceChange * 10f).abs().floatValue()))
+				.add(new Cell().add(CurrencyHelper.formatPercentageString(ytdPerformanceRate)).setBackgroundColor(
+						calculatePercentageFontColor(new BigDecimal(ytdPerformanceRate)),
+						new BigDecimal(ytdPerformanceRate * 10f).abs().floatValue()))
+				.add(new Cell().add(CurrencyHelper.formatPercentageString(fiftyTwoWeekPerformanceRate))
+						.setBackgroundColor(calculatePercentageFontColor(new BigDecimal(fiftyTwoWeekPerformanceRate)),
+								new BigDecimal(fiftyTwoWeekPerformanceRate * 10f).abs().floatValue()))
 				.add(new Cell().add(CurrencyHelper.formatPercentageString(annualizedThreeYearPriceChange))
 						.setBackgroundColor(
 								calculatePercentageFontColor(new BigDecimal(annualizedThreeYearPriceChange)),
@@ -3317,9 +3531,10 @@ public class PortfolioService {
 		return LocalDate.of(LocalDate.now().getYear(), 1, 1);
 	}
 
-	private int getYtdDays() {
+	private long getYtdDays() {
 		Period period = getFirstOfYearDate().until(LocalDate.now());
-		Integer ytdDays = period.getYears() * 365 + period.getMonths() * 30 + period.getDays();
+		int ytdDays = period.getDays();
+
 		return ytdDays;
 	}
 
@@ -3494,6 +3709,34 @@ public class PortfolioService {
 		saveHistoricalPrices(portfolio, HISTORICAL_PRICES_FILE);
 		saveHistoricalValue(portfolio, HISTORICAL_VALUES_FILE);
 		saveHistoricalShares(portfolio, HISTORICAL_SHARES_FILE);
+	}
+
+	public void updateDownloadFilenames(Portfolio portfolio2, String downloadFilenamePrefix) {
+
+		DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HHmmss.SSS");
+
+		try (Stream<Path> stream = Files.list(Paths.get(basePath))) {
+
+			List<String> filenames = stream.filter(p -> p.getFileName().toString().startsWith(downloadFilenamePrefix))
+					.map(p -> p.getFileName().toString()).sorted().collect(Collectors.toList());
+			for (String filename : filenames) {
+				LocalDateTime date = getDownloadFileDate(filename, false);
+
+				if (date == null) {
+					// Not a valid download file
+					continue;
+				}
+
+				// rename file to correct mistake
+				String newFileName = downloadFilenamePrefix + " - " + date.format(formatter) + ".csv";
+				if (Files.exists(Paths.get(basePath, filename)) && !Files.exists(Paths.get(basePath, newFileName))) {
+					Files.move(Paths.get(basePath, filename), Paths.get(basePath, newFileName));
+				}
+
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
 
 }

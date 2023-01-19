@@ -32,7 +32,9 @@ public class PortfolioPriceHistory {
 	}
 
 	private Map<String, Map<LocalDate, Float>> fundShares = new HashMap<>();
+	// TODO add source to find inconsistencies = use separate map or throw exception that is handled by printing out source?
 	private Map<String, Map<LocalDate, BigDecimal>> fundPrices = new HashMap<>();
+	private Map<String, Map<LocalDate, String>> fundPricesSource = new HashMap<>();
 	private Map<String, Map<LocalDate, BigDecimal>> fundReturns = new HashMap<>();
 	private Map<String, Map<LocalDate, BigDecimal>> fundBalanceByDate = new HashMap<>();
 
@@ -47,14 +49,18 @@ public class PortfolioPriceHistory {
 
 	private Map<String, Map<FundCategory, BigDecimal>> desiredFundAllocation = new HashMap<>();
 
-	private LocalDate oldestDay = LocalDate.now();
+	private LocalDate oldestDate = LocalDate.now();
 
-	public LocalDate getOldestDay() {
-		return oldestDay;
+	public LocalDate getOldestDate() {
+		return oldestDate;
 	}
 
-	public void setOldestDay(LocalDate oldestDay) {
-		this.oldestDay = oldestDay;
+	public int getOldestDay() {
+		return oldestDate.until(LocalDate.now()).getDays();
+	}
+
+	public void setOldestDate(LocalDate date) {
+		this.oldestDate = date;
 	}
 
 	public LocalDate getMostRecentDay() {
@@ -120,8 +126,8 @@ public class PortfolioPriceHistory {
 			return;
 		}
 
-		if (date.isBefore(oldestDay)) {
-			oldestDay = date;
+		if (date.isBefore(oldestDate)) {
+			oldestDate = date;
 		}
 		if (date.isAfter(mostRecentDay)) {
 			mostRecentDay = date;
@@ -200,6 +206,7 @@ public class PortfolioPriceHistory {
 			fund.setCurrentPrice(price);
 			addFundPrice(symbol, date, price);
 			addFundShares(symbol, date, new Float(shares));
+			addFundPriceSource(symbol, date, downloadFile);
 			funds.put(symbol, fund);
 
 		}
@@ -221,8 +228,13 @@ public class PortfolioPriceHistory {
 						continue;
 					}
 
-					LocalDate tradeDate = LocalDate.parse(fundTransaction.get(1),
-							DateTimeFormatter.ofPattern("M/d/yyyy"));
+					LocalDate tradeDate;
+					try {
+						tradeDate = LocalDate.parse(fundTransaction.get(1), DateTimeFormatter.ofPattern("M/d/yyyy"));
+					} catch (Exception e) {
+						System.out.println("Exception processing transactions:  " + e);
+						continue;
+					}
 					Float transactionShares = Float.valueOf(fundTransaction.get(7));
 					BigDecimal transactionSharePrice = new BigDecimal(fundTransaction.get(8));
 					BigDecimal principalAmount = new BigDecimal(fundTransaction.get(9));
@@ -248,6 +260,14 @@ public class PortfolioPriceHistory {
 						fund.addShareConversion(tradeDate, transactionType, transactionShares, transactionSharePrice,
 								principalAmount, downloadFile);
 
+					}
+					if (transactionType.contains("Withholding (Federal)")) {
+						fund.addShareConversion(tradeDate, transactionType, transactionShares, transactionSharePrice,
+								principalAmount, downloadFile);
+					}
+					if (transactionType.contains("Withholding (State)")) {
+						fund.addShareConversion(tradeDate, transactionType, transactionShares, transactionSharePrice,
+								principalAmount, downloadFile);
 					}
 				}
 			}
@@ -313,6 +333,7 @@ public class PortfolioPriceHistory {
 
 				if (price != null) {
 					addFundPrice(symbol, date, price);
+					addFundPriceSource(symbol, date, historyFile);
 				}
 			}
 
@@ -394,6 +415,17 @@ public class PortfolioPriceHistory {
 
 	}
 
+	private void addFundPriceSource(String symbol, LocalDate date, String source) {
+		Map<LocalDate, String> fundPriceSourceMap = fundPricesSource.get(symbol);
+		if (fundPriceSourceMap == null) {
+			fundPriceSourceMap = new HashMap<>();
+			fundPricesSource.put(symbol, fundPriceSourceMap);
+		}
+		
+		fundPriceSourceMap.put(date, source);
+
+	}
+	
 	public void addFundPrice(String symbol, LocalDate date, BigDecimal price) {
 
 		if (price == null || price.compareTo(BigDecimal.ZERO) <= 0) {
@@ -401,7 +433,7 @@ public class PortfolioPriceHistory {
 		}
 
 		price = price.setScale(4, RoundingMode.HALF_DOWN);
-		
+
 		if (date.getDayOfWeek() == DayOfWeek.SATURDAY || date.getDayOfWeek() == DayOfWeek.SUNDAY) {
 			// filter out bad data????
 			return;
@@ -415,8 +447,11 @@ public class PortfolioPriceHistory {
 		BigDecimal existingPrice = fundPriceMap.get(date);
 		if (existingPrice != null) {
 			if (existingPrice.compareTo(price) != 0) {
-				// Alpha Vantage service is returning different price than vanguard....  use vanguard download files...
-				System.out.println(symbol + " " + date + " " + CurrencyHelper.formatAsCurrencyString(existingPrice) + "," + CurrencyHelper.formatAsCurrencyString(price));
+				// Alpha Vantage service is returning different price than vanguard.... use
+				// vanguard download files...
+				String source= fundPricesSource.get(symbol).get(date);
+				System.out.println(symbol + " prev source: " + source + " " + date + " " + CurrencyHelper.formatAsCurrencyString(existingPrice)
+						+ "," + CurrencyHelper.formatAsCurrencyString(price));
 			}
 			// Don't add second price for same date
 			return;
@@ -571,19 +606,35 @@ public class PortfolioPriceHistory {
 		for (PortfolioFund fund : portfolio.getFundMap().values()) {
 
 			Map<LocalDate, BigDecimal> fundPriceMap = fundPrices.get(fund.getSymbol());
-			BigDecimal value = fundPriceMap.get(date);
-			if (value == null && !isExactDate) {
+			Map<LocalDate, Float> fundShareMap = fundShares.get(fund.getSymbol());
+			
+			BigDecimal fundPrice = fundPriceMap.get(date);
+			Float fundShares = fundShareMap.get(date);
+			BigDecimal fundValue = BigDecimal.ZERO;
+			if (fundPrice != null && fundShares != null) {
+				fundValue = fundPrice.multiply(new BigDecimal(fundShares));
+			}
+			if (fundValue.compareTo(BigDecimal.ZERO) == 0 && !isExactDate) {
 				int tries = 30;
 				while (tries-- > 0) {
 					date = date.minus(1, ChronoUnit.DAYS);
-					value = fundPriceMap.get(date);
-					if (value != null) {
-						portfolioValue = portfolioValue.add(value);
+					fundPrice = fundPriceMap.get(date);
+					fundShares = fundShareMap.get(date);
+					if (fundPrice != null && fundShares != null) {
+						fundValue = fundPrice.multiply(new BigDecimal(fundShares));
+						if (fundValue.compareTo(BigDecimal.ZERO) > 0) {
+							break;
+						}
 					}
 				}
 			}
+			portfolioValue = portfolioValue.add(fundValue);
 		}
 		return portfolioValue;
+	}
+
+	public BigDecimal getPriceByDate(String symbol, LocalDate date) {
+		return fundPrices.get(symbol).get(date);
 	}
 
 }

@@ -88,8 +88,8 @@ public class AlphaVantageFundPriceService {
 			}
 
 			httpclient.close();
-			if (earliestDate.isBefore(priceHistory.getOldestDay())) {
-				priceHistory.setOldestDay(earliestDate);
+			if (earliestDate.isBefore(priceHistory.getOldestDate())) {
+				priceHistory.setOldestDate(earliestDate);
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
