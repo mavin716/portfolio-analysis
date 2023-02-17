@@ -32,7 +32,8 @@ public class PortfolioPriceHistory {
 	}
 
 	private Map<String, Map<LocalDate, Float>> fundShares = new HashMap<>();
-	// TODO add source to find inconsistencies = use separate map or throw exception that is handled by printing out source?
+	// TODO add source to find inconsistencies = use separate map or throw exception
+	// that is handled by printing out source?
 	private Map<String, Map<LocalDate, BigDecimal>> fundPrices = new HashMap<>();
 	private Map<String, Map<LocalDate, String>> fundPricesSource = new HashMap<>();
 	private Map<String, Map<LocalDate, BigDecimal>> fundReturns = new HashMap<>();
@@ -55,8 +56,8 @@ public class PortfolioPriceHistory {
 		return oldestDate;
 	}
 
-	public int getOldestDay() {
-		return oldestDate.until(LocalDate.now()).getDays();
+	public long getOldestDay() {
+		return oldestDate.until(LocalDate.now(), ChronoUnit.DAYS);
 	}
 
 	public void setOldestDate(LocalDate date) {
@@ -127,7 +128,7 @@ public class PortfolioPriceHistory {
 		}
 
 		if (date.isBefore(oldestDate)) {
-			oldestDate = date;
+			setOldestDate(date);
 		}
 		if (date.isAfter(mostRecentDay)) {
 			mostRecentDay = date;
@@ -166,6 +167,7 @@ public class PortfolioPriceHistory {
 			currentFundsTransactions = br.lines().map(line -> Arrays.asList(line.split(",")))
 					.filter(line -> line.size() == 14).collect(Collectors.toList());
 
+			System.out.println("Read " + currentFundsTransactions.size() + " transactions from file:  " + downloadFile);
 		} catch (Exception e) {
 			System.out.println("Invalid file:  " + downloadFile + "Exception: " + e.getMessage());
 		}
@@ -218,28 +220,36 @@ public class PortfolioPriceHistory {
 				currentFundsTransactions.remove(0);
 
 				for (List<String> fundTransaction : currentFundsTransactions) {
+					PortfolioFund fund = null;
 					String transactionType = fundTransaction.get(3);
 					String fundSymbol = fundTransaction.get(6);
-					if (fundSymbol == null || fundSymbol.length() == 0) {
-						continue;
-					}
-					PortfolioFund fund = funds.get(fundSymbol);
-					if (fund == null) {
-						continue;
+					if (!transactionType.contains("Withholding")) {
+
+						if (fundSymbol == null || fundSymbol.length() == 0) {
+							continue;
+						}
+						fund = funds.get(fundSymbol);
+						if (fund == null) {
+							continue;
+						}
 					}
 
 					LocalDate tradeDate;
 					try {
 						tradeDate = LocalDate.parse(fundTransaction.get(1), DateTimeFormatter.ofPattern("M/d/yyyy"));
 					} catch (Exception e) {
-						System.out.println("Exception processing transactions:  " + e);
-						continue;
+						try {
+							tradeDate = LocalDate.parse(fundTransaction.get(1), DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+						} catch (Exception e1) {
+							System.out.println("Exception processing transactions:  " + e);
+							continue;
+						}
 					}
 					Float transactionShares = Float.valueOf(fundTransaction.get(7));
 					BigDecimal transactionSharePrice = new BigDecimal(fundTransaction.get(8));
 					BigDecimal principalAmount = new BigDecimal(fundTransaction.get(9));
 
-					if (transactionType.startsWith("Reinvestment")) {
+					if (transactionType.startsWith("Reinvestment") && fund != null) {
 						fund.addDistribution(tradeDate, transactionType, transactionShares, transactionSharePrice,
 								principalAmount, downloadFile);
 					}
@@ -248,26 +258,26 @@ public class PortfolioPriceHistory {
 					// was adjusted?
 					// no way to distinguish (except maybe amount is equal) and doesn't always
 					// happen
-					if (transactionType.equals("Sell")) {
+					if (transactionType.equals("Sell") && fund != null) {
 						fund.addWithdrawal(tradeDate, transactionType, transactionShares, transactionSharePrice,
 								principalAmount, downloadFile);
 					}
-					if (transactionType.contains("exchange")) {
+					if (transactionType.contains("exchange") && fund != null) {
 						fund.addExchange(tradeDate, transactionType, transactionShares, transactionSharePrice,
 								principalAmount, downloadFile);
 					}
-					if (transactionType.contains("Share Conversion")) {
+					if (transactionType.contains("Share Conversion") && fund != null) {
 						fund.addShareConversion(tradeDate, transactionType, transactionShares, transactionSharePrice,
 								principalAmount, downloadFile);
 
 					}
 					if (transactionType.contains("Withholding (Federal)")) {
-						fund.addShareConversion(tradeDate, transactionType, transactionShares, transactionSharePrice,
-								principalAmount, downloadFile);
+						portfolio.addFederalWithholdingTax(tradeDate, transactionType, transactionShares,
+								transactionSharePrice, principalAmount, downloadFile);
 					}
 					if (transactionType.contains("Withholding (State)")) {
-						fund.addShareConversion(tradeDate, transactionType, transactionShares, transactionSharePrice,
-								principalAmount, downloadFile);
+						portfolio.addStateWithholdingTax(tradeDate, transactionType, transactionShares,
+								transactionSharePrice, principalAmount, downloadFile);
 					}
 				}
 			}
@@ -421,11 +431,11 @@ public class PortfolioPriceHistory {
 			fundPriceSourceMap = new HashMap<>();
 			fundPricesSource.put(symbol, fundPriceSourceMap);
 		}
-		
+
 		fundPriceSourceMap.put(date, source);
 
 	}
-	
+
 	public void addFundPrice(String symbol, LocalDate date, BigDecimal price) {
 
 		if (price == null || price.compareTo(BigDecimal.ZERO) <= 0) {
@@ -449,9 +459,10 @@ public class PortfolioPriceHistory {
 			if (existingPrice.compareTo(price) != 0) {
 				// Alpha Vantage service is returning different price than vanguard.... use
 				// vanguard download files...
-				String source= fundPricesSource.get(symbol).get(date);
-				System.out.println(symbol + " prev source: " + source + " " + date + " " + CurrencyHelper.formatAsCurrencyString(existingPrice)
-						+ "," + CurrencyHelper.formatAsCurrencyString(price));
+				String source = fundPricesSource.get(symbol).get(date);
+				System.out.println(symbol + " prev source: " + source + " " + date + " "
+						+ CurrencyHelper.formatAsCurrencyString(existingPrice) + ","
+						+ CurrencyHelper.formatAsCurrencyString(price));
 			}
 			// Don't add second price for same date
 			return;
@@ -607,7 +618,7 @@ public class PortfolioPriceHistory {
 
 			Map<LocalDate, BigDecimal> fundPriceMap = fundPrices.get(fund.getSymbol());
 			Map<LocalDate, Float> fundShareMap = fundShares.get(fund.getSymbol());
-			
+
 			BigDecimal fundPrice = fundPriceMap.get(date);
 			Float fundShares = fundShareMap.get(date);
 			BigDecimal fundValue = BigDecimal.ZERO;

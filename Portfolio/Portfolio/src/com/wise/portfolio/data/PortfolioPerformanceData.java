@@ -49,10 +49,6 @@ public class PortfolioPerformanceData {
 	}
 
 
-	public void setPortfolioPreviousValueChange(BigDecimal portfolioPreviousValueChange) {
-		this.portfolioPreviousValueChange = portfolioPreviousValueChange;
-	}
-
 
 	public void setPortfolioYearAgoValue(BigDecimal portfolioYearAgoValue) {
 		this.portfolioYearAgoValue = portfolioYearAgoValue;
@@ -119,9 +115,6 @@ public class PortfolioPerformanceData {
 	}
 
 
-	public BigDecimal getPortfolioPreviousValueChange() {
-		return portfolioPreviousValueChange;
-	}
 
 
 	public BigDecimal getPortfolioYearAgoValue() {
@@ -148,6 +141,12 @@ public class PortfolioPerformanceData {
 
 	BigDecimal portfolioYtdDividends = BigDecimal.ZERO;
 	BigDecimal portfolioLastYearDividends = BigDecimal.ZERO;
+	BigDecimal portfolioLastYearWithdrawals = BigDecimal.ZERO;
+	public BigDecimal getPortfolioLastYearWithdrawals() {
+		return portfolioLastYearWithdrawals;
+	}
+
+
 	BigDecimal portfolioTotalCurrentPercentage = BigDecimal.ZERO;
 	BigDecimal portfolioTotalTargetPercentage = BigDecimal.ZERO;
 	
@@ -166,8 +165,11 @@ public class PortfolioPerformanceData {
 		return portfolioPreviousDayValueChange;
 	}
 
+	BigDecimal portfolioYtdValueChange = BigDecimal.ZERO;
+	public BigDecimal getPortfolioYtdValueChange() {
+		return portfolioYtdValueChange;
+	}
 
-	BigDecimal portfolioPreviousValueChange = BigDecimal.ZERO;
 	BigDecimal portfolioYearAgoValue = BigDecimal.ZERO;
 	BigDecimal portfolioYearAgoReturns = BigDecimal.ZERO;
 	public BigDecimal getPortfolioYearAgoReturns() {
@@ -203,6 +205,12 @@ public class PortfolioPerformanceData {
 	BigDecimal portfolioLastYearStateWithholding = BigDecimal.ZERO;
 	public BigDecimal getPortfolioLastYearStateWithholding() {
 		return portfolioLastYearStateWithholding;
+	}
+
+
+	public BigDecimal getPortfolioLastYearReturns() {
+		// TODO yearago or last year????
+		return portfolioYearAgoReturns;
 	}
 
 

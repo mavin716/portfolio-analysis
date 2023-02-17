@@ -29,12 +29,14 @@ public class PortfolioApp {
 
 	private static final String DOWNLOAD_FILENAME_PREFIX = "ofxdownload";
 	private static final String CURRENT_DOWNLOAD_FILE = DOWNLOAD_PATH + DOWNLOAD_FILENAME_PREFIX + ".csv";
+	private static final String DOWNLOAD_FILENAME_PREFIX_NEW = "OfxDownload";
+	private static final String CURRENT_DOWNLOAD_FILE_NEW = DOWNLOAD_PATH + DOWNLOAD_FILENAME_PREFIX_NEW + ".csv";
 	private static final String ALLOCATION_FILE = DOWNLOAD_PATH + "allocation.csv";
 
 	private static final String FUND_SYMBOLS_MAP_FILE = "allocation.csv";
 	private static final String PORTFOLIO_PDF_FILE = "C:\\Users\\Margaret\\Documents\\portfolio.pdf";
 
-	private static final BigDecimal MONTHLY_WITHDRAWAL_AMOUNT = new BigDecimal(2500);
+	private static final BigDecimal MONTHLY_WITHDRAWAL_AMOUNT = new BigDecimal(1200);
 	private static final BigDecimal PROPERTY_TAX_WITHDRAWAL_AMOUNT = new BigDecimal(3500);
 	private static final BigDecimal SCHOOL_TAX_WITHDRAWAL_AMOUNT = new BigDecimal(4500);
 
@@ -64,6 +66,7 @@ public class PortfolioApp {
 				currentDownloadFilePriceDate = currentDownloadFilePriceDate.minusDays(1);
 			}
 			portfolioService.loadPortfolioDownloadFile(portfolio, currentDownloadFilePriceDate, CURRENT_DOWNLOAD_FILE);
+			//portfolioService.loadPortfolioDownloadFile(portfolio, currentDownloadFilePriceDate, CURRENT_DOWNLOAD_FILE_NEW);
 
 			// Get price history via alphaVantage
 
@@ -99,21 +102,23 @@ public class PortfolioApp {
 							+ " " + LocalTime.now().format(DateTimeFormatter.ofPattern("hh:mm a"))));
 
 			//
+			printCondoPurchanseWithdrawalSpreadsheet(portfolio, document, portfolioService);
+			printCondoPurchanseWeeklyTransferSpreadsheet(portfolio, document, portfolioService);
 			LocalDate today = LocalDate.now();
-			if (today.getMonthValue() == 1) {
+			if (today.getMonthValue() == 1 && today.getDayOfMonth() > 15) {
 				printPropertyTaxWithdrawalSpreadsheet(portfolio, document, portfolioService);
 			}
-			if (today.getMonthValue() == 8) {
+			if (today.getMonthValue() == 8 && today.getDayOfMonth() > 15) {
 				printSchoolTaxWithdrawalSpreadsheet(portfolio, document, portfolioService);
 			}
-			if (today.getDayOfMonth() > 25) {
+			if (today.getDayOfMonth() > 23) {
 				printMonthlyWithdrawalSpreadsheet(portfolio, document, portfolioService);
 			}
 
 			pdfDoc.addNewPage();
 			portfolioService.printPerformanceTable(portfolio, document);
 
-			portfolioService.printAuxPerformanceTable(portfolio, document);
+			portfolioService.printPortfolioPerformanceTable(portfolio, document);
 
 			// Add price performance graphs,
 			pdfDoc.addNewPage();
@@ -359,7 +364,7 @@ public class PortfolioApp {
 		// Net withdrawal adjusts for transfer to money market fixed accounts
 		// Transfer 500 into money market fixed accounts (included in withdrawal amount)
 		Map<String, BigDecimal> withdrawals = portfolioService.calculateWithdrawal(portfolio, MONTHLY_WITHDRAWAL_AMOUNT,
-				new BigDecimal(500), BigDecimal.ZERO, new BigDecimal(500), BigDecimal.ZERO);
+				new BigDecimal(1000), BigDecimal.ZERO, new BigDecimal(1000), BigDecimal.ZERO);
 
 		// Calculate withdrawals and print spreadsheet
 		portfolioService.printWithdrawalSpreadsheet(title, portfolio, MONTHLY_WITHDRAWAL_AMOUNT, withdrawals, document);
@@ -383,4 +388,40 @@ public class PortfolioApp {
 				document);
 	}
 
+	private static void printCondoPurchanseWithdrawalSpreadsheet(Portfolio portfolio, Document document,
+			PortfolioService portfolioService) {
+
+		// Withdrawal from cash mm is implied, min amount is still 20K
+		BigDecimal closingShareAmount = new BigDecimal(20000);
+		String title = "Condo Purchanse Withdrawal "
+				+ CurrencyHelper.formatAsCurrencyString(closingShareAmount);
+		System.out.println(title);
+
+		// Net withdrawal adjusts for transfer to money market fixed accounts
+		Map<String, BigDecimal> withdrawals = portfolioService.calculateWithdrawal(portfolio,
+				closingShareAmount, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
+				BigDecimal.ZERO);
+
+		// Calculate withdrawals and print spreadsheet
+		portfolioService.printWithdrawalSpreadsheet(title, portfolio, closingShareAmount, withdrawals,
+				document);
+	}
+
+	private static void printCondoPurchanseWeeklyTransferSpreadsheet(Portfolio portfolio, Document document,
+			PortfolioService portfolioService) {
+
+		BigDecimal weeklyTransferAmount = new BigDecimal(5000);
+		String title = "Condo Weekly Tranfer into Cash MM "
+				+ CurrencyHelper.formatAsCurrencyString(weeklyTransferAmount);
+		System.out.println(title);
+
+		// Net withdrawal adjusts for transfer to money market fixed accounts
+		Map<String, BigDecimal> withdrawals = portfolioService.calculateWithdrawal(portfolio,
+				BigDecimal.ZERO, weeklyTransferAmount, BigDecimal.ZERO, BigDecimal.ZERO,
+				BigDecimal.ZERO);
+
+		// Calculate withdrawals and print spreadsheet
+		portfolioService.printWithdrawalSpreadsheet(title, portfolio, BigDecimal.ZERO, withdrawals,
+				document);
+	}
 }

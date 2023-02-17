@@ -397,7 +397,7 @@ public class MutualFundPerformance {
 			BigDecimal currentValue = portfolioFund.getValue();
 			BigDecimal historicalValue = portfolioPriceHistory.getFundValueByDate(portfolioFund, date, isExactDate);
 			if (currentValue != null && historicalValue != null) {
-				returns = currentValue.add(dividends).add(withdrawals).add(exchanges).subtract(historicalValue).subtract(conversions);
+				returns = currentValue.subtract(historicalValue).add(dividends).add(withdrawals).add(exchanges).subtract(conversions);
 //				System.out.println("fund:  " + fund.getShortName() + " date:  " + date);
 //				System.out.println("currentValue:  " + CurrencyHelper.formatAsCurrencyString(currentValue));
 //				System.out.println("historicalValue:  " + CurrencyHelper.formatAsCurrencyString(historicalValue));

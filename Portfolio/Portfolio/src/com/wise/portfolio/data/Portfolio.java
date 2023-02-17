@@ -3,6 +3,9 @@ package com.wise.portfolio.data;
 import java.math.BigDecimal;
 import java.math.MathContext;
 import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
@@ -20,7 +23,11 @@ public class Portfolio {
 	public void setFundSymbolNameMap(Map<String, String> fundSymbolNameMap) {
 		this.fundSymbolNameMap = fundSymbolNameMap;
 	}
+
 	private Map<String, PortfolioFund> fundMap = new TreeMap<String, PortfolioFund>();
+
+	protected Map<LocalDate, Collection<Transaction>> federalWithholdingTax = new TreeMap<>();
+	protected Map<LocalDate, Collection<Transaction>> stateWithholdingTax = new TreeMap<>();
 
 //	private Map<String, PortfolioFund> fundMap = new TreeMap<String, PortfolioFund>(new Comparator<String>() {
 //
@@ -32,7 +39,6 @@ public class Portfolio {
 //		}
 //	});
 	private PortfolioPriceHistory priceHistory = new PortfolioPriceHistory();
-
 
 	public PortfolioPriceHistory getPriceHistory() {
 		return priceHistory;
@@ -146,4 +152,80 @@ public class Portfolio {
 	public BigDecimal getAvailableValue() {
 		return getTotalValue().subtract(getPrespentValue());
 	}
+
+	public void addFederalWithholdingTax(LocalDate transactionDate, String transactionType, Float transactionShares,
+			BigDecimal transactionSharePrice, BigDecimal transastionPrincipal, String transactionSourceFile) {
+
+		Transaction newTransaction = new Transaction(transactionDate, transactionType, transactionShares,
+				transactionSharePrice, transastionPrincipal, transactionSourceFile);
+
+		Collection<Transaction> transactionsForDate = federalWithholdingTax.get(transactionDate);
+		if (transactionsForDate != null) {
+			for (Transaction transaction : transactionsForDate) {
+				if (transaction.getTransactionType().contentEquals(transactionType)
+						&& transaction.getTransastionPrincipal().compareTo(transastionPrincipal) == 0
+						&& !transaction.getTransactionSourceFile().contentEquals(transactionSourceFile)) {
+					// duplicate
+					return;
+				}
+			}
+		} else {
+			transactionsForDate = new ArrayList<Transaction>();
+			federalWithholdingTax.put(transactionDate, transactionsForDate);
+		}
+		transactionsForDate.add(newTransaction);
+	}
+
+	public BigDecimal getFederalWithholdingBetweenDates(LocalDate startDate, LocalDate endDate) {
+		BigDecimal transactionsAmount = new BigDecimal(0);
+
+		for (Entry<LocalDate, Collection<Transaction>> entry : federalWithholdingTax.entrySet()) {
+			if (entry.getKey().isAfter(startDate) && entry.getKey().isBefore(endDate)) {
+				Collection<Transaction> transactionList = entry.getValue();
+				for (Transaction transaction : transactionList) {
+					transactionsAmount = transactionsAmount.add(transaction.getTransastionPrincipal());
+				}
+			}
+		}
+		return transactionsAmount;
+	}
+
+	public void addStateWithholdingTax(LocalDate transactionDate, String transactionType, Float transactionShares,
+			BigDecimal transactionSharePrice, BigDecimal transastionPrincipal, String transactionSourceFile) {
+
+		Transaction newTransaction = new Transaction(transactionDate, transactionType, transactionShares,
+				transactionSharePrice, transastionPrincipal, transactionSourceFile);
+
+		Collection<Transaction> transactionsForDate = stateWithholdingTax.get(transactionDate);
+		if (transactionsForDate != null) {
+			for (Transaction transaction : transactionsForDate) {
+				if (transaction.getTransactionType().contentEquals(transactionType)
+						&& transaction.getTransastionPrincipal().compareTo(transastionPrincipal) == 0
+						&& !transaction.getTransactionSourceFile().contentEquals(transactionSourceFile)) {
+					// duplicate, not as simple because there is no fundassociated and there
+					// couldbelegit multiples for samedate wiutg sae amount
+					return;
+				}
+			}
+		} else {
+			transactionsForDate = new ArrayList<Transaction>();
+			stateWithholdingTax.put(transactionDate, transactionsForDate);
+		}
+		transactionsForDate.add(newTransaction);
+	}
+
+	public BigDecimal getStateWithholdingBetweenDates(LocalDate startDate, LocalDate endDate) {
+		BigDecimal transactionsAmount = new BigDecimal(0);
+
+		for (Entry<LocalDate, Collection<Transaction>> entry : stateWithholdingTax.entrySet()) {
+			if (entry.getKey().isAfter(startDate) && entry.getKey().isBefore(endDate)) {
+				Collection<Transaction> transactionList = entry.getValue();
+				for (Transaction transaction : transactionList) {
+					transactionsAmount = transactionsAmount.add(transaction.getTransastionPrincipal());
+				}
+			}
+		}
+		return transactionsAmount;
+	}
+
 }
