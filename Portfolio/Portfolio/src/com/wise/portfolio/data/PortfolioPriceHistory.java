@@ -36,11 +36,11 @@ public class PortfolioPriceHistory {
 	// that is handled by printing out source?
 	private Map<String, Map<LocalDate, BigDecimal>> fundPrices = new HashMap<>();
 	private Map<String, Map<LocalDate, String>> fundPricesSource = new HashMap<>();
-	private Map<String, Map<LocalDate, BigDecimal>> fundReturns = new HashMap<>();
+	private Map<String, Map<LocalDate, BigDecimal>> fundReturnsByDateMap = new HashMap<>();
 	private Map<String, Map<LocalDate, BigDecimal>> fundBalanceByDate = new HashMap<>();
 
-	public Map<String, Map<LocalDate, BigDecimal>> getFundReturns() {
-		return fundReturns;
+	public Map<String, Map<LocalDate, BigDecimal>> getFundReturnsMap() {
+		return fundReturnsByDateMap;
 	}
 
 	private Map<String, Pair<LocalDate, BigDecimal>> fundsMaxPriceMap = new HashMap<>();
@@ -167,7 +167,6 @@ public class PortfolioPriceHistory {
 			currentFundsTransactions = br.lines().map(line -> Arrays.asList(line.split(",")))
 					.filter(line -> line.size() == 14).collect(Collectors.toList());
 
-			System.out.println("Read " + currentFundsTransactions.size() + " transactions from file:  " + downloadFile);
 		} catch (Exception e) {
 			System.out.println("Invalid file:  " + downloadFile + "Exception: " + e.getMessage());
 		}

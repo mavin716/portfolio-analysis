@@ -27,7 +27,7 @@ public class MutualFundPerformance {
 		this.portfolioPriceHistory = portfolio.getPriceHistory();
 		this.portfolioFund = fund;
 
-		BigDecimal beginYearPrice = getClosestHistoricalPrice(fund, getFirstOfYearDate(), 30);
+		BigDecimal beginYearPrice = getClosestHistoricalPrice(getFirstOfYearDate(), 30);
 		if (beginYearPrice == null) {
 			return;
 		}
@@ -97,25 +97,25 @@ public class MutualFundPerformance {
 		return firstOfYearDate;
 	}
 
-	private BigDecimal getClosestHistoricalPrice(PortfolioFund fund, LocalDate date, int days) {
+	public BigDecimal getClosestHistoricalPrice(LocalDate date, int days) {
 
-		BigDecimal historicalValue = portfolioPriceHistory.getPriceByDate(fund, date, true);
+		BigDecimal historicalValue = portfolioPriceHistory.getPriceByDate(portfolioFund, date, true);
 		if (historicalValue != null) {
 			return historicalValue;
 		}
 		int tries = 0;
 		while (tries++ < days) {
 
-			historicalValue = portfolioPriceHistory.getPriceByDate(fund, date.minusDays(tries), true);
+			historicalValue = portfolioPriceHistory.getPriceByDate(portfolioFund, date.minusDays(tries), true);
 			if (historicalValue != null) {
 				return historicalValue;
 			}
-			historicalValue = portfolioPriceHistory.getPriceByDate(fund, date.plusDays(tries), true);
+			historicalValue = portfolioPriceHistory.getPriceByDate(portfolioFund, date.plusDays(tries), true);
 			if (historicalValue != null) {
 				return historicalValue;
 			}
 		}
-		return null;
+		return BigDecimal.ZERO;
 	}
 
 	public BigDecimal getDeviation(FundCategory category) {
@@ -381,11 +381,11 @@ public class MutualFundPerformance {
 	// difference.
 	public BigDecimal getReturnsByDate(LocalDate date, boolean isExactDate) {
 
-		Map<LocalDate, BigDecimal> fundReturnMap = portfolioPriceHistory.getFundReturns()
+		Map<LocalDate, BigDecimal> fundReturnMap = portfolioPriceHistory.getFundReturnsMap()
 				.get(portfolioFund.getSymbol());
 		if (fundReturnMap == null) {
 			fundReturnMap = new HashMap<>();
-			portfolioPriceHistory.getFundReturns().put(portfolioFund.getSymbol(), fundReturnMap);
+			portfolioPriceHistory.getFundReturnsMap().put(portfolioFund.getSymbol(), fundReturnMap);
 		}
 		BigDecimal returns = fundReturnMap.get(date);
 		if (returns == null) {
@@ -398,14 +398,14 @@ public class MutualFundPerformance {
 			BigDecimal historicalValue = portfolioPriceHistory.getFundValueByDate(portfolioFund, date, isExactDate);
 			if (currentValue != null && historicalValue != null) {
 				returns = currentValue.subtract(historicalValue).add(dividends).add(withdrawals).add(exchanges).subtract(conversions);
-//				System.out.println("fund:  " + fund.getShortName() + " date:  " + date);
-//				System.out.println("currentValue:  " + CurrencyHelper.formatAsCurrencyString(currentValue));
-//				System.out.println("historicalValue:  " + CurrencyHelper.formatAsCurrencyString(historicalValue));
-//				System.out.println("withdrawals:  " + CurrencyHelper.formatAsCurrencyString(withdrawals));
-//				System.out.println("conversions:  " + CurrencyHelper.formatAsCurrencyString(conversions));
-//				System.out.println("exchanges:  " + CurrencyHelper.formatAsCurrencyString(exchanges));
-//				System.out.println("dividends:  " + CurrencyHelper.formatAsCurrencyString(dividends));
-//				System.out.println("returns:  " + CurrencyHelper.formatAsCurrencyString(returns));
+				System.out.println("fund:  " + portfolioFund.getShortName() + " date:  " + date);
+				System.out.println("currentValue:  " + CurrencyHelper.formatAsCurrencyString(currentValue));
+				System.out.println("historicalValue:  " + CurrencyHelper.formatAsCurrencyString(historicalValue));
+				System.out.println("withdrawals:  " + CurrencyHelper.formatAsCurrencyString(withdrawals));
+				System.out.println("conversions:  " + CurrencyHelper.formatAsCurrencyString(conversions));
+				System.out.println("exchanges:  " + CurrencyHelper.formatAsCurrencyString(exchanges));
+				System.out.println("dividends:  " + CurrencyHelper.formatAsCurrencyString(dividends));
+				System.out.println("returns:  " + CurrencyHelper.formatAsCurrencyString(returns));
 			} else {
 //				System.out.println("currentValue:  " + CurrencyHelper.formatAsCurrencyString(currentValue));
 //				System.out.println("historicalValue:  " + CurrencyHelper.formatAsCurrencyString(historicalValue));
@@ -424,6 +424,11 @@ public class MutualFundPerformance {
 
 	public PortfolioFund getFund() {
 		return portfolioFund;
+	}
+
+	public BigDecimal getDividendsFromDate(LocalDate historicalDate) {
+		// TODO Auto-generated method stub
+		return null;
 	}
 
 }

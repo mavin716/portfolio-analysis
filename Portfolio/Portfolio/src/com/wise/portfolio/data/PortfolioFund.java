@@ -282,9 +282,9 @@ public class PortfolioFund extends MutualFund {
 			transactionsForDate = new ArrayList<Transaction>();
 			exchanges.put(transactionDate, transactionsForDate);
 		}
-		System.out.println(
-				transactionDate + ": " + String.format("%-12s", CurrencyHelper.formatAsCurrencyString(principalAmount))
-						+ " " + String.format("%-10s", transactionType) + ": " + getShortName());
+//		System.out.println(
+//				transactionDate + ": " + String.format("%-12s", CurrencyHelper.formatAsCurrencyString(principalAmount))
+//						+ " " + String.format("%-10s", transactionType) + ": " + getShortName());
 
 		transactionsForDate.add(newTransaction);
 	}
