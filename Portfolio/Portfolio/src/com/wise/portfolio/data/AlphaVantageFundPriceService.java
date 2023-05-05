@@ -83,7 +83,7 @@ public class AlphaVantageFundPriceService {
 //				System.out.println("date:  " + date.toString() + " closing price:  "
 //						+ CurrencyHelper.formatAsCurrencyString(closingPrice));
 
-				priceHistory.addFundPrice(symbol, date, closingPrice);
+				priceHistory.addFundPrice(symbol, date, closingPrice, "AlphaVantage Service");
 
 			}
 

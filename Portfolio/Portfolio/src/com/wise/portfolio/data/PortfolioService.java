@@ -23,6 +23,7 @@ import java.time.LocalTime;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.time.temporal.TemporalUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -120,18 +121,35 @@ public class PortfolioService {
 
 	private static java.awt.Color[] axisPaints = { java.awt.Color.RED, java.awt.Color.BLUE, java.awt.Color.GREEN,
 			new java.awt.Color(104, 30, 126), // Purple
-			new java.awt.Color(0, 121, 231), // Lt Blue
 			new java.awt.Color(255, 116, 53), // Orange
 			new java.awt.Color(255, 240, 53), // Yellow
-			new java.awt.Color(251, 72, 196), // Hot Pink
-			new java.awt.Color(0, 158, 71), // Med Green
-			java.awt.Color.RED, java.awt.Color.BLUE, java.awt.Color.GREEN, new java.awt.Color(104, 30, 126), // Purple
 			new java.awt.Color(0, 121, 231), // Lt Blue
-			new java.awt.Color(255, 88, 0), // Orange
-			new java.awt.Color(255, 240, 53), // Yellow
 			new java.awt.Color(251, 72, 196), // Hot Pink
 			new java.awt.Color(0, 158, 71), // Med Green
-	};
+			java.awt.Color.RED, java.awt.Color.BLUE, java.awt.Color.GREEN, 
+			new java.awt.Color(104, 30, 126), // Purple
+			new java.awt.Color(255, 116, 53), // Orange
+			new java.awt.Color(255, 240, 53), // Yellow
+			new java.awt.Color(0, 121, 231), // Lt Blue
+			new java.awt.Color(251, 72, 196), // Hot Pink
+			new java.awt.Color(0, 158, 71), // Med Green
+			java.awt.Color.RED, java.awt.Color.BLUE, java.awt.Color.GREEN,
+			new java.awt.Color(104, 30, 126), // Purple
+			new java.awt.Color(255, 116, 53), // Orange
+			new java.awt.Color(255, 240, 53), // Yellow
+			new java.awt.Color(0, 121, 231), // Lt Blue
+			new java.awt.Color(251, 72, 196), // Hot Pink
+			new java.awt.Color(0, 158, 71), // Med Green
+			java.awt.Color.RED, java.awt.Color.BLUE, java.awt.Color.GREEN,
+			new java.awt.Color(104, 30, 126), // Purple
+			new java.awt.Color(255, 116, 53), // Orange
+			new java.awt.Color(255, 240, 53), // Yellow
+			new java.awt.Color(0, 121, 231), // Lt Blue
+			new java.awt.Color(251, 72, 196), // Hot Pink
+			new java.awt.Color(0, 158, 71) // Med Green	
+		};
+
+	private static Map<String, java.awt.Color> fundPaints = new HashMap<>();
 
 	public void sendMail(String subject, String textBody, File portfolioPdfFile) {
 		Properties properties = System.getProperties();
@@ -984,6 +1002,16 @@ public class PortfolioService {
 	public PortfolioService(String basePath, String fundSymbolFileName) {
 		this.basePath = basePath;
 		loadFundSymbolMap(fundSymbolFileName);
+		setFundColors();
+	}
+
+	private void setFundColors() {
+
+		int index = 0;
+		for (String symbol : fundSymbolNameMap.keySet()) {
+			fundPaints.put(symbol, axisPaints[index++]);
+		}
+
 	}
 
 	public Portfolio createPortfolio() {
@@ -1128,9 +1156,9 @@ public class PortfolioService {
 //		}
 
 		if (adjust) {
-			LocalTime cutoffTime = LocalTime.of(15, 0);
+			LocalTime cutoffTime = LocalTime.of(18, 0);
 			if (date.toLocalTime().isBefore(cutoffTime)) {
-				date = date.minusDays(1);
+				date = date.truncatedTo(ChronoUnit.DAYS).minusHours(5);
 			}
 		}
 
@@ -1152,34 +1180,35 @@ public class PortfolioService {
 	}
 
 	public Map<String, BigDecimal> calculateWithdrawal(Portfolio portfolio, BigDecimal withdrawalAmount,
-			BigDecimal cashReservesTransferAmount, BigDecimal cashReservesWithdrawalAmount,
-			BigDecimal federalMMTransferAmount, BigDecimal federalMMWithdrawalAmount) {
+			BigDecimal cashReservesWithdrawalAmount, BigDecimal federalMMWithdrawalAmount) {
 
+		BigDecimal cashReservesNetWithdrawal = BigDecimal.ZERO;
+		BigDecimal federalMMNetWithdrawal = BigDecimal.ZERO;
 		Map<String, BigDecimal> withdrawalMap = new LinkedHashMap<>();
-		if (cashReservesWithdrawalAmount.compareTo(BigDecimal.ZERO) > 0
-				|| federalMMWithdrawalAmount.compareTo(BigDecimal.ZERO) > 0) {
-			withdrawalMap.put("VMRXX", cashReservesWithdrawalAmount);
-			withdrawalMap.put("VMFXX", federalMMWithdrawalAmount);
-		} else if (cashReservesTransferAmount.compareTo(BigDecimal.ZERO) > 0
-				|| federalMMTransferAmount.compareTo(BigDecimal.ZERO) > 0) {
-			withdrawalMap.put("VMRXX", BigDecimal.ZERO.subtract(cashReservesTransferAmount));
-			withdrawalMap.put("VMFXX", BigDecimal.ZERO.subtract(federalMMTransferAmount));
+		if (cashReservesWithdrawalAmount.compareTo(BigDecimal.ZERO) > 0) {
+			cashReservesNetWithdrawal = cashReservesWithdrawalAmount;
 		}
+		if (federalMMWithdrawalAmount.compareTo(BigDecimal.ZERO) > 0) {
+			federalMMNetWithdrawal = federalMMWithdrawalAmount;
+		}
+		withdrawalMap.put("VMRXX", cashReservesNetWithdrawal);
+		withdrawalMap.put("VMFXX", federalMMNetWithdrawal);
 
-		BigDecimal actualWithdrawalAount = withdrawalAmount;
-		actualWithdrawalAount = actualWithdrawalAount.subtract(cashReservesWithdrawalAmount);
-		actualWithdrawalAount = actualWithdrawalAount.subtract(federalMMWithdrawalAmount);
-
-		// BigDecimal
-		// Create map sorted by descending value of deviation
-		Map<String, Pair<BigDecimal, PortfolioFund>> sortedDifferenceMap = createSortedDeviationMap(portfolio,
-				withdrawalAmount);
+		// MM withdrawals are subtracted from withdrawal amount
+		BigDecimal additionalWithdrawalAount = withdrawalAmount;
+		if (cashReservesNetWithdrawal.compareTo(BigDecimal.ZERO) > 0) {
+			additionalWithdrawalAount = additionalWithdrawalAount.subtract(cashReservesNetWithdrawal);
+		}
+		if (federalMMNetWithdrawal.compareTo(BigDecimal.ZERO) > 0) {
+			additionalWithdrawalAount = additionalWithdrawalAount.subtract(federalMMNetWithdrawal);
+		}
 
 		// Transfers are not incuded in deviation map because don't contriubte to bottom
 		// line
-		BigDecimal actualMoveMoneyAount = actualWithdrawalAount;
-		actualMoveMoneyAount = actualMoveMoneyAount.add(cashReservesTransferAmount);
-		actualMoveMoneyAount = actualMoveMoneyAount.add(federalMMTransferAmount);
+		// BigDecimal
+		// Create map sorted by descending value of deviation
+		Map<String, Pair<BigDecimal, PortfolioFund>> sortedDifferenceMap = createSortedDeviationMap(portfolio,
+				additionalWithdrawalAount);
 
 		// Initialize deviation to start
 		BigDecimal nextDeviation = BigDecimal.ZERO;
@@ -1197,7 +1226,7 @@ public class PortfolioService {
 
 		System.out.println("Starting deviation:  " + CurrencyHelper.formatPercentageString4(nextDeviation));
 		BigDecimal runningWithdrawal = BigDecimal.ZERO;
-		while (runningWithdrawal.compareTo(actualMoveMoneyAount) < 0) {
+		while (runningWithdrawal.compareTo(additionalWithdrawalAount) < 0) {
 			for (String fundSymbol : sortedDifferenceMap.keySet()) {
 
 				Pair<BigDecimal, PortfolioFund> fundDifferencePair = sortedDifferenceMap.get(fundSymbol);
@@ -1211,6 +1240,110 @@ public class PortfolioService {
 //						+ CurrencyHelper.formatPercentageString4(fundDeviation));
 
 				BigDecimal fundWithdrawalIncrement = withdrawalIncrement;
+
+				while (fundDeviation.compareTo(nextDeviation) >= 0) {
+					if (runningWithdrawal.add(fundWithdrawalIncrement).compareTo(additionalWithdrawalAount) > 0) {
+						fundWithdrawalIncrement = additionalWithdrawalAount.subtract(runningWithdrawal);
+					}
+					BigDecimal runningFundWithdrawalAmount = withdrawalMap.get(fund.getSymbol());
+					if (runningFundWithdrawalAmount == null) {
+						runningFundWithdrawalAmount = BigDecimal.ZERO;
+					}
+					if (fund.getMinimumAmount() != null
+							&& fund.getValue().subtract(runningFundWithdrawalAmount.add(fundWithdrawalIncrement))
+									.compareTo(fund.getMinimumAmount()) <= 0) {
+						break;
+					}
+
+					runningFundWithdrawalAmount = runningFundWithdrawalAmount.add(fundWithdrawalIncrement);
+
+					BigDecimal newFundBalance = fund.getValue().subtract(runningFundWithdrawalAmount);
+					BigDecimal newFundDeviation = getFundNewBalanceDeviation(fund, newFundBalance, withdrawalAmount);
+					System.out.println("Fund:  " + fund.getShortName() + " New Fund Balance:  "
+							+ CurrencyHelper.formatAsCurrencyString(newFundBalance) + " New Fund Deviation:  "
+							+ CurrencyHelper.formatPercentageString4(newFundDeviation));
+					fundDeviation = newFundDeviation;
+					sortedDifferenceMap.put(fund.getSymbol(), Pair.of(newFundDeviation, fund));
+
+					System.out.println("Fund:  " + fund.getShortName() + " running withdrawal amount "
+							+ CurrencyHelper.formatAsCurrencyString(runningFundWithdrawalAmount));
+					withdrawalMap.put(fund.getSymbol(), runningFundWithdrawalAmount);
+
+					runningWithdrawal = runningWithdrawal.add(fundWithdrawalIncrement);
+					System.out.println("runningWithdrawal " + CurrencyHelper.formatAsCurrencyString(runningWithdrawal));
+
+					if (runningWithdrawal.compareTo(additionalWithdrawalAount) >= 0) {
+						break;
+					}
+
+				}
+			}
+			nextDeviation = nextDeviation.subtract(new BigDecimal(.0001));
+			System.out.println("next deviation:  " + CurrencyHelper.formatPercentageString4(nextDeviation));
+		}
+
+		BigDecimal totalWithdrawal = withdrawalMap.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+		System.out.println("total  withdrawalfrom map:  " + CurrencyHelper.formatAsCurrencyString(totalWithdrawal));
+
+		return withdrawalMap;
+
+	}
+
+	public Map<String, BigDecimal> calculateFixedExpensesTransfer(Portfolio portfolio,
+			BigDecimal cashReservesTransferAmount, BigDecimal federalMMTransferAmount) {
+
+		BigDecimal cashReservesNetWithdrawal = BigDecimal.ZERO;
+		BigDecimal federalMMNetWithdrawal = BigDecimal.ZERO;
+		Map<String, BigDecimal> withdrawalMap = new LinkedHashMap<>();
+		if (cashReservesTransferAmount.compareTo(BigDecimal.ZERO) > 0) {
+			cashReservesNetWithdrawal = cashReservesNetWithdrawal.subtract(cashReservesTransferAmount);
+		}
+		if (federalMMTransferAmount.compareTo(BigDecimal.ZERO) > 0) {
+			federalMMNetWithdrawal = federalMMNetWithdrawal.subtract(federalMMTransferAmount);
+		}
+		withdrawalMap.put("VMRXX", cashReservesNetWithdrawal);
+		withdrawalMap.put("VMFXX", federalMMNetWithdrawal);
+
+		// Transfers are not incuded in deviation map because don't contriubte to bottom
+		// line
+		BigDecimal actualMoveMoneyAount = BigDecimal.ZERO;
+		actualMoveMoneyAount = actualMoveMoneyAount.add(cashReservesTransferAmount);
+		actualMoveMoneyAount = actualMoveMoneyAount.add(federalMMTransferAmount);
+		// BigDecimal
+		// Create map sorted by descending value of deviation
+		Map<String, Pair<BigDecimal, PortfolioFund>> sortedDifferenceMap = createSortedDeviationMap(portfolio,
+				actualMoveMoneyAount);
+
+		// Initialize deviation to first deviation found in sorted difference map
+		BigDecimal nextDeviation = BigDecimal.ZERO;
+		for (Entry<String, Pair<BigDecimal, PortfolioFund>> entry : sortedDifferenceMap.entrySet()) {
+			nextDeviation = entry.getValue().getLeft().setScale(4, RoundingMode.HALF_DOWN);
+			break;
+		}
+
+		// withdrawl increment is one percent of fund value
+		BigDecimal transferIncrement = portfolio.getTotalValue().divide(new BigDecimal(10000), 0,
+				RoundingMode.HALF_DOWN);
+		// Round up to nearest 5
+		transferIncrement = transferIncrement.divide(new BigDecimal(5), 0, RoundingMode.HALF_DOWN)
+				.setScale(2, RoundingMode.HALF_DOWN).multiply(new BigDecimal(5));
+
+		System.out.println("Starting deviation:  " + CurrencyHelper.formatPercentageString4(nextDeviation));
+		BigDecimal runningWithdrawal = BigDecimal.ZERO;
+		while (runningWithdrawal.compareTo(actualMoveMoneyAount) < 0) {
+			for (String fundSymbol : sortedDifferenceMap.keySet()) {
+
+				Pair<BigDecimal, PortfolioFund> fundDifferencePair = sortedDifferenceMap.get(fundSymbol);
+				BigDecimal fundDeviation = fundDifferencePair.getLeft();
+				PortfolioFund fund = fundDifferencePair.getRight();
+				if (fund.isClosed()) {
+					continue;
+				}
+
+//				System.out.println("Fund:  " + fund.getShortName() + " starting dev "
+//						+ CurrencyHelper.formatPercentageString4(fundDeviation));
+
+				BigDecimal fundWithdrawalIncrement = transferIncrement;
 
 				while (fundDeviation.compareTo(nextDeviation) >= 0) {
 					if (runningWithdrawal.add(fundWithdrawalIncrement).compareTo(actualMoveMoneyAount) > 0) {
@@ -1230,7 +1363,7 @@ public class PortfolioService {
 
 					BigDecimal newFundBalance = fund.getValue().subtract(runningFundWithdrawalAmount);
 					BigDecimal newFundDeviation = getFundNewBalanceDeviation(fund, newFundBalance,
-							withdrawalAmount);
+							actualMoveMoneyAount);
 					System.out.println("Fund:  " + fund.getShortName() + " New Fund Balance:  "
 							+ CurrencyHelper.formatAsCurrencyString(newFundBalance) + " New Fund Deviation:  "
 							+ CurrencyHelper.formatPercentageString4(newFundDeviation));
@@ -1243,8 +1376,8 @@ public class PortfolioService {
 
 					runningWithdrawal = runningWithdrawal.add(fundWithdrawalIncrement);
 					System.out.println("runningWithdrawal " + CurrencyHelper.formatAsCurrencyString(runningWithdrawal));
-					
-					if (runningWithdrawal.compareTo(actualMoveMoneyAount) >= 0 )  {
+
+					if (runningWithdrawal.compareTo(actualMoveMoneyAount) >= 0) {
 						break;
 					}
 
@@ -2094,30 +2227,6 @@ public class PortfolioService {
 	public void prinPerformanceLineGraphs(Portfolio portfolio, List<String> fundSynbols, Document document,
 			PdfDocument pdfDocument, LocalDate startDate, LocalDate endDate) {
 
-		// JFreeChart lineChart = ChartFactory.createTimeSeriesChart(null, null, null,
-		// createFundPriceHistoryDataset(portfolio, fundSynbols, startDate, endDate),
-		// true, false, false);
-//		List<XYItemRenderer> renderers = new ArrayList<>();
-//		List<TimeSeriesCollection> datasets = new ArrayList<>();
-//		
-//		datasets.add(createFundBalanceDataset(portfolio, fundSynbols, startDate, endDate));
-//		XYLineAndShapeRenderer renderer = new XYLineAndShapeRenderer();
-//		renderer.setDefaultShapesVisible(false);
-//		renderers.add(renderer);
-//		
-//		datasets.add(createFundDividendDataset(portfolio, fundSynbols, startDate, endDate));
-//		renderer = new XYLineAndShapeRenderer();
-//		renderer.setDefaultShapesVisible(true);
-//		renderers.add(renderer);
-//		
-//		datasets.add(createFundWithdrawalDataset(portfolio, fundSynbols, startDate, endDate));
-//		XYBarRenderer barRenderer = new XYBarRenderer();
-//		renderer = new XYLineAndShapeRenderer();
-//		// renderer.setDefaultItemLabelsVisible(true);
-//		barRenderer.setShadowVisible(false);
-//		renderers.add(renderer);
-
-		
 		List<TimeSeriesCollection> datasets = new ArrayList<>();
 		datasets.add(createFundPriceHistoryDataset(portfolio, fundSynbols, startDate, endDate));
 		List<XYItemRenderer> renderers = new ArrayList<>();
@@ -2135,14 +2244,6 @@ public class PortfolioService {
 		JFreeChart lineChart = createTimeSeriesChart("Fund Price History", null, null, datasets, renderers, true, true,
 				false);
 
-		// TODO Attempt to configure stroke to be darker, doesn't seem to work....
-//		XYPlot plot = (XYPlot) lineChart.getPlot();
-//		XYItemRenderer r = plot.getRenderer();
-//		if (r instanceof XYLineAndShapeRenderer) {
-//			XYLineAndShapeRenderer renderer = (XYLineAndShapeRenderer) r;
-//			renderer.setDefaultStroke(new BasicStroke(5.0f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_BEVEL), false);
-//			renderer.setDefaultOutlineStroke(new BasicStroke(5.0f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_BEVEL));
-//		}
 
 		addChartToDocument(lineChart, pdfDocument, document);
 
@@ -2234,7 +2335,7 @@ public class PortfolioService {
 
 	}
 
-	public static JFreeChart createTimeSeriesChart(String title, String timeAxisLabel, String valueAxisLabel,
+	public JFreeChart createTimeSeriesChart(String title, String timeAxisLabel, String valueAxisLabel,
 			List<TimeSeriesCollection> datasets, List<XYItemRenderer> renderers, boolean legend, boolean tooltips,
 			boolean urls) {
 
@@ -2260,21 +2361,37 @@ public class PortfolioService {
 
 			for (int seriesIndex = 0; seriesIndex < timeSeriesCollection.getSeries().size(); seriesIndex++) {
 				TimeSeries series = timeSeriesCollection.getSeries(seriesIndex);
+				java.awt.Color seriesColor = null;
+
 				String key = (String) series.getKey();
-				java.awt.Color seriesColor = axisPaints[seriesIndex];
+				int indexOfSpace = key.indexOf(' ');
+				String symbol = key;
+				String extra = "";
+				if (indexOfSpace > 0) {
+					symbol = key.substring(0, key.indexOf(' '));
+					extra = key.substring(indexOfSpace + 1);
+				}
+				if (symbol != null) {
+					PortfolioFund fund = portfolio.getFund(symbol);
+					if (fund != null) {
+						series.setKey(fund.getShortName() + " " + extra);
+						seriesColor = fundPaints.get(symbol);
+					}
+				}
+				if (seriesColor == null) {
+					seriesColor = axisPaints[seriesIndex];
+				}
 				if (key.contains("Dividends")) {
 					renderer.setSeriesShape(seriesIndex, ShapeUtils.createDiamond(2f));
 				} else if (key.contains("Withdrawals")) {
 					renderer.setSeriesShape(seriesIndex, ShapeUtils.createDownTriangle(2f));
-				} else if (key.contains("MA")) {
-					seriesColor = axisPaints[seriesIndex - 1];
 				}
-				if (!key.contains("Withdrawals")) {
+//				if (!key.contains("Withdrawals")) {
 					renderer.setSeriesFillPaint(seriesIndex, seriesColor);
 					renderer.setSeriesPaint(seriesIndex, seriesColor);
 					renderer.setSeriesFillPaint(seriesIndex, seriesColor);
 					renderer.setSeriesOutlinePaint(seriesIndex, seriesColor);
-				}
+//				}
 			}
 
 			plot.setDataset(datasetIndex, timeSeriesCollection);
@@ -2316,18 +2433,6 @@ public class PortfolioService {
 		renderers.add(renderer);
 		JFreeChart lineChart = createTimeSeriesChart(title, null, null, datasets, renderers, true, true, false);
 
-//		JFreeChart lineChart = ChartFactory.createTimeSeriesChart(title, null, null,
-//				createFundBalanceDataset(portfolio, fundSynbols, startDate, endDate), true, false, false);
-
-		// TODO Attempt to configure stroke to be darker, doesn't seem to work....
-//		XYPlot plot = (XYPlot) lineChart.getPlot();
-//		XYItemRenderer r = plot.getRenderer();
-//		if (r instanceof XYLineAndShapeRenderer) {
-//			XYLineAndShapeRenderer renderer = (XYLineAndShapeRenderer) r;
-//			renderer.setDefaultStroke(new BasicStroke(5.0f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_BEVEL), false);
-//			renderer.setDefaultOutlineStroke(new BasicStroke(5.0f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_BEVEL));
-//		}
-
 		addChartToDocument(lineChart, pdfDocument, document);
 
 	}
@@ -2336,10 +2441,10 @@ public class PortfolioService {
 			LocalDate startDate, LocalDate endDate) {
 		TimeSeriesCollection dataset = new TimeSeriesCollection();
 
-		BigDecimal cumulativeWithdrawals = BigDecimal.ZERO;
 		TimeSeries timeSeries;
 		for (String symbol : fundSynbols) {
 			PortfolioFund fund = portfolio.getFund(symbol);
+			BigDecimal cumulativeWithdrawals = BigDecimal.ZERO;
 
 			LocalDate graphDate = startDate;
 			if (graphDate == null) {
@@ -2348,7 +2453,10 @@ public class PortfolioService {
 			if (endDate == null) {
 				endDate = LocalDate.now();
 			}
-			timeSeries = new TimeSeries(fund.getShortName() + " Withdrawals");
+			timeSeries = new TimeSeries(symbol + " Withdrawals");
+			timeSeries.add(new Day(graphDate.getDayOfMonth(), graphDate.getMonthValue(), graphDate.getYear()),
+					cumulativeWithdrawals);
+
 			while (!graphDate.isAfter(endDate)) {
 				final LocalDate date = graphDate;
 				BigDecimal withdrawalsByDate = fund.getWithdrawalTotalForDate(date);
@@ -2356,8 +2464,6 @@ public class PortfolioService {
 					cumulativeWithdrawals = cumulativeWithdrawals.subtract(withdrawalsByDate);
 					timeSeries.add(new Day(date.getDayOfMonth(), date.getMonthValue(), date.getYear()),
 							cumulativeWithdrawals);
-//					timeSeries.add(new Day(date.getDayOfMonth(), date.getMonthValue(), date.getYear()),
-//							withdrawalsByDate);
 
 				}
 				graphDate = graphDate.plusDays(1);
@@ -2413,7 +2519,7 @@ public class PortfolioService {
 		for (String symbol : fundSynbols) {
 			PortfolioFund fund = portfolio.getFund(symbol);
 
-			TimeSeries timeSeries = new TimeSeries(fund.getShortName());
+			TimeSeries timeSeries = new TimeSeries(fund.getSymbol());
 			for (Entry<LocalDate, BigDecimal> fundPriceEntry : portfolio.getPriceHistory().getFundPrices().get(symbol)
 					.entrySet()) {
 
@@ -2433,7 +2539,7 @@ public class PortfolioService {
 
 			}
 			dataset.addSeries(timeSeries);
-			dataset.addSeries(MovingAverage.createMovingAverage(timeSeries, "MA", 30, 0));
+			dataset.addSeries(MovingAverage.createMovingAverage(timeSeries, symbol + " MA", 30, 0));
 
 		}
 		return dataset;
@@ -2681,7 +2787,7 @@ public class PortfolioService {
 				.add(CurrencyHelper.formatPercentageString(performanceData.getPortfolioPreviousDayValueChange()))); // Day
 																													// %
 																													// change
-
+		// Change
 		table.addCell(new Cell().add(new Cell().setMargin(0f)
 				.add(CurrencyHelper.formatPercentageString(performanceData.getPortfolioYtdValueChange()))
 				.setBackgroundColor(calculatePercentageFontColor(performanceData.getPortfolioYtdReturns()),
@@ -3706,8 +3812,8 @@ public class PortfolioService {
 		table.addCell(new Cell().add(""));
 
 		// Current Value
-		table.addCell(createCurrentValueCell(false, totalCurrentValueByCategory, totalDeviationByCategory, BigDecimal.ZERO,
-				BigDecimal.ZERO, totalAdjustedMinimumTargetValue, totalAdjustedMinimumDeviation));
+		table.addCell(createCurrentValueCell(false, totalCurrentValueByCategory, totalDeviationByCategory,
+				BigDecimal.ZERO, BigDecimal.ZERO, totalAdjustedMinimumTargetValue, totalAdjustedMinimumDeviation));
 
 		// Current Percentage
 		table.addCell(

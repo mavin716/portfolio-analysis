@@ -90,6 +90,8 @@ public class PerformanceService {
 
 			performanceData.portfolioYtdWithdrawals = performanceData.portfolioYtdWithdrawals
 					.add(fund.getWithdrawalsUpToDate(getFirstOfYearDate()));
+			System.out.println("fund " + fund.getName() + " ytd withdraws:  " + performanceData.portfolioYtdWithdrawals);
+			System.out.println("portfolio ytd withdraws:  " + performanceData.portfolioYtdWithdrawals);
 			performanceData.portfolioYtdDividends = performanceData.portfolioYtdDividends
 					.add(fund.getDistributionsAfterDate(getFirstOfYearDate()));
 			performanceData.portfolioLastYearDividends = performanceData.portfolioLastYearDividends
@@ -111,14 +113,14 @@ public class PerformanceService {
 			performanceData.portfolioThreeYearAgoValue = performanceData.portfolioThreeYearAgoValue
 					.add(fundThreeYearAgoValue);
 
-			performanceData.portfolioYtdWithdrawals = performanceData.portfolioYtdWithdrawals
-					.add(fund.geWithdrawalsBetweenDates(getFirstOfYearDate(),LocalDate.now()));
-			performanceData.portfolioLastYearWithdrawals = performanceData.portfolioLastYearWithdrawals
-					.add(fund.geWithdrawalsBetweenDates(getFirstOfLastYearDate(), getFirstOfYearDate()));
-			performanceData.portfolioYearAgoWithdrawals = performanceData.portfolioYearAgoWithdrawals
-					.add(fund.getWithdrawalsUpToDate(LocalDate.now().minusYears(1)));
-			performanceData.portfolioThreeYearAgoWithdrawals = performanceData.portfolioThreeYearAgoWithdrawals
-					.add(fund.getWithdrawalsUpToDate(LocalDate.now().minusYears(3)));
+//			performanceData.portfolioYtdWithdrawals = performanceData.portfolioYtdWithdrawals
+//					.add(fund.geWithdrawalsBetweenDates(getFirstOfYearDate(),LocalDate.now()));
+//			performanceData.portfolioLastYearWithdrawals = performanceData.portfolioLastYearWithdrawals
+//					.add(fund.geWithdrawalsBetweenDates(getFirstOfLastYearDate(), getFirstOfYearDate()));
+//			performanceData.portfolioYearAgoWithdrawals = performanceData.portfolioYearAgoWithdrawals
+//					.add(fund.getWithdrawalsUpToDate(LocalDate.now().minusYears(1)));
+//			performanceData.portfolioThreeYearAgoWithdrawals = performanceData.portfolioThreeYearAgoWithdrawals
+//					.add(fund.getWithdrawalsUpToDate(LocalDate.now().minusYears(3)));
 
 			performanceData.portfolioTotalCurrentPercentage = performanceData.portfolioTotalCurrentPercentage
 					.add(CurrencyHelper.calculatePercentage(fund.getValue(), portfolio.getTotalValue()));

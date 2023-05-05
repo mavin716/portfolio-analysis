@@ -205,9 +205,8 @@ public class PortfolioPriceHistory {
 			Double shares = Float.valueOf(fundValues.get(3)) + fund.getShares();
 			fund.setShares(shares);
 			fund.setCurrentPrice(price);
-			addFundPrice(symbol, date, price);
-			addFundShares(symbol, date, new Float(shares));
-			addFundPriceSource(symbol, date, downloadFile);
+			addFundPrice(symbol, date, price, downloadFile);
+			addFundShares(symbol, date, shares.floatValue(), downloadFile);
 			funds.put(symbol, fund);
 
 		}
@@ -238,7 +237,8 @@ public class PortfolioPriceHistory {
 						tradeDate = LocalDate.parse(fundTransaction.get(1), DateTimeFormatter.ofPattern("M/d/yyyy"));
 					} catch (Exception e) {
 						try {
-							tradeDate = LocalDate.parse(fundTransaction.get(1), DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+							tradeDate = LocalDate.parse(fundTransaction.get(1),
+									DateTimeFormatter.ofPattern("yyyy-MM-dd"));
 						} catch (Exception e1) {
 							System.out.println("Exception processing transactions:  " + e);
 							continue;
@@ -341,8 +341,7 @@ public class PortfolioPriceHistory {
 				}
 
 				if (price != null) {
-					addFundPrice(symbol, date, price);
-					addFundPriceSource(symbol, date, historyFile);
+					addFundPrice(symbol, date, price, historyFile);
 				}
 			}
 
@@ -414,7 +413,7 @@ public class PortfolioPriceHistory {
 				}
 
 				if (shares.compareTo(0f) > 0) {
-					addFundShares(symbol, date, shares);
+					addFundShares(symbol, date, shares, sharesFile);
 				}
 			}
 
@@ -435,7 +434,7 @@ public class PortfolioPriceHistory {
 
 	}
 
-	public void addFundPrice(String symbol, LocalDate date, BigDecimal price) {
+	public void addFundPrice(String symbol, LocalDate date, BigDecimal price, String source) {
 
 		if (price == null || price.compareTo(BigDecimal.ZERO) <= 0) {
 			return;
@@ -454,19 +453,27 @@ public class PortfolioPriceHistory {
 		}
 
 		BigDecimal existingPrice = fundPriceMap.get(date);
+
 		if (existingPrice != null) {
+			String prevSource = fundPricesSource.get(symbol).get(date);
 			if (existingPrice.compareTo(price) != 0) {
 				// Alpha Vantage service is returning different price than vanguard.... use
 				// vanguard download files...
-				String source = fundPricesSource.get(symbol).get(date);
-				System.out.println(symbol + " prev source: " + source + " " + date + " "
-						+ CurrencyHelper.formatAsCurrencyString(existingPrice) + ","
-						+ CurrencyHelper.formatAsCurrencyString(price));
+				System.out.println(symbol + " " + date + " prev source: " + prevSource 
+						+ " current source: " + source + " " + CurrencyHelper.formatAsCurrencyString(existingPrice)
+						+ "," + CurrencyHelper.formatAsCurrencyString(price));
+			} else {
+//				System.out.println(prevSource + " " + date + " "
+//						+ CurrencyHelper.formatAsCurrencyString(existingPrice) + ","
+//						+ CurrencyHelper.formatAsCurrencyString(price));
+				// System.out.println(prevSource + " same price");.
 			}
+
 			// Don't add second price for same date
 			return;
 		}
 		fundPriceMap.put(date, price);
+		addFundPriceSource(symbol, date, source);
 
 		Pair<LocalDate, BigDecimal> fundMaxPriceMap = fundsMaxPriceMap.get(symbol);
 		if (fundMaxPriceMap == null) {
@@ -492,7 +499,7 @@ public class PortfolioPriceHistory {
 
 	}
 
-	public void addFundShares(String symbol, LocalDate date, Float shares) {
+	public void addFundShares(String symbol, LocalDate date, Float shares, String source) {
 
 		Map<LocalDate, Float> fundShareMap = fundShares.get(symbol);
 		if (fundShareMap == null) {
@@ -500,6 +507,7 @@ public class PortfolioPriceHistory {
 			fundShares.put(symbol, fundShareMap);
 		}
 		fundShareMap.put(date, shares);
+		addFundPriceSource(symbol, date, source);
 
 	}
 

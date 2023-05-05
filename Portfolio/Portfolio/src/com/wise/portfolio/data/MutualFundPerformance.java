@@ -398,14 +398,14 @@ public class MutualFundPerformance {
 			BigDecimal historicalValue = portfolioPriceHistory.getFundValueByDate(portfolioFund, date, isExactDate);
 			if (currentValue != null && historicalValue != null) {
 				returns = currentValue.subtract(historicalValue).add(dividends).add(withdrawals).add(exchanges).subtract(conversions);
-				System.out.println("fund:  " + portfolioFund.getShortName() + " date:  " + date);
-				System.out.println("currentValue:  " + CurrencyHelper.formatAsCurrencyString(currentValue));
-				System.out.println("historicalValue:  " + CurrencyHelper.formatAsCurrencyString(historicalValue));
-				System.out.println("withdrawals:  " + CurrencyHelper.formatAsCurrencyString(withdrawals));
-				System.out.println("conversions:  " + CurrencyHelper.formatAsCurrencyString(conversions));
-				System.out.println("exchanges:  " + CurrencyHelper.formatAsCurrencyString(exchanges));
-				System.out.println("dividends:  " + CurrencyHelper.formatAsCurrencyString(dividends));
-				System.out.println("returns:  " + CurrencyHelper.formatAsCurrencyString(returns));
+//				System.out.println("fund:  " + portfolioFund.getShortName() + " date:  " + date);
+//				System.out.println("currentValue:  " + CurrencyHelper.formatAsCurrencyString(currentValue));
+//				System.out.println("historicalValue:  " + CurrencyHelper.formatAsCurrencyString(historicalValue));
+//				System.out.println("withdrawals:  " + CurrencyHelper.formatAsCurrencyString(withdrawals));
+//				System.out.println("conversions:  " + CurrencyHelper.formatAsCurrencyString(conversions));
+//				System.out.println("exchanges:  " + CurrencyHelper.formatAsCurrencyString(exchanges));
+//				System.out.println("dividends:  " + CurrencyHelper.formatAsCurrencyString(dividends));
+//				System.out.println("returns:  " + CurrencyHelper.formatAsCurrencyString(returns));
 			} else {
 //				System.out.println("currentValue:  " + CurrencyHelper.formatAsCurrencyString(currentValue));
 //				System.out.println("historicalValue:  " + CurrencyHelper.formatAsCurrencyString(historicalValue));
