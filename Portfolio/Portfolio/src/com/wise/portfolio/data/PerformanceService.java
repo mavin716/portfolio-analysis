@@ -90,8 +90,6 @@ public class PerformanceService {
 
 			performanceData.portfolioYtdWithdrawals = performanceData.portfolioYtdWithdrawals
 					.add(fund.getWithdrawalsUpToDate(getFirstOfYearDate()));
-			System.out.println("fund " + fund.getName() + " ytd withdraws:  " + performanceData.portfolioYtdWithdrawals);
-			System.out.println("portfolio ytd withdraws:  " + performanceData.portfolioYtdWithdrawals);
 			performanceData.portfolioYtdDividends = performanceData.portfolioYtdDividends
 					.add(fund.getDistributionsAfterDate(getFirstOfYearDate()));
 			performanceData.portfolioLastYearDividends = performanceData.portfolioLastYearDividends

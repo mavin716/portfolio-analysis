@@ -119,31 +119,54 @@ public class PortfolioService {
 	private final static String MAIL_TO = "mavin14534@yahoo.com";
 	private final static String MAIL_FROM = "mavin14534@yahoo.com";
 
-	private static java.awt.Color[] axisPaints = { java.awt.Color.RED, java.awt.Color.BLUE, java.awt.Color.GREEN,
-			new java.awt.Color(104, 30, 126), // Purple
-			new java.awt.Color(255, 116, 53), // Orange
-			new java.awt.Color(255, 240, 53), // Yellow
-			new java.awt.Color(0, 121, 231), // Lt Blue
+	private static java.awt.Color[] axisPaints = { 
+			java.awt.Color.RED, 
+			java.awt.Color.BLUE, 
+			java.awt.Color.GREEN,
+			java.awt.Color.CYAN,
+			java.awt.Color.ORANGE,
+			java.awt.Color.PINK,
+			java.awt.Color.DARK_GRAY,
+			java.awt.Color.GRAY,
+			java.awt.Color.MAGENTA,
+			java.awt.Color.YELLOW,
+			java.awt.Color.BLACK,
+			new java.awt.Color(162, 42, 42), // Brown
+			
 			new java.awt.Color(251, 72, 196), // Hot Pink
+			new java.awt.Color(0, 0, 139), // Lt Blue
+			new java.awt.Color(104, 30, 126), // Purple
 			new java.awt.Color(0, 158, 71), // Med Green
 			java.awt.Color.RED, java.awt.Color.BLUE, java.awt.Color.GREEN, 
+			java.awt.Color.CYAN,
+			java.awt.Color.ORANGE,
+			java.awt.Color.PINK,
+			java.awt.Color.DARK_GRAY,
+			java.awt.Color.GRAY,
+			java.awt.Color.MAGENTA,
+			java.awt.Color.YELLOW,
+			java.awt.Color.BLACK,
+			new java.awt.Color(162, 42, 42), // Brown
+
 			new java.awt.Color(104, 30, 126), // Purple
-			new java.awt.Color(255, 116, 53), // Orange
-			new java.awt.Color(255, 240, 53), // Yellow
-			new java.awt.Color(0, 121, 231), // Lt Blue
+			new java.awt.Color(0, 0, 139), // Lt Blue
+			new java.awt.Color(251, 72, 196), // Hot Pink
+			new java.awt.Color(0, 158, 71), // Med Green
+			java.awt.Color.RED, java.awt.Color.BLUE, java.awt.Color.GREEN,
+			java.awt.Color.CYAN,
+			java.awt.Color.ORANGE,
+			java.awt.Color.PINK,
+			java.awt.Color.DARK_GRAY,
+			java.awt.Color.GRAY,
+			java.awt.Color.MAGENTA,
+			java.awt.Color.YELLOW,
+			java.awt.Color.BLACK,
+			new java.awt.Color(104, 30, 126), // Purple
+			new java.awt.Color(0, 0, 139), // Lt Blue
 			new java.awt.Color(251, 72, 196), // Hot Pink
 			new java.awt.Color(0, 158, 71), // Med Green
 			java.awt.Color.RED, java.awt.Color.BLUE, java.awt.Color.GREEN,
 			new java.awt.Color(104, 30, 126), // Purple
-			new java.awt.Color(255, 116, 53), // Orange
-			new java.awt.Color(255, 240, 53), // Yellow
-			new java.awt.Color(0, 121, 231), // Lt Blue
-			new java.awt.Color(251, 72, 196), // Hot Pink
-			new java.awt.Color(0, 158, 71), // Med Green
-			java.awt.Color.RED, java.awt.Color.BLUE, java.awt.Color.GREEN,
-			new java.awt.Color(104, 30, 126), // Purple
-			new java.awt.Color(255, 116, 53), // Orange
-			new java.awt.Color(255, 240, 53), // Yellow
 			new java.awt.Color(0, 121, 231), // Lt Blue
 			new java.awt.Color(251, 72, 196), // Hot Pink
 			new java.awt.Color(0, 158, 71) // Med Green	
@@ -300,26 +323,26 @@ public class PortfolioService {
 		return Pair.of(sortedSurplusFundMap, sortedDeficitFundMap);
 	}
 
-	public void printTrends(Portfolio portfolio) {
-		System.out.println("\n\nPerformance sorted by name");
-		Collection<PortfolioFund> funds = portfolio.getFundMap().values();
-		for (Integer days : rankDaysArray) {
-			printFundsPerformance(days, funds,
-					(PortfolioFund o1, PortfolioFund o2) -> o1.getName().compareTo(o2.getName()));
-		}
-
-		System.out.println("\n\nPerformance sorted by IRR");
-		for (Integer days : rankDaysArray) {
-			printFundsPerformance(days, funds,
-					(PortfolioFund f1, PortfolioFund f2) -> getInternalRateReturn(f2, f2.getCost())
-							.compareTo(getInternalRateReturn(f1, f1.getCost())));
-		}
-
-		for (Integer days : rankDaysArray) {
-			System.out.println("\n\nPerformance sorted by descending " + days + " days change");
-			printFundsPerformance(days, funds, new CompareByPerformanceDays(days));
-		}
-	}
+//	public void printTrends(Portfolio portfolio) {
+//		System.out.println("\n\nPerformance sorted by name");
+//		Collection<PortfolioFund> funds = portfolio.getFundMap().values();
+//		for (Integer days : rankDaysArray) {
+//			printFundsPerformance(days, funds,
+//					(PortfolioFund o1, PortfolioFund o2) -> o1.getName().compareTo(o2.getName()));
+//		}
+//
+//		System.out.println("\n\nPerformance sorted by IRR");
+//		for (Integer days : rankDaysArray) {
+//			printFundsPerformance(days, funds,
+//					(PortfolioFund f1, PortfolioFund f2) -> getInternalRateReturn(f2, f2.getCost())
+//							.compareTo(getInternalRateReturn(f1, f1.getCost())));
+//		}
+//
+//		for (Integer days : rankDaysArray) {
+//			System.out.println("\n\nPerformance sorted by descending " + days + " days change");
+//			printFundsPerformance(days, funds, new CompareByPerformanceDays(days));
+//		}
+//	}
 
 	private BigDecimal performAdjustments(Portfolio portfolio, Map<String, BigDecimal> adjustments,
 			BigDecimal surplus) {
@@ -347,40 +370,40 @@ public class PortfolioService {
 		return surplus;
 	}
 
-	/**
-	 * Print each funds performance in order determined by given comparator
-	 * 
-	 * @param days
-	 * @param funds
-	 * @param c
-	 */
-	private void printFundsPerformance(Integer days, Collection<PortfolioFund> funds,
-			Comparator<? super PortfolioFund> c) {
-		// Create map of fund symbol to list of rankings per rankDays
-		Map<String, LinkedList<Integer>> fundRanking = createFundRankingList(funds);
+//	/**
+//	 * Print each funds performance in order determined by given comparator
+//	 * 
+//	 * @param days
+//	 * @param funds
+//	 * @param c
+//	 */
+//	private void printFundsPerformance(Integer days, Collection<PortfolioFund> funds,
+//			Comparator<? super PortfolioFund> c) {
+//		// Create map of fund symbol to list of rankings per rankDays
+//		Map<String, LinkedList<Integer>> fundRanking = createFundRankingList(funds);
+//
+//		// Print each fund performance details
+//		System.out.println("\nfund performance by days:  " + days);
+//		funds.stream().sorted(c)
+//				.forEach(f -> System.out.println(generateFundPeformanceText(f, days, fundRanking.get(f.getSymbol()))));
+//	}
 
-		// Print each fund performance details
-		System.out.println("\nfund performance by days:  " + days);
-		funds.stream().sorted(c)
-				.forEach(f -> System.out.println(generateFundPeformanceText(f, days, fundRanking.get(f.getSymbol()))));
-	}
-
-	private String generateFundPeformanceText(PortfolioFund fund, Integer days, LinkedList<Integer> fundRanking) {
-
-		MutualFundPerformance performance = new MutualFundPerformance(portfolio, fund);
-		LocalDate historicalDate = getClosestHistoricalDate(days);
-		Float irr = getInternalRateReturn(fund, fund.getCost());
-		StringBuffer displayString = new StringBuffer(String.format("%-24s", fund.getShortName()) + " irr: "
-				+ CurrencyHelper.formatPercentageString(irr) + "% ");
-		displayString.append(String.valueOf(days)).append("d:")
-				.append(CurrencyHelper.formatPercentageString(performance.getPerformanceRateByDate(historicalDate)))
-				.append("% ");
-
-		displayString.append(generatePerformanceStatusText(fund));
-
-		return displayString.toString();
-
-	}
+//	private String generateFundPeformanceText(PortfolioFund fund, Integer days, LinkedList<Integer> fundRanking) {
+//
+//		MutualFundPerformance performance = new MutualFundPerformance(portfolio, fund);
+//		LocalDate historicalDate = getClosestHistoricalDate(days);
+//		Float irr = getInternalRateReturn(fund, fund.getCost());
+//		StringBuffer displayString = new StringBuffer(String.format("%-24s", fund.getShortName()) + " irr: "
+//				+ CurrencyHelper.formatPercentageString(irr) + "% ");
+//		displayString.append(String.valueOf(days)).append("d:")
+//				.append(CurrencyHelper.formatPercentageString(performance.getPerformanceRateByDate(historicalDate)))
+//				.append("% ");
+//
+//		displayString.append(generatePerformanceStatusText(fund));
+//
+//		return displayString.toString();
+//
+//	}
 
 	public void printRanking(Portfolio portfolio, Document document) {
 
@@ -542,7 +565,7 @@ public class PortfolioService {
 
 			Cell cell1 = new Cell(); // Creating a cell
 			LocalDate historicalDate = LocalDate.now().minusDays(rankdays);
-			if (rankdays.equals(new Long(numDays))) {
+			if (rankdays.equals(Long.valueOf(numDays)) ) {
 				cell1.add(String.format("%3d", rankdays) + "*");
 			} else {
 				cell1.add(String.format("%3d", rankdays));
@@ -887,61 +910,61 @@ public class PortfolioService {
 
 	}
 
-	private static String generateTrendScaleDescription(LinkedList<Integer> ranking) {
-
-		int sumDifference = 0;
-		String trendScale;
-		int scale = 0;
-		// start with one week change
-		for (int i = 2; i <= ranking.size() - 1; i++) {
-			int difference = Math.abs(ranking.get(i - 1) - ranking.get(i));
-			sumDifference += difference;
-			if (difference >= 8) {
-				scale += 8;
-			} else if (difference >= 4) {
-				scale += 4;
-			} else if (difference >= 1) {
-				scale += 1;
-			}
-		}
-
-		// if (scale >= 32)
-		// {
-		// trendScale = "VOLATILE ";
-		// }
-		// else if (scale >= 24)
-		// {
-		// trendScale = "MODERATE ";
-		// }
-		// else if (scale >= 12)
-		// {
-		// trendScale = "GRADUAL ";
-		// }
-		// else if (scale >= 8)
-		// {
-		// trendScale = "SLOW ";
-		// }
-		// else
-		// {
-		// trendScale = "STEADY ";
-		// }
-
-		if (sumDifference >= 75) {
-			trendScale = "VOLATILE ";
-		} else if (sumDifference >= 60) {
-			trendScale = "MODERATE ";
-		} else if (sumDifference >= 49) {
-			trendScale = "GRADUAL ";
-		} else if (sumDifference >= 38) {
-			trendScale = "SLOW ";
-		} else if (sumDifference > 21) {
-			trendScale = "SLIGHTLY";
-		} else {
-			trendScale = "STEADY ";
-		}
-
-		return trendScale;
-	}
+//	private static String generateTrendScaleDescription(LinkedList<Integer> ranking) {
+//
+//		int sumDifference = 0;
+//		String trendScale;
+//		int scale = 0;
+//		// start with one week change
+//		for (int i = 2; i <= ranking.size() - 1; i++) {
+//			int difference = Math.abs(ranking.get(i - 1) - ranking.get(i));
+//			sumDifference += difference;
+//			if (difference >= 8) {
+//				scale += 8;
+//			} else if (difference >= 4) {
+//				scale += 4;
+//			} else if (difference >= 1) {
+//				scale += 1;
+//			}
+//		}
+//
+//		// if (scale >= 32)
+//		// {
+//		// trendScale = "VOLATILE ";
+//		// }
+//		// else if (scale >= 24)
+//		// {
+//		// trendScale = "MODERATE ";
+//		// }
+//		// else if (scale >= 12)
+//		// {
+//		// trendScale = "GRADUAL ";
+//		// }
+//		// else if (scale >= 8)
+//		// {
+//		// trendScale = "SLOW ";
+//		// }
+//		// else
+//		// {
+//		// trendScale = "STEADY ";
+//		// }
+//
+//		if (sumDifference >= 75) {
+//			trendScale = "VOLATILE ";
+//		} else if (sumDifference >= 60) {
+//			trendScale = "MODERATE ";
+//		} else if (sumDifference >= 49) {
+//			trendScale = "GRADUAL ";
+//		} else if (sumDifference >= 38) {
+//			trendScale = "SLOW ";
+//		} else if (sumDifference > 21) {
+//			trendScale = "SLIGHTLY";
+//		} else {
+//			trendScale = "STEADY ";
+//		}
+//
+//		return trendScale;
+//	}
 
 	private static String generateTrendDescription(Integer oldRank, Integer newRank) {
 		StringBuilder description = new StringBuilder();
@@ -1362,8 +1385,9 @@ public class PortfolioService {
 					runningFundWithdrawalAmount = runningFundWithdrawalAmount.add(fundWithdrawalIncrement);
 
 					BigDecimal newFundBalance = fund.getValue().subtract(runningFundWithdrawalAmount);
+					// No money is being withdrawn, total balance is same
 					BigDecimal newFundDeviation = getFundNewBalanceDeviation(fund, newFundBalance,
-							actualMoveMoneyAount);
+							BigDecimal.ZERO);
 					System.out.println("Fund:  " + fund.getShortName() + " New Fund Balance:  "
 							+ CurrencyHelper.formatAsCurrencyString(newFundBalance) + " New Fund Deviation:  "
 							+ CurrencyHelper.formatPercentageString4(newFundDeviation));
@@ -2856,7 +2880,7 @@ public class PortfolioService {
 		// Print table headings
 		table.addHeaderCell(new Cell().add("Fund"));
 		table.addHeaderCell(new Cell().add("Current Value\nCategory\n Total").setTextAlignment(TextAlignment.CENTER));
-		table.addHeaderCell(new Cell().add("Current\n%").setTextAlignment(TextAlignment.CENTER));
+		table.addHeaderCell(new Cell().add("Current %\nCategory\nTotal\nMinimum").setTextAlignment(TextAlignment.CENTER));
 		table.addHeaderCell(
 				new Cell().add("Target %\nCategory\nTotal\nMinimum").setTextAlignment(TextAlignment.CENTER));
 		table.addHeaderCell(
@@ -3134,6 +3158,10 @@ public class PortfolioService {
 					.add(fundWithdrawal.getValue().multiply(fund.getPercentageByCategory(category)));
 		}
 
+		BigDecimal postWithdrawalValueByCategory = totalCurrentValueByCategory.subtract(totalWithdrawalsByCategory);
+		BigDecimal postWithdrawalValue = totalCurrentValue.subtract(totalWithdrawals);
+
+		
 		table.addCell(new Cell().add("Cat. Total").setItalic());
 
 		// Current Value
@@ -3165,8 +3193,10 @@ public class PortfolioService {
 		table.addCell(new Cell().add(CurrencyHelper.formatAsCurrencyString(totalWithdrawalsByCategory)));
 
 		// Post Withdrwal Value
-		table.addCell(new Cell()
-				.add(CurrencyHelper.formatAsCurrencyString(totalCurrentValue.subtract(totalWithdrawalsByCategory))));
+//		table.addCell(new Cell()
+//				.add(CurrencyHelper.formatAsCurrencyString(totalCurrentValue.subtract(totalWithdrawalsByCategory))));
+		table.addCell(createCurrentValueCell(false, postWithdrawalValueByCategory, totalDeviation, postWithdrawalValue,
+				totalDeviation, totalAdjustedMinimumTargetValue, totalDeviation));
 
 		table.addCell(new Cell().add(""));
 		table.addCell(new Cell().add(""));
@@ -3785,6 +3815,7 @@ public class PortfolioService {
 		BigDecimal totalDeviationByCategory = totalCurrentPercentageByCategory
 				.subtract(totalTargetPercentageByCategory);
 		BigDecimal totalSurplusDeficit = totalCurrentValue.subtract(totalTargetValue);
+		BigDecimal totalSurplusDeficitDerivation = totalCurrentValue.subtract(totalTargetValue);
 		BigDecimal surpusDeficitByCategory = totalCurrentValueByCategory.subtract(totalTargetValueByCategory);
 		BigDecimal adjustedMinimumSurplusDeficit = totalCurrentValue.subtract(totalAdjustedMinimumTargetValue);
 
@@ -3813,7 +3844,7 @@ public class PortfolioService {
 
 		// Current Value
 		table.addCell(createCurrentValueCell(false, totalCurrentValueByCategory, totalDeviationByCategory,
-				BigDecimal.ZERO, BigDecimal.ZERO, totalAdjustedMinimumTargetValue, totalAdjustedMinimumDeviation));
+				totalCurrentValue, BigDecimal.ZERO, totalAdjustedMinimumTargetValue, totalAdjustedMinimumDeviation));
 
 		// Current Percentage
 		table.addCell(
@@ -3821,20 +3852,20 @@ public class PortfolioService {
 						totalCurrentValue, totalAdjustedMinimumTargetPercentage, totalCurrentPercentage));
 
 		// Target Percentage
-		table.addCell(createTargetPercentageCell(false, totalTargetPercentageByCategory, BigDecimal.ZERO,
-				totalAdjustedMinimumTargetPercentage));
+		table.addCell(createTargetPercentageCell(false, totalTargetPercentageByCategory, totalAdjustedMinimumTargetPercentage,
+				null));
 
 		// Target Value
-		table.addCell(createTargetValueCell(false, totalTargetValueByCategory, BigDecimal.ZERO,
-				totalAdjustedMinimumTargetValue));
+		table.addCell(createTargetValueCell(false, totalTargetValueByCategory, totalAdjustedMinimumTargetValue,
+				null));
 
 		// Deviation
 		table.addCell(createDeviationCell(false, totalDeviationByCategory, totalTargetValueByCategory, BigDecimal.ZERO,
-				BigDecimal.ZERO, totalAdjustedMinimumDeviation));
+				totalAdjustedMinimumDeviation, null));
 
 		// Surplus / Deficit
 		table.addCell(createSurplusDeficitCell(false, surpusDeficitByCategory, totalDeviationByCategory,
-				BigDecimal.ZERO, BigDecimal.ZERO, adjustedMinimumSurplusDeficit, totalAdjustedMinimumDeviation));
+				totalSurplusDeficit, BigDecimal.ZERO, totalAdjustedMinimumDeviation, adjustedMinimumSurplusDeficit));
 
 	}
 
