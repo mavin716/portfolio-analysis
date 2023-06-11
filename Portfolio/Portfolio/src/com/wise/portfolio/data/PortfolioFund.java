@@ -6,6 +6,9 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Map.Entry;
+
+import com.wise.portfolio.data.MutualFund.FundCategory;
+
 import java.util.TreeMap;
 
 public class PortfolioFund extends MutualFund {
@@ -354,5 +357,9 @@ public class PortfolioFund extends MutualFund {
 			}
 		}
 		return conversionSharesAmount;
+	}
+
+	public boolean isMMFund() {
+		return getCategoriesMap().get(FundCategory.CASH).compareTo(BigDecimal.ZERO) != 0;
 	}
 }

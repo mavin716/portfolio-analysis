@@ -2,6 +2,7 @@ package com.wise.portfolio.data;
 
 import java.io.File;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.text.NumberFormat;
@@ -50,7 +51,7 @@ public class PortfolioApp {
 			// If current download file timestamp before 6pm, then the fund prices are from
 			// the previous day.
 			LocalDate currentDownloadFilePriceDate = LocalDate.now();
-			if (LocalTime.now().isBefore(LocalTime.of(15, 0))) {
+			if (LocalTime.now().isBefore(LocalTime.of(18, 0))) {
 				currentDownloadFilePriceDate = currentDownloadFilePriceDate.minusDays(1);
 			}
 			portfolioService.loadPortfolioDownloadFile(portfolio, currentDownloadFilePriceDate, CURRENT_DOWNLOAD_FILE);
@@ -104,9 +105,14 @@ public class PortfolioApp {
 				headerHandler.setHeader("school tax withdrawal");
 				printSchoolTaxWithdrawalSpreadsheet(portfolio, document, portfolioService);
 			}
-			if (today.getDayOfMonth() > 17 || today.getDayOfMonth() < 2) {
+			
+			if (today.getDayOfMonth() > 17 || today.getDayOfMonth() < 4) {
 				headerHandler.setHeader("monthly withdrawal");
-				printPostCondoMonthlyWithdrawalSpreadsheet(portfolio, document, portfolioService);
+				if (today.getDayOfMonth() < 27) {
+					printPostCondoMonthlyWithdrawalSpreadsheet(portfolio, document, portfolioService);
+				} else {
+					printPostCondoMonthlyWithdrawalSpreadsheet26(portfolio, document, portfolioService);
+				}
 			}
 			if (today.getDayOfMonth() < 16 && today.getDayOfMonth() > 7) {
 				headerHandler.setHeader("fixed expenses transfer");
@@ -366,15 +372,17 @@ public class PortfolioApp {
 	private static final BigDecimal STATE_WITHOLD_TAXES_PERCENT = new BigDecimal(.03);
 	private static final BigDecimal WITHOLD_TAXES_PERCENT = FEDERAL_WITHOLD_TAXES_PERCENT
 			.add(STATE_WITHOLD_TAXES_PERCENT);
+	private static final BigDecimal WITHDRAW_AMOUNT_PERCENTAGE = BigDecimal.ONE.subtract(WITHOLD_TAXES_PERCENT);
+
 	private static final BigDecimal CONDO_MORTGAGE_MONTHLY_SHARE_AMOUNT = new BigDecimal(650);
-	private static final BigDecimal MONTHLY_WITHDRAWAL_AMOUNT = new BigDecimal(1000)
-			.add(CONDO_MORTGAGE_MONTHLY_SHARE_AMOUNT);
+	private static final BigDecimal MONTHLY_EXPENSES_AMOUNT = new BigDecimal(1000);
 	private static final BigDecimal CONDO_MONTHLY_HOA = new BigDecimal(279);
 	private static final BigDecimal CONDO_MONTHLY_ENERGY_AVERAGE = new BigDecimal(40);
-	
-	private static final BigDecimal CONDO_EXPENSES_MONTHLY_SHARE_AMOUNT = (CONDO_MONTHLY_HOA.add(CONDO_MONTHLY_ENERGY_AVERAGE)).divide(new BigDecimal(2));
-	private static final BigDecimal PROPERTY_TAX_WITHDRAWAL_AMOUNT = new BigDecimal(3500);
-	private static final BigDecimal SCHOOL_TAX_WITHDRAWAL_AMOUNT = new BigDecimal(4500);
+
+	private static final BigDecimal CONDO_EXPENSES_MONTHLY_SHARE_AMOUNT = (CONDO_MONTHLY_HOA
+			.add(CONDO_MONTHLY_ENERGY_AVERAGE)).divide(new BigDecimal(2));
+	private static final BigDecimal PROPERTY_TAX_WITHDRAWAL_AMOUNT = new BigDecimal(3000);
+	private static final BigDecimal SCHOOL_TAX_WITHDRAWAL_AMOUNT = new BigDecimal(4000);
 
 	public static String formatAsCurrencyString(BigDecimal n) {
 		return NumberFormat.getCurrencyInstance().format(n);
@@ -389,17 +397,12 @@ public class PortfolioApp {
 
 	private void printFixedExpensesTransferSpreadsheet(Portfolio portfolio, Document document,
 			PortfolioService portfolioService) {
+
 		String title = "Monthly Fixed Expenses Transfer (included $650 into Fed MM for Condo Mortgage)";
 		System.out.println(title);
 
-		// Net withdrawal adjusts for transfer to money market fixed accounts
-		// Transfer 1000 into money market fixed accounts (included in withdrawal
-		// amount)
-//		Map<String, BigDecimal> withdrawals = portfolioService.calculateFixedExpensesTransfer(portfolio, new BigDecimal(1000), new BigDecimal(1650));
 		Map<String, BigDecimal> withdrawals = portfolioService.calculateFixedExpensesTransfer(portfolio,
 				new BigDecimal(1000), new BigDecimal(1650));
-
-		// Calculate withdrawals and print spreadsheet
 
 		portfolioService.printWithdrawalSpreadsheet(title, portfolio, BigDecimal.ZERO, withdrawals, document);
 
@@ -408,72 +411,70 @@ public class PortfolioApp {
 	private void printSchoolTaxWithdrawalSpreadsheet(Portfolio portfolio, Document document,
 			PortfolioService portfolioService) {
 
-		String title = "School Tax Withdrawal " + CurrencyHelper.formatAsCurrencyString(SCHOOL_TAX_WITHDRAWAL_AMOUNT);
+		BigDecimal withdrawAmount = SCHOOL_TAX_WITHDRAWAL_AMOUNT;
+		BigDecimal totalWithdrawalAmount = withdrawAmount.divide(WITHDRAW_AMOUNT_PERCENTAGE, 0, RoundingMode.UP);
+
+		String title = "School Tax Withdrawal " + CurrencyHelper.formatAsCurrencyString(totalWithdrawalAmount);
 		System.out.println(title);
 
-		// Net withdrawal adjusts for transfer to money market fixed accounts
-		Map<String, BigDecimal> withdrawals = portfolioService.calculateWithdrawal(portfolio,
-				SCHOOL_TAX_WITHDRAWAL_AMOUNT, BigDecimal.ZERO, new BigDecimal(2000));
+		// Calculate withdrawals
+		Map<String, BigDecimal> withdrawals = portfolioService.calculateWithdrawal(portfolio, totalWithdrawalAmount,
+				BigDecimal.ZERO, new BigDecimal(2000));
 
-		// Calculate withdrawals and print spreadsheet
-		portfolioService.printWithdrawalSpreadsheet(title, portfolio, SCHOOL_TAX_WITHDRAWAL_AMOUNT, withdrawals,
-				document);
+		// print spreadsheet
+		portfolioService.printWithdrawalSpreadsheet(title, portfolio, totalWithdrawalAmount, withdrawals, document);
 
 	}
 
 	private void printPostCondoMonthlyWithdrawalSpreadsheet(Portfolio portfolio, Document document,
 			PortfolioService portfolioService) {
 
-		BigDecimal taxesWitheld = MONTHLY_WITHDRAWAL_AMOUNT.multiply(WITHOLD_TAXES_PERCENT);
-		BigDecimal totalWithdrawalAmount = MONTHLY_WITHDRAWAL_AMOUNT.add(taxesWitheld);
+		BigDecimal withdrawAmount = MONTHLY_EXPENSES_AMOUNT.add(CONDO_MORTGAGE_MONTHLY_SHARE_AMOUNT);
+		BigDecimal totalWithdrawalAmount = withdrawAmount.divide(WITHDRAW_AMOUNT_PERCENTAGE, 0, RoundingMode.UP);
 
 		String title = "Monthly Expenses (Including Automatic Monthly Condo Mortgage Share) Withdrawal "
 				+ CurrencyHelper.formatAsCurrencyString(totalWithdrawalAmount) + " Net:  "
-				+ CurrencyHelper.formatAsCurrencyString(MONTHLY_WITHDRAWAL_AMOUNT);
+				+ CurrencyHelper.formatAsCurrencyString(withdrawAmount);
 		System.out.println(title);
 
-		// transfers for fixed expenses has been moved to a separate transaction mid
-		// month
 		Map<String, BigDecimal> withdrawals = portfolioService.calculateWithdrawal(portfolio, totalWithdrawalAmount,
-				BigDecimal.ZERO, CONDO_MORTGAGE_MONTHLY_SHARE_AMOUNT
-						.add(CONDO_MORTGAGE_MONTHLY_SHARE_AMOUNT.multiply(WITHOLD_TAXES_PERCENT)));
+				BigDecimal.ZERO, CONDO_MORTGAGE_MONTHLY_SHARE_AMOUNT);
 
 		// Calculate withdrawals and print spreadsheet
-		portfolioService.printWithdrawalSpreadsheet(title, portfolio, totalWithdrawalAmount, withdrawals, document);
+		portfolioService.printWithdrawalSpreadsheet(title, portfolio, withdrawAmount, withdrawals, document);
 
 	}
 
-//	private static void printAprilWithdrawalSpreadsheet(Portfolio portfolio, Document document,
-//			PortfolioService portfolioService) {
-//
-//		BigDecimal taxesWitheld = APRIL_NET_WITHDRAWAL_AMOUNT.multiply(WITHOLD_TAXES_PERCENT);
-//		BigDecimal totalWithdrawalAmount = APRIL_NET_WITHDRAWAL_AMOUNT.add(taxesWitheld);
-//		String title = "April (Zack & Shiori's Wedding & Japan Flight & monthly expenses) Withdrawal "
-//				+ CurrencyHelper.formatAsCurrencyString(totalWithdrawalAmount) + " Net:  "
-//				+ CurrencyHelper.formatAsCurrencyString(APRIL_NET_WITHDRAWAL_AMOUNT);
-//		System.out.println(title);
-//
-//		// Net withdrawal adjusts for transfer to money market fixed accounts
-//		// Transfer 500 into money market fixed accounts (included in withdrawal amount)
-//		Map<String, BigDecimal> withdrawals = portfolioService.calculateWithdrawal(portfolio, totalWithdrawalAmount,
-//				BigDecimal.ZERO, new BigDecimal(5000), new BigDecimal(1000), BigDecimal.ZERO);
-//
-//		// Calculate withdrawals and print spreadsheet
-//		portfolioService.printWithdrawalSpreadsheet(title, portfolio, APRIL_NET_WITHDRAWAL_AMOUNT, withdrawals,
-//				document);
-//
-//	}
+	private void printPostCondoMonthlyWithdrawalSpreadsheet26(Portfolio portfolio, Document document,
+			PortfolioService portfolioService) {
+
+		BigDecimal withdrawAmount = MONTHLY_EXPENSES_AMOUNT;
+		BigDecimal totalWithdrawalAmount = withdrawAmount.divide(WITHDRAW_AMOUNT_PERCENTAGE, 0, RoundingMode.UP);
+
+		String title = "Monthly Expenses Withdrawal " + CurrencyHelper.formatAsCurrencyString(totalWithdrawalAmount)
+				+ " Net:  " + CurrencyHelper.formatAsCurrencyString(withdrawAmount);
+		System.out.println(title);
+
+		Map<String, BigDecimal> withdrawals = portfolioService.calculateWithdrawal(portfolio, totalWithdrawalAmount,
+				BigDecimal.ZERO, BigDecimal.ZERO);
+
+		// Calculate withdrawals and print spreadsheet
+		portfolioService.printWithdrawalSpreadsheet(title, portfolio, withdrawAmount, withdrawals, document);
+
+	}
 
 	private void printPropertyTaxWithdrawalSpreadsheet(Portfolio portfolio, Document document,
 			PortfolioService portfolioService) {
 
-		String title = "Property Tax Withdrawal "
-				+ CurrencyHelper.formatAsCurrencyString(PROPERTY_TAX_WITHDRAWAL_AMOUNT);
+		BigDecimal withdrawAmount = PROPERTY_TAX_WITHDRAWAL_AMOUNT;
+		BigDecimal totalWithdrawalAmount = withdrawAmount.divide(WITHDRAW_AMOUNT_PERCENTAGE, 0, RoundingMode.UP);
+
+		String title = "Property Tax Withdrawal " + CurrencyHelper.formatAsCurrencyString(totalWithdrawalAmount);
 		System.out.println(title);
 
 		// Net withdrawal adjusts for transfer to money market fixed accounts
-		Map<String, BigDecimal> withdrawals = portfolioService.calculateWithdrawal(portfolio,
-				PROPERTY_TAX_WITHDRAWAL_AMOUNT, BigDecimal.ZERO, new BigDecimal(1750));
+		Map<String, BigDecimal> withdrawals = portfolioService.calculateWithdrawal(portfolio, totalWithdrawalAmount,
+				BigDecimal.ZERO, PROPERTY_TAX_WITHDRAWAL_AMOUNT);
 
 		// Calculate withdrawals and print spreadsheet
 		portfolioService.printWithdrawalSpreadsheet(title, portfolio, PROPERTY_TAX_WITHDRAWAL_AMOUNT, withdrawals,

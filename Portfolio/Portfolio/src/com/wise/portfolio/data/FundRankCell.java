@@ -18,7 +18,8 @@ public class FundRankCell extends Cell {
 		if (enhancedRankDaysList.get(rankDayIndex) == numDays) {
 			this.setBold();
 		}
-		this.add(new Cell() // rank
+		
+		this.add(rank == 0 ? new Cell().add("n/a") : new Cell() // rank
 				.setBackgroundColor(calculateRankBackgroundColor(rank), calculateRankBackgroundOpacity(rank))
 				.add(String.format("%2d", rank))).add(new Cell() // rate
 						.setMargin(0)
@@ -63,7 +64,7 @@ public class FundRankCell extends Cell {
 	}
 
 	private Color calculateCurrentPriceColor(MutualFundPerformance fundPerformance, LocalDate date) {
-		LocalDate threeYearsAgo = LocalDate.now().minusYears(3);
+		LocalDate threeYearsAgo = LocalDate.now().minusYears(5);
 		BigDecimal minPrice = fundPerformance.getMinPricePairFromDate(threeYearsAgo).getRight();
 		BigDecimal maxPrice = fundPerformance.getMaxPricePairFromDate(threeYearsAgo).getRight();
 		BigDecimal fundPrice = fundPerformance.getPriceByDate(fundPerformance.getFund(), date, false);

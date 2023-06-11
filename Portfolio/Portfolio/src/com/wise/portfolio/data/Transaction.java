@@ -10,7 +10,14 @@ public class Transaction {
 	private BigDecimal transastionSharePrice;
 	private BigDecimal transastionPrincipal;
 	private String transactionSourceFile;
+	private String transactionComment;
 
+	public String getTransactionComment() {
+		return transactionComment;
+	}
+	public void setTransactionComment(String transactionComment) {
+		this.transactionComment = transactionComment;
+	}
 	public String getTransactionSourceFile() {
 		return transactionSourceFile;
 	}

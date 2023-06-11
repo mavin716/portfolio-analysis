@@ -24,20 +24,23 @@ public class Portfolio {
 		this.fundSymbolNameMap = fundSymbolNameMap;
 	}
 
-	private Map<String, PortfolioFund> fundMap = new TreeMap<String, PortfolioFund>();
+//	private Map<String, PortfolioFund> fundMap = new TreeMap<String, PortfolioFund>();
 
 	protected Map<LocalDate, Collection<Transaction>> federalWithholdingTax = new TreeMap<>();
 	protected Map<LocalDate, Collection<Transaction>> stateWithholdingTax = new TreeMap<>();
 
-//	private Map<String, PortfolioFund> fundMap = new TreeMap<String, PortfolioFund>(new Comparator<String>() {
-//
-//		@Override
-//		public int compare(String symbol1, String symbol12) {
-//			String fundName1 = fundSymbolNameMap.get(symbol1);
-//			String fundName2 = fundSymbolNameMap.get(symbol12);
-//			return fundName1.compareTo(fundName2);
-//		}
-//	});
+	private Map<String, PortfolioFund> fundMap = new TreeMap<String, PortfolioFund>(new Comparator<String>() {
+
+		@Override
+		public int compare(String symbol1, String symbol12) {
+			String fundName1 = fundSymbolNameMap.get(symbol1);
+			String fundName2 = fundSymbolNameMap.get(symbol12);
+			if (fundName1 == null || fundName2 == null) {
+				return symbol1.compareTo(symbol12);
+			}
+			return fundName1.compareTo(fundName2);
+		}
+	});
 	private PortfolioPriceHistory priceHistory = new PortfolioPriceHistory();
 
 	public PortfolioPriceHistory getPriceHistory() {
@@ -226,6 +229,11 @@ public class Portfolio {
 			}
 		}
 		return transactionsAmount;
+	}
+
+	public Collection<String> getFundSymbols() {
+		// TODO Auto-generated method stub
+		return fundSymbolNameMap.values();
 	}
 
 }
