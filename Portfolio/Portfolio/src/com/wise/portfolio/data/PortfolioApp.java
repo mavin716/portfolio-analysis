@@ -36,28 +36,18 @@ public class PortfolioApp {
 		File portfolioPdfFile = null;
 		try {
 			// Create the portfolio service
-			PortfolioService portfolioService = new PortfolioService(DOWNLOAD_PATH, FUND_SYMBOLS_MAP_FILE);
+			PortfolioService portfolioService = new PortfolioService(DOWNLOAD_PATH);
 
 			// Create the portfolio
-			Portfolio portfolio = portfolioService.createPortfolio();
+			Portfolio portfolio = portfolioService.createPortfolio(FUND_SYMBOLS_MAP_FILE);
 
 			// Load history download files
-			portfolioService.loadPortfolio(portfolio, DOWNLOAD_FILENAME_PREFIX);
+			portfolioService.loadPortfolioDownloadFiles(portfolio, DOWNLOAD_FILENAME_PREFIX, CURRENT_DOWNLOAD_FILE);
 			// Used to change naming policy
 			// portfolioService.updateDownloadFilenames(portfolio,
 			// DOWNLOAD_FILENAME_PREFIX);
 
-			// Load current download file
-			// If current download file timestamp before 6pm, then the fund prices are from
-			// the previous day.
-			LocalDate currentDownloadFilePriceDate = LocalDate.now();
-			if (LocalTime.now().isBefore(LocalTime.of(18, 0))) {
-				currentDownloadFilePriceDate = currentDownloadFilePriceDate.minusDays(1);
-			}
-			portfolioService.loadPortfolioDownloadFile(portfolio, currentDownloadFilePriceDate, CURRENT_DOWNLOAD_FILE);
-
 			// Get price history via alphaVantage
-
 			for (Entry<String, PortfolioFund> entry : portfolio.getFundMap().entrySet()) {
 				if (entry.getValue().getShares() == 0) {
 					continue;
@@ -65,16 +55,18 @@ public class PortfolioApp {
 
 				// not working, returning values which differ greatly from vanguard download
 				// files
-				String symbol = entry.getKey();
+//				String symbol = entry.getKey();
 //				AlphaVantageFundPriceService.loadFundHistoryFromAlphaVantage(portfolio, symbol, true);
 //				AlphaVantageFundPriceService.loadFundHistoryFromAlphaVantage(portfolio, symbol, false);
 			}
 
 			// Load fund allocation file
-			portfolioService.loadFundAllocation(portfolio, ALLOCATION_FILE);
+			portfolioService.loadFundAllocation(ALLOCATION_FILE);
 
 			// save all prices in spreadsheet
-			portfolioService.savePortfolioData(portfolio);
+			portfolioService.savePortfolioData();
+
+			portfolioService.setFundColors();
 
 			// Overwrite PDF output file
 			portfolioPdfFile = new File(PORTFOLIO_PDF_FILE);
@@ -86,6 +78,7 @@ public class PortfolioApp {
 			Document document = new Document(pdfDoc, PageSize.LEDGER);
 			document.setMargins(30f, 10f, 30f, 10f);
 
+			// Document Title
 			document.add(
 					new Paragraph("Report run at " + LocalDate.now().format(DateTimeFormatter.ofPattern("MM/dd/yy"))
 							+ " " + LocalTime.now().format(DateTimeFormatter.ofPattern("hh:mm a"))).setFontSize(14)
@@ -97,44 +90,52 @@ public class PortfolioApp {
 
 			//
 			LocalDate today = LocalDate.now();
+			// Property Tax due Feb 1st
 			if (today.getMonthValue() == 1 && today.getDayOfMonth() > 10) {
 				headerHandler.setHeader("propety tax withdrawal");
 				printPropertyTaxWithdrawalSpreadsheet(portfolio, document, portfolioService);
 			}
+			// School tax due Sept 1st
 			if (today.getMonthValue() == 8 && today.getDayOfMonth() > 10) {
 				headerHandler.setHeader("school tax withdrawal");
 				printSchoolTaxWithdrawalSpreadsheet(portfolio, document, portfolioService);
 			}
-			
-			if (today.getDayOfMonth() > 17 || today.getDayOfMonth() < 4) {
+
+			if (today.getDayOfMonth() > 15 || today.getDayOfMonth() < 4) {
 				headerHandler.setHeader("monthly withdrawal");
-				if (today.getDayOfMonth() < 27) {
+				if (today.getDayOfMonth() < 24 && today.getDayOfMonth() >= 4) {
+					// Withdrawal including auto withdrawal $650 mortgage from MM
 					printPostCondoMonthlyWithdrawalSpreadsheet(portfolio, document, portfolioService);
 				} else {
+					// Withdrawal excluding auto withdrawal $650 mortgage from MM
 					printPostCondoMonthlyWithdrawalSpreadsheet26(portfolio, document, portfolioService);
 				}
 			}
-			if (today.getDayOfMonth() < 16 && today.getDayOfMonth() > 7) {
-				headerHandler.setHeader("fixed expenses transfer");
+			if (today.getDayOfMonth() < 17 && today.getDayOfMonth() > 7) {
+				headerHandler.setHeader("fixed expenses transfer include transfer $650 into Fed MM");
 				printFixedExpensesTransferSpreadsheet(portfolio, document, portfolioService);
 			}
 
 			pdfDoc.addNewPage();
 			headerHandler.setHeader("performance table");
-			portfolioService.printPerformanceTable(portfolio, document);
+			portfolioService.printPerformanceTable(document);
 
 			headerHandler.setHeader("portfolio performance table");
-			portfolioService.printPortfolioPerformanceTable(portfolio, document);
+			portfolioService.printPortfolioPerformanceTable(document);
 
 			// Add price performance graphs,
 			pdfDoc.addNewPage();
 			headerHandler.setHeader("balance line graph");
-			portfolioService.prinBalanceLineGraphs(portfolio, document, pdfDoc, null, null);
+			portfolioService.prinBalanceLineGraphs(document, pdfDoc, null, null);
 
 			pdfDoc.addNewPage();
-			portfolioService.prinBalanceLineGraphs(portfolio, document, pdfDoc, LocalDate.now().minusYears(1),
-					LocalDate.now());
+			portfolioService.prinBalanceLineGraphs(document, pdfDoc, LocalDate.now().minusYears(1), LocalDate.now());
 
+			pdfDoc.addNewPage();
+			for (PortfolioFund fund : portfolio.getFundMap().values()) {
+				if (fund.isFixedExpensesAccount()) continue;
+				portfolioService.printFundPerformanceLineGraph(fund.getSymbol(), document, pdfDoc, LocalDate.now().minusYears(3), today);
+			}
 //			pdfDoc.addNewPage();
 //			PortfolioPriceHistory portfolioPriceHistory = portfolio.getPriceHistory();
 //			List<String> fundSynbols = new ArrayList<String>();
@@ -235,7 +236,7 @@ public class PortfolioApp {
 					fundSynbols.add(fund.getSymbol());
 				}
 			}
-			portfolioService.prinPerformanceLineGraphs(portfolio, fundSynbols, document, pdfDoc, null, null);
+			portfolioService.prinPerformanceLineGraphs(fundSynbols, document, pdfDoc, null, null);
 
 			pdfDoc.addNewPage();
 			fundSynbols = new ArrayList<String>();
@@ -245,7 +246,7 @@ public class PortfolioApp {
 					fundSynbols.add(fund.getSymbol());
 				}
 			}
-			portfolioService.prinPerformanceLineGraphs(portfolio, fundSynbols, document, pdfDoc, null, null);
+			portfolioService.prinPerformanceLineGraphs(fundSynbols, document, pdfDoc, null, null);
 
 			pdfDoc.addNewPage();
 			fundSynbols = new ArrayList<String>();
@@ -255,7 +256,7 @@ public class PortfolioApp {
 					fundSynbols.add(fund.getSymbol());
 				}
 			}
-			portfolioService.prinPerformanceLineGraphs(portfolio, fundSynbols, document, pdfDoc, null, null);
+			portfolioService.prinPerformanceLineGraphs(fundSynbols, document, pdfDoc, null, null);
 
 			pdfDoc.addNewPage();
 			fundSynbols = new ArrayList<String>();
@@ -265,7 +266,7 @@ public class PortfolioApp {
 					fundSynbols.add(fund.getSymbol());
 				}
 			}
-			portfolioService.prinPerformanceLineGraphs(portfolio, fundSynbols, document, pdfDoc, null, null);
+			portfolioService.prinPerformanceLineGraphs(fundSynbols, document, pdfDoc, null, null);
 
 			pdfDoc.addNewPage();
 			fundSynbols = new ArrayList<String>();
@@ -275,7 +276,7 @@ public class PortfolioApp {
 					fundSynbols.add(fund.getSymbol());
 				}
 			}
-			portfolioService.prinPerformanceLineGraphs(portfolio, fundSynbols, document, pdfDoc, null, null);
+			portfolioService.prinPerformanceLineGraphs(fundSynbols, document, pdfDoc, null, null);
 			pdfDoc.addNewPage();
 			fundSynbols = new ArrayList<String>();
 			for (PortfolioFund fund : portfolio.getFundMap().values()) {
@@ -284,7 +285,7 @@ public class PortfolioApp {
 					fundSynbols.add(fund.getSymbol());
 				}
 			}
-			portfolioService.prinPerformanceLineGraphs(portfolio, fundSynbols, document, pdfDoc, null, null);
+			portfolioService.prinPerformanceLineGraphs(fundSynbols, document, pdfDoc, null, null);
 			pdfDoc.addNewPage();
 			fundSynbols = new ArrayList<String>();
 			for (PortfolioFund fund : portfolio.getFundMap().values()) {
@@ -293,18 +294,18 @@ public class PortfolioApp {
 					fundSynbols.add(fund.getSymbol());
 				}
 			}
-			portfolioService.prinPerformanceLineGraphs(portfolio, fundSynbols, document, pdfDoc, null, null);
+			portfolioService.prinPerformanceLineGraphs(fundSynbols, document, pdfDoc, null, null);
 			// Print fund Trends
 			// portfolioService.printTrends(portfolio);
 
 			// Print ranking
-			portfolioService.printRanking(portfolio, document);
+			portfolioService.printRanking(document);
 
 //            Map<String, BigDecimal> adjustments = portfolioService.calculateAdjustments(portfolio);
 //           System.out.println("Rebalance funds");
 //           portfolioService.rebalanceFunds(portfolio, EXCHANGE_INCREMENT, adjustments);
 
-			Map<String, BigDecimal> adjustments = portfolioService.calculateAdjustments(portfolio);
+			Map<String, BigDecimal> adjustments = portfolioService.calculateAdjustments();
 //			portfolioService.rebalanceFunds(portfolio, EXCHANGE_INCREMENT,
 //					portfolioService.calculateAdjustments(portfolio));
 			pdfDoc.addNewPage();
@@ -338,8 +339,8 @@ public class PortfolioApp {
 				previousBusinessDay = previousBusinessDay.minusDays(1);
 			}
 
-			BigDecimal currentTotalValue = portfolioService.getTotalValueByDate(portfolio, lastBusinessDay);
-			BigDecimal previousTotalValue = portfolioService.getTotalValueByDate(portfolio, previousBusinessDay);
+			BigDecimal currentTotalValue = portfolioService.getTotalValueByDate(lastBusinessDay);
+			BigDecimal previousTotalValue = portfolioService.getTotalValueByDate(previousBusinessDay);
 			BigDecimal difference = currentTotalValue.subtract(previousTotalValue);
 			String subject = "YEAH";
 			if (difference.compareTo(BigDecimal.ZERO) < 0) {
@@ -349,7 +350,7 @@ public class PortfolioApp {
 			}
 			String textBody = "Change:  " + formatAsCurrencyString(difference) + " Total:  "
 					+ formatAsCurrencyString(portfolio.getTotalValue());
-//			portfolioService.sendMail(subject, textBody, portfolioPdfFile);
+			MailService.sendMail(subject, textBody, portfolioPdfFile);
 
 		} catch (Exception e) {
 			System.out.println("Exception e: " + e.getMessage());
@@ -372,7 +373,8 @@ public class PortfolioApp {
 	private static final BigDecimal STATE_WITHOLD_TAXES_PERCENT = new BigDecimal(.03);
 	private static final BigDecimal WITHOLD_TAXES_PERCENT = FEDERAL_WITHOLD_TAXES_PERCENT
 			.add(STATE_WITHOLD_TAXES_PERCENT);
-	private static final BigDecimal WITHDRAW_AMOUNT_PERCENTAGE = BigDecimal.ONE.subtract(WITHOLD_TAXES_PERCENT);
+	private static final BigDecimal AFTER_TAXES_WITHDRAW_AMOUNT_PERCENTAGE = BigDecimal.ONE
+			.subtract(WITHOLD_TAXES_PERCENT);
 
 	private static final BigDecimal CONDO_MORTGAGE_MONTHLY_SHARE_AMOUNT = new BigDecimal(650);
 	private static final BigDecimal MONTHLY_EXPENSES_AMOUNT = new BigDecimal(1000);
@@ -398,11 +400,11 @@ public class PortfolioApp {
 	private void printFixedExpensesTransferSpreadsheet(Portfolio portfolio, Document document,
 			PortfolioService portfolioService) {
 
-		String title = "Monthly Fixed Expenses Transfer (included $650 into Fed MM for Condo Mortgage)";
+		String title = "Monthly Fixed Expenses Transfer (included $750 into Fed MM for Condo Mortgage)";
 		System.out.println(title);
 
-		Map<String, BigDecimal> withdrawals = portfolioService.calculateFixedExpensesTransfer(portfolio,
-				new BigDecimal(1000), new BigDecimal(1650));
+		Map<String, BigDecimal> withdrawals = portfolioService.calculateFixedExpensesTransfer(new BigDecimal(1000),
+				new BigDecimal(1750));
 
 		portfolioService.printWithdrawalSpreadsheet(title, portfolio, BigDecimal.ZERO, withdrawals, document);
 
@@ -412,17 +414,21 @@ public class PortfolioApp {
 			PortfolioService portfolioService) {
 
 		BigDecimal withdrawAmount = SCHOOL_TAX_WITHDRAWAL_AMOUNT;
-		BigDecimal totalWithdrawalAmount = withdrawAmount.divide(WITHDRAW_AMOUNT_PERCENTAGE, 0, RoundingMode.UP);
+		BigDecimal totalWithdrawalAmountIncludingTaxes = withdrawAmount.divide(AFTER_TAXES_WITHDRAW_AMOUNT_PERCENTAGE,
+				0, RoundingMode.UP);
 
-		String title = "School Tax Withdrawal " + CurrencyHelper.formatAsCurrencyString(totalWithdrawalAmount);
+		String title = "School Tax Withdrawal: "
+				+ CurrencyHelper.formatAsCurrencyString(totalWithdrawalAmountIncludingTaxes) + " net: "
+				+ CurrencyHelper.formatAsCurrencyString(withdrawAmount);
 		System.out.println(title);
 
 		// Calculate withdrawals
-		Map<String, BigDecimal> withdrawals = portfolioService.calculateWithdrawal(portfolio, totalWithdrawalAmount,
-				BigDecimal.ZERO, new BigDecimal(2000));
+		Map<String, BigDecimal> withdrawals = portfolioService.calculateWithdrawal(totalWithdrawalAmountIncludingTaxes,
+				BigDecimal.ZERO, new BigDecimal(4000));
 
 		// print spreadsheet
-		portfolioService.printWithdrawalSpreadsheet(title, portfolio, totalWithdrawalAmount, withdrawals, document);
+		portfolioService.printWithdrawalSpreadsheet(title, portfolio, totalWithdrawalAmountIncludingTaxes, withdrawals,
+				document);
 
 	}
 
@@ -430,15 +436,19 @@ public class PortfolioApp {
 			PortfolioService portfolioService) {
 
 		BigDecimal withdrawAmount = MONTHLY_EXPENSES_AMOUNT.add(CONDO_MORTGAGE_MONTHLY_SHARE_AMOUNT);
-		BigDecimal totalWithdrawalAmount = withdrawAmount.divide(WITHDRAW_AMOUNT_PERCENTAGE, 0, RoundingMode.UP);
+		BigDecimal totalWithdrawalAmountIncludingTaxes = withdrawAmount.divide(AFTER_TAXES_WITHDRAW_AMOUNT_PERCENTAGE,
+				0, RoundingMode.UP);
 
 		String title = "Monthly Expenses (Including Automatic Monthly Condo Mortgage Share) Withdrawal "
-				+ CurrencyHelper.formatAsCurrencyString(totalWithdrawalAmount) + " Net:  "
+				+ CurrencyHelper.formatAsCurrencyString(totalWithdrawalAmountIncludingTaxes) + " Net:  "
 				+ CurrencyHelper.formatAsCurrencyString(withdrawAmount);
 		System.out.println(title);
 
-		Map<String, BigDecimal> withdrawals = portfolioService.calculateWithdrawal(portfolio, totalWithdrawalAmount,
-				BigDecimal.ZERO, CONDO_MORTGAGE_MONTHLY_SHARE_AMOUNT);
+		BigDecimal fedMMWithdrawal = CONDO_MORTGAGE_MONTHLY_SHARE_AMOUNT.divide(AFTER_TAXES_WITHDRAW_AMOUNT_PERCENTAGE,
+				0, RoundingMode.UP);
+
+		Map<String, BigDecimal> withdrawals = portfolioService.calculateWithdrawal(totalWithdrawalAmountIncludingTaxes,
+				BigDecimal.ZERO, fedMMWithdrawal);
 
 		// Calculate withdrawals and print spreadsheet
 		portfolioService.printWithdrawalSpreadsheet(title, portfolio, withdrawAmount, withdrawals, document);
@@ -449,13 +459,20 @@ public class PortfolioApp {
 			PortfolioService portfolioService) {
 
 		BigDecimal withdrawAmount = MONTHLY_EXPENSES_AMOUNT;
-		BigDecimal totalWithdrawalAmount = withdrawAmount.divide(WITHDRAW_AMOUNT_PERCENTAGE, 0, RoundingMode.UP);
+		// extra $500 to pay down cc
+		withdrawAmount = withdrawAmount.add(new BigDecimal(500));
+		BigDecimal totalWithdrawalAmount = withdrawAmount.divide(AFTER_TAXES_WITHDRAW_AMOUNT_PERCENTAGE, 4,
+				RoundingMode.UP);
+		// round up to nearest $5
+		totalWithdrawalAmount = totalWithdrawalAmount.divide(new BigDecimal(5), 0, RoundingMode.HALF_DOWN)
+				.setScale(2, RoundingMode.HALF_DOWN).multiply(new BigDecimal(5));
+
 
 		String title = "Monthly Expenses Withdrawal " + CurrencyHelper.formatAsCurrencyString(totalWithdrawalAmount)
 				+ " Net:  " + CurrencyHelper.formatAsCurrencyString(withdrawAmount);
 		System.out.println(title);
 
-		Map<String, BigDecimal> withdrawals = portfolioService.calculateWithdrawal(portfolio, totalWithdrawalAmount,
+		Map<String, BigDecimal> withdrawals = portfolioService.calculateWithdrawal(totalWithdrawalAmount,
 				BigDecimal.ZERO, BigDecimal.ZERO);
 
 		// Calculate withdrawals and print spreadsheet
@@ -467,13 +484,14 @@ public class PortfolioApp {
 			PortfolioService portfolioService) {
 
 		BigDecimal withdrawAmount = PROPERTY_TAX_WITHDRAWAL_AMOUNT;
-		BigDecimal totalWithdrawalAmount = withdrawAmount.divide(WITHDRAW_AMOUNT_PERCENTAGE, 0, RoundingMode.UP);
+		BigDecimal totalWithdrawalAmount = withdrawAmount.divide(AFTER_TAXES_WITHDRAW_AMOUNT_PERCENTAGE, 0,
+				RoundingMode.UP);
 
 		String title = "Property Tax Withdrawal " + CurrencyHelper.formatAsCurrencyString(totalWithdrawalAmount);
 		System.out.println(title);
 
 		// Net withdrawal adjusts for transfer to money market fixed accounts
-		Map<String, BigDecimal> withdrawals = portfolioService.calculateWithdrawal(portfolio, totalWithdrawalAmount,
+		Map<String, BigDecimal> withdrawals = portfolioService.calculateWithdrawal(totalWithdrawalAmount,
 				BigDecimal.ZERO, PROPERTY_TAX_WITHDRAWAL_AMOUNT);
 
 		// Calculate withdrawals and print spreadsheet

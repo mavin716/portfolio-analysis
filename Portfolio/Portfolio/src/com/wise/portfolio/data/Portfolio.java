@@ -7,7 +7,6 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TreeMap;
@@ -24,7 +23,12 @@ public class Portfolio {
 		this.fundSymbolNameMap = fundSymbolNameMap;
 	}
 
+	
 //	private Map<String, PortfolioFund> fundMap = new TreeMap<String, PortfolioFund>();
+
+	public Map<String, String> getFundSymbolNameMap() {
+		return fundSymbolNameMap;
+	}
 
 	protected Map<LocalDate, Collection<Transaction>> federalWithholdingTax = new TreeMap<>();
 	protected Map<LocalDate, Collection<Transaction>> stateWithholdingTax = new TreeMap<>();
@@ -53,16 +57,6 @@ public class Portfolio {
 
 	public Portfolio() {
 		super();
-
-	}
-
-	public Portfolio(Portfolio originalPortfolio) {
-		super();
-		this.totalValue = originalPortfolio.totalValue;
-
-		for (Entry<String, PortfolioFund> entry : originalPortfolio.getFundMap().entrySet()) {
-			PortfolioFund fund = new PortfolioFund();
-		}
 
 	}
 
@@ -234,6 +228,10 @@ public class Portfolio {
 	public Collection<String> getFundSymbols() {
 		// TODO Auto-generated method stub
 		return fundSymbolNameMap.values();
+	}
+
+	public String getFundName(String fundSymbol) {
+		return fundSymbolNameMap.get(fundSymbol);
 	}
 
 }

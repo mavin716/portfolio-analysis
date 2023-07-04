@@ -431,4 +431,9 @@ public class MutualFundPerformance {
 		return null;
 	}
 
+	public LocalDate getOldestDate() {
+		// TODO Auto-generated method stub
+		return portfolioPriceHistory.getOldestDate();
+	}
+
 }

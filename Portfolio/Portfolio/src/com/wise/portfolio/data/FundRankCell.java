@@ -64,10 +64,11 @@ public class FundRankCell extends Cell {
 	}
 
 	private Color calculateCurrentPriceColor(MutualFundPerformance fundPerformance, LocalDate date) {
-		LocalDate threeYearsAgo = LocalDate.now().minusYears(5);
-		BigDecimal minPrice = fundPerformance.getMinPricePairFromDate(threeYearsAgo).getRight();
-		BigDecimal maxPrice = fundPerformance.getMaxPricePairFromDate(threeYearsAgo).getRight();
-		BigDecimal fundPrice = fundPerformance.getPriceByDate(fundPerformance.getFund(), date, false);
+		LocalDate oldestDate = fundPerformance.getOldestDate();
+
+		BigDecimal minPrice = fundPerformance.getMinPricePairFromDate(oldestDate).getRight();
+		BigDecimal maxPrice = fundPerformance.getMaxPricePairFromDate(oldestDate).getRight();
+		BigDecimal fundPrice = fundPerformance.getClosestHistoricalPrice(date, 30);
 		BigDecimal range = maxPrice.subtract(minPrice);
 		BigDecimal midPrice = maxPrice.subtract(range.divide(new BigDecimal(2), RoundingMode.HALF_UP));
 		if (fundPrice == null) {
