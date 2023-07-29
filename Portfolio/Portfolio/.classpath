@@ -1,19 +1,26 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <classpath>
 	<classpathentry kind="src" path="src"/>
+	<classpathentry kind="src" path="WEB-INF"/>
 	<classpathentry kind="con" path="org.eclipse.jst.j2ee.internal.web.container"/>
 	<classpathentry kind="con" path="org.eclipse.jst.j2ee.internal.module.container"/>
-	<classpathentry exported="true" kind="con" path="org.apache.ivyde.eclipse.cpcontainer.IVYDE_CONTAINER/?project=Portfolio&amp;ivyXmlPath=build%2Fivy.xml&amp;confs=*"/>
+	<classpathentry kind="con" path="org.apache.ivyde.eclipse.cpcontainer.IVYDE_CONTAINER/?project=Portfolio&amp;ivyXmlPath=build%2Fivy.xml&amp;confs=*"/>
 	<classpathentry kind="con" path="org.eclipse.jst.server.core.container/org.eclipse.jst.server.tomcat.runtimeTarget/Apache Tomcat v9.0">
 		<attributes>
 			<attribute name="owner.project.facets" value="jst.web"/>
 		</attributes>
 	</classpathentry>
-	<classpathentry exported="true" kind="lib" path="C:/Program Files/Java/jdk-17/lib/jrt-fs.jar"/>
-	<classpathentry kind="lib" path="C:/Users/mavin/.ivy2/cache/com.itextpdf/kernel/jars/kernel-7.0.4.jar" rootpath="C:/Users/mavin/.ivy2/cache/com.itextpdf/kernel/sources/kernel-7.0.4-sources.jar" sourcepath="C:/Users/mavin/.ivy2/cache/com.itextpdf/kernel/sources/kernel-7.0.4-sources.jar">
+	<classpathentry kind="lib" path="C:/Users/mavin/.ivy2/cache/com.itextpdf/kernel/jars/kernel-7.0.4.jar" sourcepath="C:/Users/mavin/.ivy2/cache/com.itextpdf/kernel/sources/kernel-7.0.4-sources.jar">
 		<attributes>
 			<attribute name="javadoc_location" value="jar:file:/C:/Users/mavin/.ivy2/cache/com.itextpdf/kernel/javadocs/kernel-7.0.4-javadoc.jar!/"/>
 		</attributes>
 	</classpathentry>
+	<classpathentry kind="lib" path="WebContent"/>
+	<classpathentry kind="var" path="TOMCAT_HOME/lib/servlet-api.jar"/>
+	<classpathentry kind="var" path="TOMCAT_HOME/lib/jasper.jar"/>
+	<classpathentry kind="var" path="TOMCAT_HOME/lib/jsp-api.jar"/>
+	<classpathentry kind="var" path="TOMCAT_HOME/lib/el-api.jar"/>
+	<classpathentry kind="var" path="TOMCAT_HOME/lib/annotations-api.jar"/>
+	<classpathentry kind="lib" path="C:/Program Files/Java/jre-1.8/lib/rt.jar"/>
 	<classpathentry kind="output" path="build/classes"/>
 </classpath>

@@ -7,8 +7,8 @@ import org.jfree.data.time.Day;
 import org.jfree.data.time.TimeSeries;
 import org.jfree.data.time.TimeSeriesCollection;
 
-import com.wise.portfolio.data.Portfolio;
-import com.wise.portfolio.data.PortfolioFund;
+import com.wise.portfolio.fund.PortfolioFund;
+import com.wise.portfolio.portfolio.Portfolio;
 
 public class PortfolioTimeSeriesCollection extends TimeSeriesCollection {
 
