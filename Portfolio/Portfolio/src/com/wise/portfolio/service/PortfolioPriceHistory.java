@@ -18,6 +18,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.tuple.Pair;
@@ -33,10 +34,10 @@ public class PortfolioPriceHistory {
 		return Collections.min(fundPrices.get(symbol).keySet());
 	}
 
-	private Map<String, Map<LocalDate, Float>> fundShares = new HashMap<>();
-	private Map<String, Map<LocalDate, BigDecimal>> fundPrices = new HashMap<>();
-	private Map<String, Map<LocalDate, String>> fundPricesSource = new HashMap<>();
-	private Map<String, Map<LocalDate, BigDecimal>> fundReturnsByDateMap = new HashMap<>();
+	private Map<String, Map<LocalDate, Float>> fundShares = new TreeMap<>();
+	private Map<String, Map<LocalDate, BigDecimal>> fundPrices = new TreeMap<>();
+	private Map<String, Map<LocalDate, String>> fundPricesSource = new TreeMap<>();
+	private Map<String, Map<LocalDate, BigDecimal>> fundReturnsByDateMap = new TreeMap<>();
 
 	public Map<String, Map<LocalDate, BigDecimal>> getFundReturnsMap() {
 		return fundReturnsByDateMap;
@@ -447,7 +448,7 @@ public class PortfolioPriceHistory {
 		}
 		Map<LocalDate, BigDecimal> fundPriceMap = fundPrices.get(symbol);
 		if (fundPriceMap == null) {
-			fundPriceMap = new HashMap<>();
+			fundPriceMap = new TreeMap<>();
 			fundPrices.put(symbol, fundPriceMap);
 		}
 

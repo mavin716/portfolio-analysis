@@ -45,18 +45,17 @@ public class PerformanceService {
 		}
 
 		BigDecimal currentPrice = portfolio.getTotalValue();
-		return currentPrice.subtract(historicalPrice).divide(historicalPrice, 4, RoundingMode.HALF_UP).floatValue();
+		return currentPrice.subtract(historicalPrice).divide(historicalPrice, 6, RoundingMode.HALF_UP).floatValue();
 	}
 
 	public static BigDecimal getValueByDate(String symbol, LocalDate date) {
 
 		BigDecimal value = new BigDecimal(0);
 
-		BigDecimal price = getClosestHistoricalPrice(symbol, date, 10);
-		double shares = portfolio.getFund(symbol).getShares();
-		shares = portfolioPriceHistory.getSharesByDate(portfolio.getFund(symbol), date, false);
-		if (price != null && shares > 0) {
-			value = price.multiply(new BigDecimal(shares));
+		BigDecimal historicalPrice = getClosestHistoricalPrice(symbol, date, 10);
+		double historicalShares = portfolioPriceHistory.getSharesByDate(portfolio.getFund(symbol), date, false);
+		if (historicalPrice != null && historicalShares > 0) {
+			value = historicalPrice.multiply(new BigDecimal(historicalShares));
 		}
 
 		return value;

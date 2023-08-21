@@ -17,6 +17,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.text.NumberFormat;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -58,6 +59,7 @@ import org.jfree.chart.renderer.xy.XYItemRenderer;
 import org.jfree.chart.renderer.xy.XYLineAndShapeRenderer;
 import org.jfree.chart.util.ShapeUtils;
 import org.jfree.data.time.Day;
+import org.jfree.data.time.MovingAverage;
 import org.jfree.data.time.TimeSeries;
 import org.jfree.data.time.TimeSeriesCollection;
 
@@ -471,7 +473,7 @@ public class PortfolioService {
 		table.setFontSize(12);
 
 		table.addHeaderCell(new Cell().add("Fund").setTextAlignment(TextAlignment.CENTER));
-		table.addHeaderCell(new Cell().add("Returns\n(YTD)").setTextAlignment(TextAlignment.CENTER));
+		table.addHeaderCell(new Cell().add("Returns\nDiv.\nPrice").setTextAlignment(TextAlignment.CENTER));
 
 		for (Long rankdays : enhancedRankDaysList) {
 
@@ -625,6 +627,15 @@ public class PortfolioService {
 			return midPrice.subtract(fundPrice).divide(halfRange, RoundingMode.HALF_UP).floatValue();
 		}
 		return 0f;
+	}
+
+	private float calculateMovingAveragePriceOpacity(BigDecimal currentFundPrice, BigDecimal movingAveragePrice) {
+		if (currentFundPrice == null) {
+			return 0f;
+		}
+		BigDecimal opacity = currentFundPrice.subtract(movingAveragePrice).abs()
+				.divide((currentFundPrice), RoundingMode.HALF_UP).multiply(new BigDecimal(10));
+		return opacity.floatValue();
 	}
 
 	private Color calculateCurrentPriceColor(MutualFundPerformance fundPerformance, LocalDate date) {
@@ -1106,7 +1117,7 @@ public class PortfolioService {
 		// line
 		// Create map sorted by descending value of deviation
 		Map<String, Pair<BigDecimal, PortfolioFund>> sortedDifferenceMap = createSortedDeviationMap(
-				nonFixedWithdrawalAmount);
+				totalWithdrawalAmount);
 
 		// Initialize deviation to highest fund deviation
 		BigDecimal nextDeviation = BigDecimal.ZERO;
@@ -1179,7 +1190,7 @@ public class PortfolioService {
 					System.out
 							.println("running Withdrawal " + CurrencyHelper.formatAsCurrencyString(runningWithdrawal));
 
-					if (runningWithdrawal.compareTo(nonFixedWithdrawalAmount) >= 0) {
+					if (runningWithdrawal.subtract(nonFixedWithdrawalAmount).compareTo(BigDecimal.ZERO) <= 0) {
 						break;
 					}
 
@@ -1347,8 +1358,8 @@ public class PortfolioService {
 		BigDecimal portfolioReturns = portfolio.getTotalValue().subtract(portfolioHistoricalValue)
 				.divide(portfolio.getTotalValue(), 4, RoundingMode.HALF_DOWN);
 
-		double arg2 = 1/(new Double(years));
-		double arg1 = 1 + portfolioReturns.doubleValue(); 
+		double arg2 = 1 / (new Double(years));
+		double arg1 = 1 + portfolioReturns.doubleValue();
 		double returns = Math.pow(arg1, arg2) - 1;
 
 		return returns;
@@ -1960,6 +1971,8 @@ public class PortfolioService {
 	public void printFundPerformanceLineGraph(String fundSynbol, Document document, PdfDocument pdfDocument,
 			LocalDate startDate, LocalDate endDate) {
 
+		PortfolioFund fund = portfolio.getFund(fundSynbol);
+
 		TimeSeriesCollection dataset;
 		portfolio.getFund(fundSynbol).getName();
 		List<TimeSeriesCollection> datasets = new ArrayList<>();
@@ -1974,22 +1987,43 @@ public class PortfolioService {
 		renderer.setDefaultShapesVisible(false);
 		renderers.add(renderer);
 
+		BigDecimal minumumAmount = fund.getMinimumAmount();
+		if (minumumAmount != null && minumumAmount.compareTo(BigDecimal.ZERO) > 0) {
+
+			LocalDate fundStartDate = startDate;
+			Map<LocalDate, BigDecimal> fundPricesMap = portfolio.getPriceHistory().getFundPrices()
+					.get(fund.getSymbol());
+			if (fundPricesMap != null & fundPricesMap.size() > 0) {
+				fundStartDate = fundPricesMap.keySet().iterator().next();
+			}
+			// want same scale as balance
+			TimeSeries timeSeries = new TimeSeries(fund.getSymbol());
+			timeSeries.add(new Day(startDate.getDayOfMonth(), fundStartDate.getMonthValue(), fundStartDate.getYear()),
+					minumumAmount);
+			timeSeries.add(new Day(endDate.getDayOfMonth(), endDate.getMonthValue(), endDate.getYear()), minumumAmount);
+			dataset.addSeries(timeSeries);
+			dataset.getSeries(1).setKey("Fund Minimum");
+		}
+
 		dataset = createFundShareDataset(fundSynbols, startDate, endDate);
 		dataset.getSeries(0).setKey("Fund Shares");
 		datasets.add(dataset);
 		renderer = new XYLineAndShapeRenderer();
 		renderer.setDefaultShapesVisible(false);
+		renderer.setSeriesVisibleInLegend(0, true);
 		renderers.add(renderer);
 
-		renderer = new XYLineAndShapeRenderer();
-		renderer.setDefaultShapesVisible(false);
-		renderers.add(renderer);
 		dataset = createFundPriceHistoryDataset(fundSynbols, startDate, endDate, false);
 		dataset.getSeries(0).setKey("Price History");
-		datasets.add(dataset);
 
-		JFreeChart lineChart = createTimeSeriesChart(portfolio.getFund(fundSynbol).getName() + " Price History", null,
-				null, datasets, renderers, true, true, false);
+		datasets.add(dataset);
+		renderer = new XYLineAndShapeRenderer();
+
+		renderer.setDefaultShapesVisible(false);
+		renderers.add(renderer);
+
+		JFreeChart lineChart = createTimeSeriesChart(fund.getName() + " Price History", null, null, datasets, renderers,
+				true, true, false);
 
 		addChartToDocument(lineChart, pdfDocument, document);
 
@@ -2116,7 +2150,9 @@ public class PortfolioService {
 				renderer = new XYLineAndShapeRenderer();
 			}
 			plot.setRenderer(datasetIndex, renderer);
-
+			boolean isCurrencyFormat = false;
+			isCurrencyFormat = timeSeriesCollection.getSeries(0).getDataItem(0).getValue() instanceof BigDecimal;
+			NumberFormat currencyInstance = NumberFormat.getCurrencyInstance();
 			for (int seriesIndex = 0; seriesIndex < timeSeriesCollection.getSeries().size(); seriesIndex++) {
 				TimeSeries series = timeSeriesCollection.getSeries(seriesIndex);
 				java.awt.Color seriesColor = null;
@@ -2140,19 +2176,23 @@ public class PortfolioService {
 					seriesColor = axisPaints[seriesIndex];
 				}
 				if (key.contains("Dividends")) {
+					currencyInstance.setMaximumFractionDigits(0);
 					renderer.setSeriesShape(seriesIndex, ShapeUtils.createDiamond(2f));
 				} else if (key.contains("Withdrawals")) {
+					currencyInstance.setMaximumFractionDigits(0);
 					renderer.setSeriesShape(seriesIndex, ShapeUtils.createDownTriangle(2f));
 				} else if (key.contains("Shares")) {
 					seriesColor = java.awt.Color.BLACK;
 				} else if (key.contains("History")) {
 					seriesColor = java.awt.Color.ORANGE;
+					currencyInstance.setMaximumFractionDigits(0);
 				} else if (key.contains("Balance")) {
+					currencyInstance.setMaximumFractionDigits(0);
 					seriesColor = java.awt.Color.GREEN;
 				}
+				renderer.setDefaultItemLabelPaint(seriesColor);
 				renderer.setSeriesFillPaint(seriesIndex, seriesColor);
 				renderer.setSeriesPaint(seriesIndex, seriesColor);
-				renderer.setSeriesFillPaint(seriesIndex, seriesColor);
 				renderer.setSeriesOutlinePaint(seriesIndex, seriesColor);
 			}
 
@@ -2160,6 +2200,9 @@ public class PortfolioService {
 
 			NumberAxis valueAxis = new NumberAxis(valueAxisLabel);
 			valueAxis.setAutoRangeIncludesZero(false); // override default
+			if (isCurrencyFormat) {
+				valueAxis.setNumberFormatOverride(currencyInstance);
+			}
 
 			plot.setRangeAxis(datasetIndex, valueAxis);
 
@@ -2305,8 +2348,8 @@ public class PortfolioService {
 
 			}
 			dataset.addSeries(timeSeries);
-			// dataset.addSeries(MovingAverage.createMovingAverage(timeSeries, symbol + "
-			// MA", 30, 0));
+
+			dataset.addSeries(MovingAverage.createMovingAverage(timeSeries, symbol + "MA", 50, 0));
 
 		}
 		return dataset;
@@ -2339,6 +2382,9 @@ public class PortfolioService {
 					continue;
 				}
 				shares = fundPriceEntry.getValue();
+				if(shares.compareTo(0f) <= 0) {
+					continue;
+				}
 				timeSeries.add(new Day(priceHistoryDate.getDayOfMonth(), priceHistoryDate.getMonthValue(),
 						priceHistoryDate.getYear()), shares);
 
@@ -2487,8 +2533,9 @@ public class PortfolioService {
 				new Cell().add("Last Year Dividends").setTextAlignment(TextAlignment.CENTER).setFontSize(12f));
 		table.addHeaderCell(
 				new Cell().add("YTD\nReturns /\nWithdrawals\n/ Exch.\n/ Diff").setTextAlignment(TextAlignment.CENTER));
-		table.addHeaderCell(new Cell().add("Share Price\n" + mostRecentSharePriceDay.format(DATE_FORMATTER))
-				.setTextAlignment(TextAlignment.CENTER));
+		table.addHeaderCell(
+				new Cell().add("Share Price\n" + mostRecentSharePriceDay.format(DATE_FORMATTER) + "\n/ 50d MA")
+						.setTextAlignment(TextAlignment.CENTER));
 		table.addHeaderCell(new Cell().add("Shares /\nYTD Change").setTextAlignment(TextAlignment.CENTER));
 		table.addHeaderCell(new Cell().add("Current Value\nCategory\n Total").setTextAlignment(TextAlignment.CENTER));
 		table.addHeaderCell(new Cell().add("Current %").setTextAlignment(TextAlignment.CENTER));
@@ -3159,11 +3206,20 @@ public class PortfolioService {
 
 	private void addFundsToTable(PortfolioFund fund, Table table, FundCategory category) {
 
+		List<String> fundSymbols = new ArrayList<>();
+		fundSymbols.add(fund.getSymbol());
+		TimeSeriesCollection fundTimeSeries = createFundPriceHistoryDataset(fundSymbols, null, null, false);
+		TimeSeries fundPriceMovingAverageTimeSeries = fundTimeSeries.getSeries(1);
+
 		PortfolioPriceHistory priceHistory = portfolio.getPriceHistory();
 		MutualFundPerformance performance = new MutualFundPerformance(portfolio, fund);
 
 		BigDecimal currentPrice = fund.getCurrentPrice();
 		BigDecimal dayPriceChange = performance.getDayPriceChange();
+
+		BigDecimal movingAveragePrice = new BigDecimal(fundPriceMovingAverageTimeSeries
+				.getDataItem(fundPriceMovingAverageTimeSeries.getItemCount() - 1).getValue().doubleValue());
+		BigDecimal movingAverageDifference = currentPrice.subtract(movingAveragePrice);
 
 		LocalDate fiftyTwoWeeksAgo = LocalDate.now().minus(1, ChronoUnit.YEARS);
 		Float fiftyTwoWeekPerformanceRate = performance.getPerformanceRateByDate(fiftyTwoWeeksAgo);
@@ -3345,8 +3401,9 @@ public class PortfolioService {
 		// YTD Dividends
 		table.addCell(
 				new Cell().setFontSize(12f).add(new Cell().add(CurrencyHelper.formatAsCurrencyString(ytdDividends)))
-						.add(new Cell().add(CurrencyHelper.formatAsCurrencyString(currentDividends))
-								.setFontColor(calculatePercentageFontColor(currentDividends))));
+						.add((currentDividends.compareTo(BigDecimal.ZERO) == 0) ? new Cell()
+								: new Cell().add(CurrencyHelper.formatAsCurrencyString(currentDividends))
+										.setFontColor(calculatePercentageFontColor(currentDividends))));
 
 		// Last Year Dividends
 		table.addCell(new Cell().add(CurrencyHelper.formatAsCurrencyString(lastYearDividends)).setFontSize(12f));
@@ -3364,10 +3421,16 @@ public class PortfolioService {
 				.setFontSize(12);
 
 		// Current share price
-//		table.addCell(new Cell().add(CurrencyHelper.formatAsCurrencyString(currentPrice))
-//				.setFontColor(currentPriceFontColor)));
-		table.addCell(new Cell().add(CurrencyHelper.formatAsCurrencyString(currentPrice)).setBackgroundColor(
-				currentPriceFontColor, calculateCurrenPriceOpacity(performance, getFirstOfYearDate())));
+		Color maColor = Color.GREEN;
+		if (currentPrice.compareTo(movingAveragePrice) < 0) {
+			maColor = Color.RED;
+		}
+		table.addCell(new Cell()
+				.add(new Cell().add(CurrencyHelper.formatAsCurrencyString(currentPrice)).setBackgroundColor(
+						currentPriceFontColor, calculateCurrenPriceOpacity(performance, getFirstOfYearDate())))
+				.add(new Cell().add("ma:" + CurrencyHelper.formatAsCurrencyString(movingAveragePrice)))
+				.add(new Cell().add(CurrencyHelper.formatAsCurrencyString(movingAverageDifference)).setBackgroundColor(
+						maColor, calculateMovingAveragePriceOpacity(currentPrice, movingAveragePrice))));
 
 		// YTD Change in number of Shares
 		table.addCell(new Cell().add(new Cell().add(String.format("%(6.2f", currentShares)))

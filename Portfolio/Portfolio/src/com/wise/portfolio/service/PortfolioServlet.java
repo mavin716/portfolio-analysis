@@ -11,6 +11,8 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import com.wise.portfolio.PortfolioApp;
+
 public class PortfolioServlet extends HttpServlet {
 
 	/**
