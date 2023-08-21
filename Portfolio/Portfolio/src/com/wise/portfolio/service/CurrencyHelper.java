@@ -3,6 +3,8 @@ package com.wise.portfolio.service;
 import java.math.BigDecimal;
 import java.text.NumberFormat;
 
+import com.itextpdf.layout.element.IBlockElement;
+
 public class CurrencyHelper {
 
 	public static BigDecimal calculatePercentage(BigDecimal amount, BigDecimal total) {
@@ -36,5 +38,7 @@ public class CurrencyHelper {
 		return desiredCategoryPercentage == null ? String.format("%6s", "N/A%")
 				: String.format("%(6.4f", (desiredCategoryPercentage.multiply(new BigDecimal(100)))) + "%";
 	}
+
+
 
 }

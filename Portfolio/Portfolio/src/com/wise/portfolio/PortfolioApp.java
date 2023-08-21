@@ -1,4 +1,4 @@
-package com.wise.portfolio.service;
+package com.wise.portfolio;
 
 import java.io.File;
 import java.math.BigDecimal;
@@ -11,9 +11,11 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.TextStyle;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -28,6 +30,9 @@ import com.wise.portfolio.fund.PortfolioFund;
 import com.wise.portfolio.pdf.FooterHandler;
 import com.wise.portfolio.pdf.HeaderHandler;
 import com.wise.portfolio.portfolio.ManagedPortfolio;
+import com.wise.portfolio.service.CurrencyHelper;
+import com.wise.portfolio.service.MailService;
+import com.wise.portfolio.service.PortfolioService;
 
 public class PortfolioApp {
 
@@ -107,27 +112,28 @@ public class PortfolioApp {
 				printPropertyTaxWithdrawalSpreadsheet(portfolio, document, portfolioService);
 			}
 
-			// School tax due Sept 1st
-			if (today.getMonthValue() == 8 && today.getDayOfMonth() > 10) {
+			// School tax due Oct 1st
+			if (today.getMonthValue() == 9 && today.getDayOfMonth() > 10) {
 				headerHandler.setHeader("school tax withdrawal");
 				pdfDoc.addNewPage();
 				printSchoolTaxWithdrawalSpreadsheet(portfolio, document, portfolioService);
 			}
 
 			// Monthly withdrawal, if before 24th include auto mortgage payment
-			if (today.getDayOfMonth() > 19 || today.getDayOfMonth() < 4) {
-				headerHandler.setHeader("monthly withdrawal");
+			if (today.getDayOfMonth() > 19 || today.getDayOfMonth() < 2) {
 				pdfDoc.addNewPage();
 				if (today.getDayOfMonth() < 26 && today.getDayOfMonth() >= 4) {
 					// Withdrawal including auto withdrawal $650 mortgage from MM
+					headerHandler.setHeader("monthly withdrawal plus $600 MM Mortage");
 					printPostCondoMonthlyWithdrawalSpreadsheet(portfolio, document, portfolioService);
 				} else {
 					// Withdrawal excluding auto withdrawal $650 mortgage from MM
+					headerHandler.setHeader("monthly withdrawal");
 					printPostCondoMonthlyWithdrawalSpreadsheet26(portfolio, document, portfolioService);
 				}
 			}
-			if (today.getDayOfMonth() < 19 && today.getDayOfMonth() > 7) {
-				headerHandler.setHeader("fixed expenses transfer include transfer $650 into Fed MM");
+			if (today.getDayOfMonth() < 18 && today.getDayOfMonth() > 9) {
+				headerHandler.setHeader("fixed expenses transfer include transfer $600 into Fed MM");
 				pdfDoc.addNewPage();
 				printFixedExpensesTransferSpreadsheet(portfolio, document, portfolioService);
 			}
@@ -419,17 +425,16 @@ public class PortfolioApp {
 			PortfolioService portfolioService) {
 
 		BigDecimal totalCondoMortgageAmountIncludingTaxes = CONDO_MORTGAGE_MONTHLY_SHARE_AMOUNT
-				.divide(AFTER_TAXES_WITHDRAW_AMOUNT_PERCENTAGE, 0, RoundingMode.UP);
+				.divide(AFTER_TAXES_WITHDRAW_AMOUNT_PERCENTAGE, 0, RoundingMode.DOWN);
 
-		String title = "Monthly Fixed Expenses Transfer (included "
+		String month = LocalDate.now().plusMonths(1).getMonth().getDisplayName(TextStyle.FULL, Locale.US);
+		String title = month + " Fixed Expenses Transfer (including "
 				+ CurrencyHelper.formatAsCurrencyString(totalCondoMortgageAmountIncludingTaxes)
 				+ " into Fed MM for Condo Mortgage)";
 		System.out.println(title);
 
 		Map<String, BigDecimal> withdrawals = portfolioService.calculateFixedExpensesTransfer(new BigDecimal(1000),
 				new BigDecimal(1000).add(totalCondoMortgageAmountIncludingTaxes));
-//		Map<String, BigDecimal> withdrawals = portfolioService.calculateFixedExpensesTransfer(new BigDecimal(0),
-//				new BigDecimal(0).add(totalCondoMortgageAmountIncludingTaxes));
 
 		portfolioService.printWithdrawalSpreadsheet(title, portfolio, BigDecimal.ZERO, withdrawals, document);
 
@@ -464,7 +469,8 @@ public class PortfolioApp {
 		BigDecimal totalWithdrawalAmountIncludingTaxes = withdrawAmount.divide(AFTER_TAXES_WITHDRAW_AMOUNT_PERCENTAGE,
 				0, RoundingMode.UP);
 
-		String title = "Monthly Expenses (Including Automatic Monthly Condo Mortgage Share) Withdrawal "
+		String month = LocalDate.now().plusMonths(1).getMonth().getDisplayName(TextStyle.FULL, Locale.US);
+		String title = "Monthly Expenses for " + month + " (Including Automatic Monthly Condo Mortgage Share) Withdrawal "
 				+ CurrencyHelper.formatAsCurrencyString(totalWithdrawalAmountIncludingTaxes) + " Net:  "
 				+ CurrencyHelper.formatAsCurrencyString(withdrawAmount);
 		System.out.println(title);
@@ -480,19 +486,42 @@ public class PortfolioApp {
 
 	}
 
+	private void printPorchStepsWithdrawalSpreadsheet(ManagedPortfolio portfolio, Document document,
+			PortfolioService portfolioService) {
+
+		BigDecimal cashMMWithdrawal = new BigDecimal(5000);
+		BigDecimal withdrawAmount = cashMMWithdrawal;
+		BigDecimal totalWithdrawalAmountIncludingTaxes = withdrawAmount.divide(AFTER_TAXES_WITHDRAW_AMOUNT_PERCENTAGE,
+				0, RoundingMode.UP);
+
+		String title = "Porch Steps Withdrawal "
+				+ CurrencyHelper.formatAsCurrencyString(totalWithdrawalAmountIncludingTaxes) + " Net:  "
+				+ CurrencyHelper.formatAsCurrencyString(withdrawAmount);
+		System.out.println(title);
+
+
+		Map<String, BigDecimal> withdrawals = portfolioService.calculateWithdrawal(totalWithdrawalAmountIncludingTaxes,
+				cashMMWithdrawal, BigDecimal.ZERO);
+
+		// Calculate withdrawals and print spreadsheet
+		portfolioService.printWithdrawalSpreadsheet(title, portfolio, withdrawAmount, withdrawals, document);
+
+	}
+
 	private void printPostCondoMonthlyWithdrawalSpreadsheet26(ManagedPortfolio portfolio, Document document,
 			PortfolioService portfolioService) {
 
 		BigDecimal withdrawAmount = MONTHLY_EXPENSES_AMOUNT;
 		// extra $700 to reimburse shiori for japan resort
-		withdrawAmount = withdrawAmount.add(new BigDecimal(500));
+		withdrawAmount = withdrawAmount.add(new BigDecimal(800));
 		BigDecimal totalWithdrawalAmount = withdrawAmount.divide(AFTER_TAXES_WITHDRAW_AMOUNT_PERCENTAGE, 4,
 				RoundingMode.UP);
 		// round up to nearest $5
 		totalWithdrawalAmount = totalWithdrawalAmount.divide(new BigDecimal(5), 0, RoundingMode.HALF_DOWN)
 				.setScale(2, RoundingMode.HALF_DOWN).multiply(new BigDecimal(5));
 
-		String title = "Monthly Expenses Withdrawal (extra $500 to reimburse Shiori for resort) " + CurrencyHelper.formatAsCurrencyString(totalWithdrawalAmount)
+		String month = LocalDate.now().plusMonths(1).getMonth().getDisplayName(TextStyle.FULL, Locale.US);
+		String title = "Monthly Expenses  for " + month + " " + CurrencyHelper.formatAsCurrencyString(totalWithdrawalAmount)
 				+ " Net:  " + CurrencyHelper.formatAsCurrencyString(withdrawAmount);
 		System.out.println(title);
 
