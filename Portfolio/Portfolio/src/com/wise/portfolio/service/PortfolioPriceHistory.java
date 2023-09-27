@@ -30,6 +30,8 @@ import com.wise.portfolio.portfolio.Portfolio;
 
 public class PortfolioPriceHistory {
 
+		public static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("MM/dd/yy");
+
 	public LocalDate getFundStart(String symbol) {
 		return Collections.min(fundPrices.get(symbol).keySet());
 	}
@@ -172,7 +174,7 @@ public class PortfolioPriceHistory {
 		}
 
 		for (List<String> fundValues : fundsValues) {
-			if (fundValues.size() != 6) {
+			if (fundValues.size() < 6) {
 				continue;
 			}
 
@@ -185,12 +187,14 @@ public class PortfolioPriceHistory {
 			if (name.contentEquals(HEADING)) {
 				continue;
 			}
-			if (fundValues.get(4) == null) {
+			String priceString = fundValues.get(4);
+			if (priceString == null) {
+				System.out.println("price is null");
 				continue;
 			}
 			BigDecimal price = new BigDecimal(0);
 			try {
-				price = new BigDecimal(fundValues.get(4));
+				price = new BigDecimal(priceString);
 			} catch (Exception e) {
 				System.out.println("Exception converting price to decimal:  " + e.getMessage());
 				continue;
@@ -459,7 +463,7 @@ public class PortfolioPriceHistory {
 			if (existingPrice.compareTo(price) != 0) {
 				// Alpha Vantage service is returning different price than vanguard.... use
 				// vanguard download files...
-				System.out.println(symbol + " " + date + " prev source: " + prevSource 
+				System.out.println("diff price:  " + symbol + " " + date + " prev source: " + prevSource 
 						+ " current source: " + source + " " + CurrencyHelper.formatAsCurrencyString(existingPrice)
 						+ "," + CurrencyHelper.formatAsCurrencyString(price));
 			} else {
@@ -472,6 +476,7 @@ public class PortfolioPriceHistory {
 			// Don't add second price for same date
 			return;
 		}
+		System.out.print("symbol:  " + symbol + " date:  " + date.format(DATE_FORMATTER) + " price:  " + CurrencyHelper.formatAsCurrencyString(price));
 		fundPriceMap.put(date, price);
 		addFundPriceSource(symbol, date, source);
 

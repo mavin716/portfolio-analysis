@@ -38,13 +38,13 @@ public class ManagedPortfolio extends Portfolio {
 		BigDecimal currentPercentage = fund.getValue().divide(getTotalValue(), 6, RoundingMode.HALF_DOWN);
 		BigDecimal targetPercentage = fund.getPercentageByCategory(FundCategory.TOTAL);
 
-		BigDecimal minimumAmount = fund.getMinimumAmount();
-		if (minimumAmount != null) {
-			BigDecimal targetValue = getTotalValue().multiply(targetPercentage);
-			if (targetValue.compareTo(minimumAmount) < 0) {
-				targetPercentage = minimumAmount.divide(getTotalValue(), 6, RoundingMode.HALF_DOWN);
-			}
-		}
+//		BigDecimal minimumAmount = fund.getMinimumAmount();
+//		if (minimumAmount != null) {
+//			BigDecimal targetValue = getTotalValue().multiply(targetPercentage);
+//			if (targetValue.compareTo(minimumAmount) < 0) {
+//				targetPercentage = minimumAmount.divide(getTotalValue(), 6, RoundingMode.HALF_DOWN);
+//			}
+//		}
 
 		return currentPercentage.subtract(targetPercentage);
 	}
@@ -223,6 +223,11 @@ public class ManagedPortfolio extends Portfolio {
 		}
 
 		return value;
+	}
+
+	public BigDecimal getTargetValue(String fundSynbol) {
+		BigDecimal targetPercentage =  desiredFundAllocationMaps.get(fundSynbol).get(FundCategory.TOTAL);
+		return this.getTotalValue().multiply(targetPercentage);
 	}
 
 }
