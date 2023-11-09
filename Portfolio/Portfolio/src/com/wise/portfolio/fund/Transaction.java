@@ -5,6 +5,13 @@ import java.time.LocalDate;
 
 public class Transaction {
 
+	private String transactionFundSymbol;
+	public String getTransactionFundSymbol() {
+		return transactionFundSymbol;
+	}
+	public void setTransactionFundSymbol(String transactionFundSymbol) {
+		this.transactionFundSymbol = transactionFundSymbol;
+	}
 	private String transactionType;
 	private Float transastionShares;
 	private BigDecimal transastionSharePrice;
@@ -30,9 +37,10 @@ public class Transaction {
 	public void setTransastionPrincipal(BigDecimal transastionPrincipal) {
 		this.transastionPrincipal = transastionPrincipal;
 	}
-	public Transaction(LocalDate transactionDate, String transactionType, Float transastionShares,
+	public Transaction(LocalDate transactionDate, String transactionFundSymbol, String transactionType, Float transastionShares,
 			BigDecimal transastionSharePrice, BigDecimal transastionPrincipal, String transactionSourceFile) {
 		super();
+		this.transactionFundSymbol = transactionFundSymbol;
 		this.transactionDate = transactionDate;
 		this.transactionType = transactionType;
 		this.transastionShares = transastionShares;

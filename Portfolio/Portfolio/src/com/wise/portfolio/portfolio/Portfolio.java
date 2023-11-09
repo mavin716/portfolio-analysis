@@ -154,7 +154,7 @@ public class Portfolio {
 	public void addFederalWithholdingTax(LocalDate transactionDate, String transactionType, Float transactionShares,
 			BigDecimal transactionSharePrice, BigDecimal transastionPrincipal, String transactionSourceFile) {
 
-		Transaction newTransaction = new Transaction(transactionDate, transactionType, transactionShares,
+		Transaction newTransaction = new Transaction(transactionDate, null, transactionType, transactionShares,
 				transactionSharePrice, transastionPrincipal, transactionSourceFile);
 
 		Collection<Transaction> transactionsForDate = federalWithholdingTax.get(transactionDate);
@@ -191,7 +191,7 @@ public class Portfolio {
 	public void addStateWithholdingTax(LocalDate transactionDate, String transactionType, Float transactionShares,
 			BigDecimal transactionSharePrice, BigDecimal transastionPrincipal, String transactionSourceFile) {
 
-		Transaction newTransaction = new Transaction(transactionDate, transactionType, transactionShares,
+		Transaction newTransaction = new Transaction(transactionDate, null, transactionType, transactionShares,
 				transactionSharePrice, transastionPrincipal, transactionSourceFile);
 
 		Collection<Transaction> transactionsForDate = stateWithholdingTax.get(transactionDate);

@@ -29,6 +29,7 @@ import com.itextpdf.layout.Document;
 import com.itextpdf.layout.element.Paragraph;
 import com.itextpdf.layout.property.HorizontalAlignment;
 import com.wise.portfolio.fund.PortfolioFund;
+import com.wise.portfolio.fund.Transaction;
 import com.wise.portfolio.pdf.FooterHandler;
 import com.wise.portfolio.pdf.HeaderHandler;
 import com.wise.portfolio.portfolio.ManagedPortfolio;
@@ -63,7 +64,7 @@ public class PortfolioApp {
 	private static final BigDecimal MONTHLY_EXPENSES_AMOUNT = new BigDecimal(1000);
 
 	private LocalDate SCHOOL_TAX_DUE_DATE = LocalDate.of(LocalDate.now().getYear(), 10, 1);
-	private static final BigDecimal  SCHOOL_TAX_WITHDRAWAL_AMOUNT = new BigDecimal(4200);
+	private static final BigDecimal SCHOOL_TAX_WITHDRAWAL_AMOUNT = new BigDecimal(4200);
 
 	private LocalDate PROPERTY_TAX_DUE_DATE = LocalDate.of(LocalDate.now().getYear(), 2, 1);
 	private static final BigDecimal PROPERTY_TAX_WITHDRAWAL_AMOUNT = new BigDecimal(3100);
@@ -72,9 +73,9 @@ public class PortfolioApp {
 	private static final BigDecimal HOMEOWNERS_INSURANCE_AMOUNT = new BigDecimal(813);
 	private static final BigDecimal AUTO_INSURANCE_SEMI_YEARLY_AMOUNT = new BigDecimal(436);
 
-	public static String formatAsCurrencyString(BigDecimal n) {
-		return NumberFormat.getCurrencyInstance().format(n);
-	}
+//	public static String formatAsCurrencyString(BigDecimal n) {
+//		return NumberFormat.getCurrencyInstance().format(n);
+//	}
 
 	public static void main(String[] args) {
 
@@ -152,32 +153,43 @@ public class PortfolioApp {
 			//
 			LocalDate today = LocalDate.now();
 
+			int numDays = 30;
+			portfolioService.printRecentTransactionsSpreadsheet("Recent Transactions (" + numDays + " days)", numDays,
+					portfolio, document);
+//			portfolioService.printRecentDividendSpreadsheet("Recent Dividends (" + numDays + " days)", numDays,
+//					portfolio, document);
+
 			// Property Tax
-			LocalDate withdrawalDate = PROPERTY_TAX_DUE_DATE.minusDays(20);
-			if (today.isBefore(PROPERTY_TAX_DUE_DATE) && today.isAfter(withdrawalDate)) {
+			LocalDate withdrawalDate = PROPERTY_TAX_DUE_DATE.minusDays(15);
+			if (today.isBefore(PROPERTY_TAX_DUE_DATE.minusDays(5)) && today.isAfter(withdrawalDate)) {
 				headerHandler.setHeader("propety tax withdrawal");
 				pdfDoc.addNewPage();
 				printOctInsuranceWithdrawalSpreadsheet(document, portfolioService);
 			}
 
 			// School tax
-			withdrawalDate = SCHOOL_TAX_DUE_DATE.minusDays(20);
-			if (today.isBefore(SCHOOL_TAX_DUE_DATE) && today.isAfter(withdrawalDate)) {
+			withdrawalDate = SCHOOL_TAX_DUE_DATE.minusDays(15);
+			if (today.isBefore(SCHOOL_TAX_DUE_DATE.minusDays(5)) && today.isAfter(withdrawalDate)) {
 				headerHandler.setHeader("school tax withdrawal");
 				pdfDoc.addNewPage();
 				printSchoolTaxWithdrawalSpreadsheet(document, portfolioService);
 			}
 
 			// Homeowners insurance and half auto insurance
-			withdrawalDate = HOMEOWNERS_INSURANCE_DUE_DATE.minusDays(25);
+			withdrawalDate = HOMEOWNERS_INSURANCE_DUE_DATE.minusDays(15);
 			if (today.isBefore(HOMEOWNERS_INSURANCE_DUE_DATE) && today.isAfter(withdrawalDate)) {
-				headerHandler.setHeader("homeowners insurance withdrawal");
-				pdfDoc.addNewPage();
-				printOctInsuranceWithdrawalSpreadsheet(document, portfolioService);
+				BigDecimal insuranceWithdrawalAmount = HOMEOWNERS_INSURANCE_AMOUNT
+						.add(AUTO_INSURANCE_SEMI_YEARLY_AMOUNT);
+				BigDecimal recentWithdrawalAmount = portfolio.getRecentWithdrawalAmount(10);
+				if (recentWithdrawalAmount.compareTo(insuranceWithdrawalAmount) < 0) {
+					headerHandler.setHeader("homeowners insurance withdrawal");
+					pdfDoc.addNewPage();
+					printOctInsuranceWithdrawalSpreadsheet(document, portfolioService);
+				}
 			}
 
 			// Monthly withdrawal,
-			if (today.getDayOfMonth() > 19 || today.getDayOfMonth() < 2) {
+			if (today.getDayOfMonth() > 20 ) {
 				pdfDoc.addNewPage();
 				// if before 24th include mortgage payment (automatically withdrawn)
 				if (today.getDayOfMonth() <= CONDO_MORTGAGE_WITHDRAW_DAY_OF_MONTH && today.getDayOfMonth() > 19) {
@@ -190,7 +202,7 @@ public class PortfolioApp {
 					printMonthlyWithdrawalSpreadsheet(document, portfolioService);
 				}
 			}
-			if (today.getDayOfMonth() < 18 && today.getDayOfMonth() > 9) {
+			if (today.getDayOfMonth() < 18 && today.getDayOfMonth() > 10) {
 				headerHandler.setHeader("fixed expenses transfer include transfer $600 into Fed MM");
 				pdfDoc.addNewPage();
 				printFixedExpensesTransferSpreadsheet(document, portfolioService);
@@ -428,8 +440,8 @@ public class PortfolioApp {
 			} else if (difference.compareTo(BigDecimal.ZERO) == 0) {
 				subject = "SAME";
 			}
-			String textBody = "Change:  " + formatAsCurrencyString(difference) + " Total:  "
-					+ formatAsCurrencyString(portfolio.getTotalValue());
+			String textBody = "Change:  " + NumberFormat.getCurrencyInstance().format(difference) + " Total:  "
+					+ NumberFormat.getCurrencyInstance().format(portfolio.getTotalValue());
 			MailService.sendMail(subject, textBody, portfolioPdfFile);
 
 		} catch (Exception e) {
@@ -439,7 +451,6 @@ public class PortfolioApp {
 		return portfolioPdfFile;
 
 	}
-
 
 	/**
 	 * Calculate the monthly transfers into the MM fixed expenses account and
@@ -453,9 +464,7 @@ public class PortfolioApp {
 
 		ManagedPortfolio portfolio = portfolioService.getPortfolio();
 		BigDecimal cashMMTransferIn = new BigDecimal(1000);
-		// Sept taxes, don't bother moving money in, just moving out again...
-//		BigDecimal fedMMTansferIn = new BigDecimal(1000);
-		BigDecimal fedMMTansferIn = new BigDecimal(0);
+		BigDecimal fedMMTansferIn = new BigDecimal(1000);
 
 		String month = LocalDate.now().plusMonths(1).getMonth().getDisplayName(TextStyle.FULL, Locale.US);
 		String title = month + " Fixed Expenses Transfer (including "
@@ -547,8 +556,6 @@ public class PortfolioApp {
 		ManagedPortfolio portfolio = portfolioService.getPortfolio();
 
 		BigDecimal withdrawAmount = MONTHLY_EXPENSES_AMOUNT;
-		// Dentist crown additional
-		withdrawAmount = withdrawAmount.add(new BigDecimal(500));
 		BigDecimal totalWithdrawalAmount = withdrawAmount.divide(AFTER_TAXES_WITHDRAW_AMOUNT_PERCENTAGE, 4,
 				RoundingMode.UP);
 		// round up to nearest $5

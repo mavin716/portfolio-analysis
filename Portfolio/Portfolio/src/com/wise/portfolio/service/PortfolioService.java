@@ -19,7 +19,6 @@ import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.text.NumberFormat;
 import java.time.DayOfWeek;
-import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -84,6 +83,7 @@ import com.orsonpdf.PDFGraphics2D;
 import com.orsonpdf.Page;
 import com.wise.portfolio.fund.MutualFund.FundCategory;
 import com.wise.portfolio.fund.PortfolioFund;
+import com.wise.portfolio.fund.Transaction;
 import com.wise.portfolio.graph.FundRankCell;
 import com.wise.portfolio.portfolio.ManagedPortfolio;
 import com.wise.portfolio.portfolio.Portfolio;
@@ -656,6 +656,28 @@ public class PortfolioService {
 		return 0f;
 	}
 
+	private float calculatePriceOpacity(BigDecimal fundPrice, MutualFundPerformance fundPerformance, LocalDate date) {
+		LocalDate threeYearsAgo = LocalDate.now().minusYears(3);
+		BigDecimal minPrice = fundPerformance.getMinPricePairFromDate(threeYearsAgo).getRight();
+		BigDecimal maxPrice = fundPerformance.getMaxPricePairFromDate(threeYearsAgo).getRight();
+		BigDecimal halfRange = maxPrice.subtract(minPrice).divide(new BigDecimal(2), RoundingMode.HALF_UP);
+		BigDecimal midPrice = maxPrice.subtract(halfRange);
+
+		if (fundPrice == null) {
+			return 0f;
+		}
+		if (halfRange.compareTo(BigDecimal.ZERO) == 0) {
+			return 0f;
+		}
+		if (fundPrice.compareTo(midPrice) > 0) {
+			return fundPrice.subtract(midPrice).divide(halfRange, RoundingMode.HALF_UP).floatValue();
+		} else if (fundPrice.compareTo(midPrice) < 0) {
+			return midPrice.subtract(fundPrice).divide(halfRange, RoundingMode.HALF_UP).floatValue();
+		}
+		return 0f;
+	}
+
+	
 	private float calculateMovingAveragePriceOpacity(BigDecimal currentFundPrice, BigDecimal movingAveragePrice) {
 		if (currentFundPrice == null) {
 			return 0f;
@@ -2955,6 +2977,110 @@ public class PortfolioService {
 
 	}
 
+	public void printRecentTransactionsSpreadsheet(String title, int numDays, ManagedPortfolio portfolio, Document document) {
+
+		document.add(new Paragraph(title));
+
+		// Creating a table object
+		float[] pointColumnWidths = { 20F, 48F, 32F, 32F };
+		Table table = new Table(pointColumnWidths);
+
+		table.setFontSize(14);
+		table.setTextAlignment(TextAlignment.RIGHT);
+		table.setAutoLayout();
+
+		// Print table headings
+		table.addHeaderCell(new Cell().add("Date"));
+		table.addHeaderCell(new Cell().add("Fund"));
+		table.addHeaderCell(new Cell().add("Type").setTextAlignment(TextAlignment.CENTER));
+		table.addHeaderCell(
+				new Cell().add("Amount").setTextAlignment(TextAlignment.CENTER));
+
+		List<Entry<LocalDate, Transaction>> transactions = portfolio.getRecentTransactions(null, numDays);
+		transactions.sort(Comparator.comparing(Entry<LocalDate, Transaction>::getKey).reversed());
+		for (Entry<LocalDate, Transaction> entrySet : transactions) {
+			LocalDate transactionDate = entrySet.getKey();
+			Transaction transaction = entrySet.getValue();
+			
+			// Transaction Date
+			table.addCell(new Cell().add(DATE_FORMATTER.format(transactionDate)));
+
+			// FUnd Name
+			String transactionFundSymbol = transaction.getTransactionFundSymbol();
+			String fundName = "n/a";
+			if (transactionFundSymbol != null) {
+				PortfolioFund fund = portfolio.getFund(transactionFundSymbol);
+				fundName = fund.getShortName();
+			}
+			table.addCell(new Cell().add(fundName));
+
+			// Transaction Type
+			table.addCell(new Cell().add(transaction.getTransactionType()));
+
+
+			// Transaction Amount
+			table.addCell(new Cell().add(CurrencyHelper.formatAsCurrencyString(transaction.getTransastionPrincipal())));
+
+		}
+
+		document.add(table);
+		document.add(new AreaBreak());
+
+	}
+	public void printRecentDividendSpreadsheet(String title, int numDays, ManagedPortfolio portfolio, Document document) {
+
+		document.add(new Paragraph(title));
+
+		// Creating a table object
+		float[] pointColumnWidths = { 20F, 48F, 32F, 32F };
+		Table table = new Table(pointColumnWidths);
+
+		table.setFontSize(14);
+		table.setTextAlignment(TextAlignment.RIGHT);
+		table.setAutoLayout();
+
+		// Print table headings
+		table.addHeaderCell(new Cell().add("Date"));
+		table.addHeaderCell(new Cell().add("Fund"));
+		table.addHeaderCell(new Cell().add("Type").setTextAlignment(TextAlignment.CENTER));
+		table.addHeaderCell(
+				new Cell().add("Amount").setTextAlignment(TextAlignment.CENTER));
+
+		List<String> transactionTypes = new ArrayList<>();
+		transactionTypes.add("Dividend");
+		List<Entry<LocalDate, Transaction>> transactions = portfolio.getRecentTransactions(transactionTypes, numDays);
+		transactions.sort(Comparator.comparing(Entry<LocalDate, Transaction>::getKey).reversed());
+		for (Entry<LocalDate, Transaction> entrySet : transactions) {
+			LocalDate transactionDate = entrySet.getKey();
+			Transaction transaction = entrySet.getValue();
+			
+			// Transaction Date
+			table.addCell(new Cell().add(DATE_FORMATTER.format(transactionDate)));
+
+			// FUnd Name
+			String transactionFundSymbol = transaction.getTransactionFundSymbol();
+			String fundName = "n/a";
+			if (transactionFundSymbol != null) {
+				PortfolioFund fund = portfolio.getFund(transactionFundSymbol);
+				fundName = fund.getShortName();
+//				fundName = portfolio.getFundName(transaction.getTransactionFundSymbol());
+			}
+			table.addCell(new Cell().add(fundName));
+
+			// Transaction Type
+			table.addCell(new Cell().add(transaction.getTransactionType()));
+
+
+			// Transaction Amount
+			table.addCell(new Cell().add(CurrencyHelper.formatAsCurrencyString(transaction.getTransastionPrincipal())));
+
+		}
+
+		document.add(table);
+		document.add(new AreaBreak());
+
+	}
+
 	private void addFundsToWithdrawalTable(PortfolioFund fund, Table table, FundCategory category,
 			BigDecimal netWithdrawalAmount, Map<String, BigDecimal> withdrawals) {
 
@@ -3520,6 +3646,24 @@ public class PortfolioService {
 			currentPriceFontColor = Color.RED;
 			minPriceFontColor = Color.RED;
 		}
+		Color movingAveragePriceFontColor = calculateCurrencyFontColor(
+				movingAveragePrice.subtract(performance.getFirstOfYearPrice()));
+		if (movingAveragePrice.compareTo(minPrice1YRPair.getRight()) <= 0
+				&& movingAveragePrice.compareTo(maxPrice1YRPair.getRight()) != 0) {
+			movingAveragePriceFontColor = Color.RED;
+		}
+		if (movingAveragePrice.compareTo(maxPrice1YRPair.getRight()) >= 0
+				&& movingAveragePrice.compareTo(minPrice1YRPair.getRight()) != 0) {
+			movingAveragePriceFontColor = Color.GREEN;
+		}
+		if (movingAveragePrice.compareTo(maxPricePair.getRight()) >= 0
+				&& movingAveragePrice.compareTo(minPrice1YRPair.getRight()) != 0) {
+			movingAveragePriceFontColor = Color.GREEN;
+		}
+		if (movingAveragePrice.compareTo(minPricePair.getRight()) <= 0
+				&& movingAveragePrice.compareTo(maxPrice1YRPair.getRight()) != 0) {
+			movingAveragePriceFontColor = Color.RED;
+		}
 
 		// Fund name
 		table.addCell(new Cell().add("  " + fund.getShortName()).setTextAlignment(TextAlignment.LEFT));
@@ -3611,12 +3755,12 @@ public class PortfolioService {
 		table.addCell(new Cell().setMargin(0f)
 				.add(new Cell().setMargin(0f).add(CurrencyHelper.formatAsCurrencyString(ytdValueChange))
 						.setFontColor(calculateCurrencyFontColor(ytdValueChange)))
-				.add(new Cell().setMargin(0f).add(CurrencyHelper.formatAsCurrencyString(ytdWithdrawals))
+				.add(new Cell().setMargin(0f).add(CurrencyHelper.formatAsCurrencyString(BigDecimal.ZERO.subtract(ytdWithdrawals)))
 						.setFontColor(ytdWithdrawalsFontColor))
 				.add(new Cell().setMargin(0f).add(CurrencyHelper.formatAsCurrencyString(ytdExchanges))
-						.setFontColor(ytdExchangesFontColor))
+						.setFontColor(ytdExchangesFontColor).setUnderline())
 				.add(new Cell().setMargin(0f).add(CurrencyHelper.formatAsCurrencyString(ytdDifference))
-						.setFontColor(ytdDifferenceFontColor)))
+						.setFontColor(ytdDifferenceFontColor).setBold()))
 				.setFontSize(12);
 
 		// Current share price
@@ -3627,7 +3771,8 @@ public class PortfolioService {
 		table.addCell(new Cell()
 				.add(new Cell().add(CurrencyHelper.formatAsCurrencyString(currentPrice)).setBackgroundColor(
 						currentPriceFontColor, calculateCurrenPriceOpacity(performance, getFirstOfYearDate())))
-				.add(new Cell().add("ma:" + CurrencyHelper.formatAsCurrencyString(movingAveragePrice)))
+				.add(new Cell().add("ma:" + CurrencyHelper.formatAsCurrencyString(movingAveragePrice)).setBackgroundColor(
+						movingAveragePriceFontColor, calculatePriceOpacity(movingAveragePrice, performance, getFirstOfYearDate())))
 				.add(new Cell().add(CurrencyHelper.formatAsCurrencyString(movingAverageDifference)).setBackgroundColor(
 						maColor, calculateMovingAveragePriceOpacity(currentPrice, movingAveragePrice))));
 

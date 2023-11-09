@@ -6,13 +6,16 @@ import java.math.RoundingMode;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.stream.Collectors;
 
 import com.wise.portfolio.fund.MutualFund.FundCategory;
 import com.wise.portfolio.fund.PortfolioFund;
+import com.wise.portfolio.fund.Transaction;
 import com.wise.portfolio.service.MutualFundPerformance;
 import com.wise.portfolio.service.PortfolioPriceHistory;
 
@@ -226,8 +229,44 @@ public class ManagedPortfolio extends Portfolio {
 	}
 
 	public BigDecimal getTargetValue(String fundSynbol) {
-		BigDecimal targetPercentage =  desiredFundAllocationMaps.get(fundSynbol).get(FundCategory.TOTAL);
+		BigDecimal targetPercentage = desiredFundAllocationMaps.get(fundSynbol).get(FundCategory.TOTAL);
 		return this.getTotalValue().multiply(targetPercentage);
+	}
+
+	public List<Entry<LocalDate, Transaction>> getRecentTransactions(List<String> transactionTypes, int days) {
+
+		LocalDate startDate = LocalDate.now().minusDays(days);
+		List<Entry<LocalDate, Transaction>> transactions = new ArrayList<>();
+		for (PortfolioFund fund : getFundMap().values()) {
+			for (Entry<LocalDate, Transaction> transactionEntry : fund.getTransactionsBetweenDates(startDate,
+					LocalDate.now())) {
+				if (transactionTypes != null) {
+					for (String filterdType : transactionTypes) {
+						if (transactionEntry.getValue().getTransactionType().contains(filterdType)) {
+							transactions.add(transactionEntry);
+							break;
+						}
+					}
+				} else {
+					transactions.add(transactionEntry);
+
+				}
+			}
+		}
+		return transactions;
+
+	}
+
+	public BigDecimal getRecentWithdrawalAmount(int days) {
+		BigDecimal recentWithdrawalTotal = BigDecimal.ZERO;
+		List<String> transactionTypes = new ArrayList<>();
+		transactionTypes.add("Sell");
+		List<Entry<LocalDate, Transaction>> transactions = getRecentTransactions(transactionTypes, days);
+		for (Entry<LocalDate, Transaction> entry : transactions) {
+			Transaction transaction = entry.getValue();
+			recentWithdrawalTotal = recentWithdrawalTotal.add(transaction.getTransastionPrincipal());
+		}
+		return recentWithdrawalTotal;
 	}
 
 }

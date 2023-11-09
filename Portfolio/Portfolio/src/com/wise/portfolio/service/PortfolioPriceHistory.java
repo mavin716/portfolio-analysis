@@ -225,6 +225,7 @@ public class PortfolioPriceHistory {
 					PortfolioFund fund = null;
 					String transactionType = fundTransaction.get(3);
 					String fundSymbol = fundTransaction.get(6);
+//					System.out.println("Transaction type:  " + transactionType);
 					if (!transactionType.contains("Withholding")) {
 
 						if (fundSymbol == null || fundSymbol.length() == 0) {
@@ -254,6 +255,11 @@ public class PortfolioPriceHistory {
 
 					if (transactionType.startsWith("Reinvestment") && fund != null) {
 						fund.addDistribution(tradeDate, transactionType, transactionShares, transactionSharePrice,
+								principalAmount, downloadFile);
+					}
+
+					if ((transactionType.contains("Dividend") || transactionType.contains("Capital gain"))&& fund != null) {
+						fund.addIncome(tradeDate, transactionType, transactionShares, transactionSharePrice,
 								principalAmount, downloadFile);
 					}
 
