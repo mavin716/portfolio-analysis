@@ -19,7 +19,7 @@ public class CurrencyHelper {
 		return NumberFormat.getCurrencyInstance().format(n);
 	}
 
-	public static String formatPercentageString(Float desiredCategoryPercentage) {
+	public static String formatPercentageString(Double desiredCategoryPercentage) {
 		return desiredCategoryPercentage == null ? String.format("%6s", "N/A%")
 				: String.format("%(6.2f", (desiredCategoryPercentage * 100)) + "%";
 	}

@@ -15,13 +15,18 @@ import java.util.stream.Collectors;
 
 import com.wise.portfolio.fund.MutualFund.FundCategory;
 import com.wise.portfolio.fund.PortfolioFund;
-import com.wise.portfolio.fund.Transaction;
+import com.wise.portfolio.fund.FundTransaction;
 import com.wise.portfolio.service.MutualFundPerformance;
 import com.wise.portfolio.service.PortfolioPriceHistory;
 
 public class ManagedPortfolio extends Portfolio {
 
 	private Map<String, Map<FundCategory, BigDecimal>> desiredFundAllocationMaps = new HashMap<>();
+	private List<PortfolioTransaction> portfolioTransactions = new ArrayList<>();
+
+	public List<PortfolioTransaction> getPortfolioTransactions() {
+		return portfolioTransactions;
+	}
 
 	public Map<String, Map<FundCategory, BigDecimal>> getDesiredFundAllocationMaps() {
 		return desiredFundAllocationMaps;
@@ -33,7 +38,7 @@ public class ManagedPortfolio extends Portfolio {
 
 	public BigDecimal getFundDeviation(PortfolioFund fund) {
 		if (fund.isClosed()) {
-			return BigDecimal.ZERO;
+			//return BigDecimal.ZERO;
 		}
 		if (fund.getValue().compareTo(BigDecimal.ZERO) == 0) {
 			return BigDecimal.ZERO;
@@ -58,7 +63,7 @@ public class ManagedPortfolio extends Portfolio {
 
 	public BigDecimal getFundDeviation(PortfolioFund fund, BigDecimal portfolioAdjustment) {
 		if (fund.isClosed()) {
-			return BigDecimal.ZERO;
+			//return BigDecimal.ZERO;
 		}
 		BigDecimal totalPortfolioValueAfterAdjustment = getTotalValue().subtract(portfolioAdjustment);
 		BigDecimal fundTargetPercentage = fund.getPercentageByCategory(FundCategory.TOTAL);
@@ -87,7 +92,7 @@ public class ManagedPortfolio extends Portfolio {
 		double returns = 0f;
 		MutualFundPerformance performance = new MutualFundPerformance(this, fund);
 		LocalDate date = LocalDate.now().minusYears(years);
-		Float fundReturns = performance.getPerformanceRateByDate(date);
+		Double fundReturns = performance.getPerformanceRateByDate(date);
 		returns = Math.pow(1 + fundReturns,
 				BigDecimal.ONE.divide(new BigDecimal(years), 4, RoundingMode.HALF_DOWN).doubleValue());
 
@@ -97,7 +102,7 @@ public class ManagedPortfolio extends Portfolio {
 	public List<PortfolioFund> getFundsByCategory(FundCategory category) {
 
 		return getFundMap().values().stream()
-				.filter(fund -> fund.getCategoriesMap().get(category).compareTo(BigDecimal.ZERO) > 0).sorted()
+				.filter(fund -> fund.getCategoriesMap().get(category) != null && fund.getCategoriesMap().get(category).compareTo(BigDecimal.ZERO) > 0).sorted()
 				.collect(Collectors.toList());
 
 	}
@@ -164,9 +169,9 @@ public class ManagedPortfolio extends Portfolio {
 		if (historicPrice == null) {
 			historicPrice = BigDecimal.ZERO;
 		}
-		Float historicalShares = priceHistory.getSharesByDate(fund, historicalDate, false);
+		Double historicalShares = priceHistory.getSharesByDate(fund, historicalDate, false);
 		if (historicalShares == null) {
-			historicalShares = new Float(0);
+			historicalShares = (double) 0;
 		}
 		historicalValue = historicPrice.multiply(new BigDecimal(historicalShares));
 
@@ -205,6 +210,9 @@ public class ManagedPortfolio extends Portfolio {
 
 	public BigDecimal getValueByDate(PortfolioFund fund, LocalDate date) {
 
+		if (fund.isClosed()) {
+			return BigDecimal.ZERO;
+		}
 		PortfolioPriceHistory priceHistory = getPriceHistory();
 		BigDecimal value = new BigDecimal(0);
 
@@ -233,12 +241,12 @@ public class ManagedPortfolio extends Portfolio {
 		return this.getTotalValue().multiply(targetPercentage);
 	}
 
-	public List<Entry<LocalDate, Transaction>> getRecentTransactions(List<String> transactionTypes, int days) {
+	public List<Entry<LocalDate, FundTransaction>> getRecentTransactions(List<String> transactionTypes, int days) {
 
 		LocalDate startDate = LocalDate.now().minusDays(days);
-		List<Entry<LocalDate, Transaction>> transactions = new ArrayList<>();
+		List<Entry<LocalDate, FundTransaction>> transactions = new ArrayList<>();
 		for (PortfolioFund fund : getFundMap().values()) {
-			for (Entry<LocalDate, Transaction> transactionEntry : fund.getTransactionsBetweenDates(startDate,
+			for (Entry<LocalDate, FundTransaction> transactionEntry : fund.getTransactionsBetweenDates(startDate,
 					LocalDate.now())) {
 				if (transactionTypes != null) {
 					for (String filterdType : transactionTypes) {
@@ -261,12 +269,17 @@ public class ManagedPortfolio extends Portfolio {
 		BigDecimal recentWithdrawalTotal = BigDecimal.ZERO;
 		List<String> transactionTypes = new ArrayList<>();
 		transactionTypes.add("Sell");
-		List<Entry<LocalDate, Transaction>> transactions = getRecentTransactions(transactionTypes, days);
-		for (Entry<LocalDate, Transaction> entry : transactions) {
-			Transaction transaction = entry.getValue();
+		List<Entry<LocalDate, FundTransaction>> transactions = getRecentTransactions(transactionTypes, days);
+		for (Entry<LocalDate, FundTransaction> entry : transactions) {
+			FundTransaction transaction = entry.getValue();
 			recentWithdrawalTotal = recentWithdrawalTotal.add(transaction.getTransastionPrincipal());
 		}
 		return recentWithdrawalTotal;
+	}
+
+	public void addPortfolioTransaction(PortfolioTransaction portfolioTransaction) {
+		portfolioTransactions.add(portfolioTransaction);
+		
 	}
 
 }

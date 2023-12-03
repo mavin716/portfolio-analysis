@@ -46,9 +46,9 @@ public class FundRankCell extends Cell {
 	}
 
 	private float calculateCurrenPriceOpacity(MutualFundPerformance fundPerformance, LocalDate date) {
-		LocalDate threeYearsAgo = LocalDate.now().minusYears(3);
-		BigDecimal minPrice = fundPerformance.getMinPricePairFromDate(threeYearsAgo).getRight();
-		BigDecimal maxPrice = fundPerformance.getMaxPricePairFromDate(threeYearsAgo).getRight();
+		LocalDate oldestDate = fundPerformance.getOldestDate();
+		BigDecimal minPrice = fundPerformance.getMinPricePairFromDate(oldestDate).getRight();
+		BigDecimal maxPrice = fundPerformance.getMaxPricePairFromDate(oldestDate).getRight();
 		BigDecimal fundPrice = fundPerformance.getPriceByDate(fundPerformance.getFund(), date, false);
 		BigDecimal halfRange = maxPrice.subtract(minPrice).divide(new BigDecimal(2), RoundingMode.HALF_UP);
 		BigDecimal midPrice = maxPrice.subtract(halfRange);

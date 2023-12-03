@@ -13,7 +13,7 @@ import java.util.TreeMap;
 
 import com.wise.portfolio.fund.MutualFund.FundCategory;
 import com.wise.portfolio.fund.PortfolioFund;
-import com.wise.portfolio.fund.Transaction;
+import com.wise.portfolio.fund.FundTransaction;
 import com.wise.portfolio.service.PortfolioPriceHistory;
 
 public class Portfolio {
@@ -31,8 +31,8 @@ public class Portfolio {
 		return fundSymbolNameMap;
 	}
 
-	protected Map<LocalDate, Collection<Transaction>> federalWithholdingTax = new TreeMap<>();
-	protected Map<LocalDate, Collection<Transaction>> stateWithholdingTax = new TreeMap<>();
+	protected Map<LocalDate, Collection<FundTransaction>> federalWithholdingTax = new TreeMap<>();
+	protected Map<LocalDate, Collection<FundTransaction>> stateWithholdingTax = new TreeMap<>();
 
 	private Map<String, PortfolioFund> fundMap = new TreeMap<String, PortfolioFund>(new Comparator<String>() {
 
@@ -154,12 +154,12 @@ public class Portfolio {
 	public void addFederalWithholdingTax(LocalDate transactionDate, String transactionType, Float transactionShares,
 			BigDecimal transactionSharePrice, BigDecimal transastionPrincipal, String transactionSourceFile) {
 
-		Transaction newTransaction = new Transaction(transactionDate, null, transactionType, transactionShares,
+		FundTransaction newTransaction = new FundTransaction(transactionDate, null, transactionType, transactionShares,
 				transactionSharePrice, transastionPrincipal, transactionSourceFile);
 
-		Collection<Transaction> transactionsForDate = federalWithholdingTax.get(transactionDate);
+		Collection<FundTransaction> transactionsForDate = federalWithholdingTax.get(transactionDate);
 		if (transactionsForDate != null) {
-			for (Transaction transaction : transactionsForDate) {
+			for (FundTransaction transaction : transactionsForDate) {
 				if (transaction.getTransactionType().contentEquals(transactionType)
 						&& transaction.getTransastionPrincipal().compareTo(transastionPrincipal) == 0
 						&& !transaction.getTransactionSourceFile().contentEquals(transactionSourceFile)) {
@@ -168,7 +168,7 @@ public class Portfolio {
 				}
 			}
 		} else {
-			transactionsForDate = new ArrayList<Transaction>();
+			transactionsForDate = new ArrayList<FundTransaction>();
 			federalWithholdingTax.put(transactionDate, transactionsForDate);
 		}
 		transactionsForDate.add(newTransaction);
@@ -177,10 +177,10 @@ public class Portfolio {
 	public BigDecimal getFederalWithholdingBetweenDates(LocalDate startDate, LocalDate endDate) {
 		BigDecimal transactionsAmount = new BigDecimal(0);
 
-		for (Entry<LocalDate, Collection<Transaction>> entry : federalWithholdingTax.entrySet()) {
+		for (Entry<LocalDate, Collection<FundTransaction>> entry : federalWithholdingTax.entrySet()) {
 			if (entry.getKey().isAfter(startDate) && entry.getKey().isBefore(endDate)) {
-				Collection<Transaction> transactionList = entry.getValue();
-				for (Transaction transaction : transactionList) {
+				Collection<FundTransaction> transactionList = entry.getValue();
+				for (FundTransaction transaction : transactionList) {
 					transactionsAmount = transactionsAmount.add(transaction.getTransastionPrincipal());
 				}
 			}
@@ -191,12 +191,12 @@ public class Portfolio {
 	public void addStateWithholdingTax(LocalDate transactionDate, String transactionType, Float transactionShares,
 			BigDecimal transactionSharePrice, BigDecimal transastionPrincipal, String transactionSourceFile) {
 
-		Transaction newTransaction = new Transaction(transactionDate, null, transactionType, transactionShares,
+		FundTransaction newTransaction = new FundTransaction(transactionDate, null, transactionType, transactionShares,
 				transactionSharePrice, transastionPrincipal, transactionSourceFile);
 
-		Collection<Transaction> transactionsForDate = stateWithholdingTax.get(transactionDate);
+		Collection<FundTransaction> transactionsForDate = stateWithholdingTax.get(transactionDate);
 		if (transactionsForDate != null) {
-			for (Transaction transaction : transactionsForDate) {
+			for (FundTransaction transaction : transactionsForDate) {
 				if (transaction.getTransactionType().contentEquals(transactionType)
 						&& transaction.getTransastionPrincipal().compareTo(transastionPrincipal) == 0
 						&& !transaction.getTransactionSourceFile().contentEquals(transactionSourceFile)) {
@@ -206,7 +206,7 @@ public class Portfolio {
 				}
 			}
 		} else {
-			transactionsForDate = new ArrayList<Transaction>();
+			transactionsForDate = new ArrayList<FundTransaction>();
 			stateWithholdingTax.put(transactionDate, transactionsForDate);
 		}
 		transactionsForDate.add(newTransaction);
@@ -215,10 +215,10 @@ public class Portfolio {
 	public BigDecimal getStateWithholdingBetweenDates(LocalDate startDate, LocalDate endDate) {
 		BigDecimal transactionsAmount = new BigDecimal(0);
 
-		for (Entry<LocalDate, Collection<Transaction>> entry : stateWithholdingTax.entrySet()) {
+		for (Entry<LocalDate, Collection<FundTransaction>> entry : stateWithholdingTax.entrySet()) {
 			if (entry.getKey().isAfter(startDate) && entry.getKey().isBefore(endDate)) {
-				Collection<Transaction> transactionList = entry.getValue();
-				for (Transaction transaction : transactionList) {
+				Collection<FundTransaction> transactionList = entry.getValue();
+				for (FundTransaction transaction : transactionList) {
 					transactionsAmount = transactionsAmount.add(transaction.getTransastionPrincipal());
 				}
 			}

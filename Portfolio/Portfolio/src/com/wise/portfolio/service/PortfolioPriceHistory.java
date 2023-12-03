@@ -36,7 +36,7 @@ public class PortfolioPriceHistory {
 		return Collections.min(fundPrices.get(symbol).keySet());
 	}
 
-	private Map<String, Map<LocalDate, Float>> fundShares = new TreeMap<>();
+	private Map<String, Map<LocalDate, Double>> fundShares = new TreeMap<>();
 	private Map<String, Map<LocalDate, BigDecimal>> fundPrices = new TreeMap<>();
 	private Map<String, Map<LocalDate, String>> fundPricesSource = new TreeMap<>();
 	private Map<String, Map<LocalDate, BigDecimal>> fundReturnsByDateMap = new TreeMap<>();
@@ -80,11 +80,11 @@ public class PortfolioPriceHistory {
 		return fundPrices;
 	}
 
-	public Map<String, Map<LocalDate, Float>> getFundShares() {
+	public Map<String, Map<LocalDate, Double>> getFundShares() {
 		return fundShares;
 	}
 
-	public void setFundShares(Map<String, Map<LocalDate, Float>> fundShares) {
+	public void setFundShares(Map<String, Map<LocalDate, Double>> fundShares) {
 		this.fundShares = fundShares;
 	}
 
@@ -205,13 +205,14 @@ public class PortfolioPriceHistory {
 				fund = new PortfolioFund();
 				fund.setSymbol(symbol);
 				fund.setName(portfolio.getFundName(symbol));
+				funds.put(symbol, fund);
+				System.out.println("add fund: " + symbol);
 			}
 			Double shares = Float.valueOf(fundValues.get(3)) + fund.getShares();
 			fund.setShares(shares);
 			fund.setCurrentPrice(price);
 			addFundPrice(symbol, date, price, downloadFile);
-			addFundShares(symbol, date, shares.floatValue(), downloadFile);
-			funds.put(symbol, fund);
+			addFundShares(symbol, date, shares, downloadFile);
 
 		}
 
@@ -417,12 +418,12 @@ public class PortfolioPriceHistory {
 				LocalDate date = LocalDate.parse(dateString);
 				String priceString = fundValues.get(column++);
 
-				Float shares = 0f;
+				Double shares = (double) 0;
 				if (priceString.length() > 0) {
-					shares = Float.valueOf(priceString);
+					shares = Double.valueOf(priceString);
 				}
 
-				if (shares.compareTo(0f) > 0) {
+				if (shares > 0) {
 					addFundShares(symbol, date, shares, sharesFile);
 				}
 			}
@@ -482,7 +483,7 @@ public class PortfolioPriceHistory {
 			// Don't add second price for same date
 			return;
 		}
-		System.out.print("symbol:  " + symbol + " date:  " + date.format(DATE_FORMATTER) + " price:  " + CurrencyHelper.formatAsCurrencyString(price));
+//		System.out.println("symbol:  " + symbol + " date:  " + date.format(DATE_FORMATTER) + " price:  " + CurrencyHelper.formatAsCurrencyString(price));
 		fundPriceMap.put(date, price);
 		addFundPriceSource(symbol, date, source);
 
@@ -512,9 +513,9 @@ public class PortfolioPriceHistory {
 
 	}
 
-	public void addFundShares(String symbol, LocalDate date, Float shares, String source) {
+	public void addFundShares(String symbol, LocalDate date, Double shares, String source) {
 
-		Map<LocalDate, Float> fundShareMap = fundShares.get(symbol);
+		Map<LocalDate, Double> fundShareMap = fundShares.get(symbol);
 		if (fundShareMap == null) {
 			fundShareMap = new HashMap<>();
 			fundShares.put(symbol, fundShareMap);
@@ -585,7 +586,7 @@ public class PortfolioPriceHistory {
 		
 		BigDecimal value = fundPriceMap.get(date);
 		if (value == null && !isExactDate) {
-			int tries = 30;
+			int tries = 5;
 			while (tries-- > 0) {
 				date = date.minus(1, ChronoUnit.DAYS);
 				value = fundPriceMap.get(date);
@@ -598,13 +599,13 @@ public class PortfolioPriceHistory {
 		return value;
 	}
 
-	public Float getSharesByDate(Fund fund, LocalDate date, boolean isExactDate) {
-		Float value = 0f;
+	public Double getSharesByDate(Fund fund, LocalDate date, boolean isExactDate) {
+		Double value = (double) 0;
 
-		Map<LocalDate, Float> fundPriceMap = fundShares.get(fund.getSymbol());
+		Map<LocalDate, Double> fundPriceMap = fundShares.get(fund.getSymbol());
 		value = fundPriceMap.get(date);
 		if (value == null && !isExactDate) {
-			int tries = 30;
+			int tries = 5;
 			while (tries-- > 0) {
 				date = date.minus(1, ChronoUnit.DAYS);
 				value = fundPriceMap.get(date);
@@ -612,7 +613,7 @@ public class PortfolioPriceHistory {
 					return value;
 				}
 			}
-			return 0f;
+			return (double) 0;
 		}
 
 		return value;
@@ -623,9 +624,9 @@ public class PortfolioPriceHistory {
 		BigDecimal value = null;
 
 		BigDecimal price = getPriceByDate(fund, date, isExactDate);
-		Float shares = getSharesByDate(fund, date, isExactDate);
+		Double shares = getSharesByDate(fund, date, isExactDate);
 
-		if (price != null && shares != null && shares.compareTo(0f) > 0) {
+		if (price != null && shares != null && shares.compareTo((double) 0) > 0) {
 			value = price.multiply(new BigDecimal(shares));
 		}
 
@@ -638,16 +639,16 @@ public class PortfolioPriceHistory {
 		for (PortfolioFund fund : portfolio.getFundMap().values()) {
 
 			Map<LocalDate, BigDecimal> fundPriceMap = fundPrices.get(fund.getSymbol());
-			Map<LocalDate, Float> fundShareMap = fundShares.get(fund.getSymbol());
+			Map<LocalDate, Double> fundShareMap = fundShares.get(fund.getSymbol());
 
 			BigDecimal fundPrice = fundPriceMap.get(date);
-			Float fundShares = fundShareMap.get(date);
+			Double fundShares = fundShareMap.get(date);
 			BigDecimal fundValue = BigDecimal.ZERO;
 			if (fundPrice != null && fundShares != null) {
 				fundValue = fundPrice.multiply(new BigDecimal(fundShares));
 			}
 			if (fundValue.compareTo(BigDecimal.ZERO) == 0 && !isExactDate) {
-				int tries = 30;
+				int tries = 5;
 				while (tries-- > 0) {
 					date = date.minus(1, ChronoUnit.DAYS);
 					fundPrice = fundPriceMap.get(date);

@@ -10,9 +10,18 @@ import java.util.Map.Entry;
 import java.util.TreeMap;
 
 import com.wise.portfolio.portfolio.Portfolio;
-import com.wise.portfolio.service.CurrencyHelper;
 
 public class PortfolioFund extends MutualFund {
+
+	private String notes;
+	
+	public String getNotes() {
+		return notes;
+	}
+
+	public void setNotes(String notes) {
+		this.notes = notes;
+	}
 
 	private boolean isClosed = false;
 	public boolean isClosed() {
@@ -61,11 +70,11 @@ public class PortfolioFund extends MutualFund {
 		this.preSpent = preSpent;
 	}
 
-	protected Map<LocalDate, Collection<Transaction>> income = new TreeMap<>();
-	protected Map<LocalDate, Collection<Transaction>> distributions = new TreeMap<>();
-	protected Map<LocalDate, Collection<Transaction>> withdrawals = new TreeMap<>();
-	protected Map<LocalDate, Collection<Transaction>> exchanges = new TreeMap<>();
-	protected Map<LocalDate, Collection<Transaction>> shareConversions = new TreeMap<>();
+	protected Map<LocalDate, Collection<FundTransaction>> income = new TreeMap<>();
+	protected Map<LocalDate, Collection<FundTransaction>> distributions = new TreeMap<>();
+	protected Map<LocalDate, Collection<FundTransaction>> withdrawals = new TreeMap<>();
+	protected Map<LocalDate, Collection<FundTransaction>> exchanges = new TreeMap<>();
+	protected Map<LocalDate, Collection<FundTransaction>> shareConversions = new TreeMap<>();
 
 	public double getShares() {
 		return shares;
@@ -101,19 +110,19 @@ public class PortfolioFund extends MutualFund {
 
 	public void addIncome(LocalDate transactionDate, String transactionType, Float transactionShares,
 			BigDecimal transactionSharePrice, BigDecimal transastionPrincipal, String transactionSourceFile) {
-		Transaction newTransaction = new Transaction(transactionDate, getSymbol(), transactionType, transactionShares,
+		FundTransaction newTransaction = new FundTransaction(transactionDate, getSymbol(), transactionType, transactionShares,
 				transactionSharePrice, transastionPrincipal, transactionSourceFile);
 
-		Collection<Transaction> transactionsForDate = income.get(transactionDate);
+		Collection<FundTransaction> transactionsForDate = income.get(transactionDate);
 		if (transactionsForDate != null) {
-			for (Transaction transaction : transactionsForDate) {
+			for (FundTransaction transaction : transactionsForDate) {
 				if (transaction.getTransactionType().contentEquals(transactionType)) {
 					// duplicate
 					return;
 				}
 			}
 		} else {
-			transactionsForDate = new ArrayList<Transaction>();
+			transactionsForDate = new ArrayList<FundTransaction>();
 			income.put(transactionDate, transactionsForDate);
 		}
 		transactionsForDate.add(newTransaction);
@@ -125,19 +134,19 @@ public class PortfolioFund extends MutualFund {
 	public void addDistribution(LocalDate transactionDate, String transactionType, Float transactionShares,
 			BigDecimal transactionSharePrice, BigDecimal transastionPrincipal, String transactionSourceFile) {
 
-		Transaction newTransaction = new Transaction(transactionDate, getSymbol(), transactionType, transactionShares,
+		FundTransaction newTransaction = new FundTransaction(transactionDate, getSymbol(), transactionType, transactionShares,
 				transactionSharePrice, transastionPrincipal, transactionSourceFile);
 
-		Collection<Transaction> transactionsForDate = distributions.get(transactionDate);
+		Collection<FundTransaction> transactionsForDate = distributions.get(transactionDate);
 		if (transactionsForDate != null) {
-			for (Transaction transaction : transactionsForDate) {
+			for (FundTransaction transaction : transactionsForDate) {
 				if (transaction.getTransactionType().contentEquals(transactionType)) {
 					// duplicate
 					return;
 				}
 			}
 		} else {
-			transactionsForDate = new ArrayList<Transaction>();
+			transactionsForDate = new ArrayList<FundTransaction>();
 			distributions.put(transactionDate, transactionsForDate);
 		}
 		transactionsForDate.add(newTransaction);
@@ -149,10 +158,10 @@ public class PortfolioFund extends MutualFund {
 	public BigDecimal getDistributionsForDate(LocalDate date) {
 		BigDecimal transactionsAmount = new BigDecimal(0);
 
-		for (Entry<LocalDate, Collection<Transaction>> entry : distributions.entrySet()) {
+		for (Entry<LocalDate, Collection<FundTransaction>> entry : distributions.entrySet()) {
 			if (entry.getKey().isEqual(date)) {
-				Collection<Transaction> transactionList = entry.getValue();
-				for (Transaction transaction : transactionList) {
+				Collection<FundTransaction> transactionList = entry.getValue();
+				for (FundTransaction transaction : transactionList) {
 					transactionsAmount = transactionsAmount.add(transaction.getTransastionPrincipal());
 				}
 			}
@@ -163,10 +172,10 @@ public class PortfolioFund extends MutualFund {
 	public BigDecimal getDistributionsAfterDate(LocalDate date) {
 		BigDecimal transactionsAmount = new BigDecimal(0);
 
-		for (Entry<LocalDate, Collection<Transaction>> entry : distributions.entrySet()) {
+		for (Entry<LocalDate, Collection<FundTransaction>> entry : distributions.entrySet()) {
 			if (!entry.getKey().isBefore(date)) {
-				Collection<Transaction> transactionList = entry.getValue();
-				for (Transaction transaction : transactionList) {
+				Collection<FundTransaction> transactionList = entry.getValue();
+				for (FundTransaction transaction : transactionList) {
 					transactionsAmount = transactionsAmount.add(transaction.getTransastionPrincipal());
 				}
 			}
@@ -177,10 +186,10 @@ public class PortfolioFund extends MutualFund {
 	public BigDecimal getDistributionsBetweenDates(LocalDate startDate, LocalDate endDate) {
 		BigDecimal transactionsAmount = new BigDecimal(0);
 
-		for (Entry<LocalDate, Collection<Transaction>> entry : distributions.entrySet()) {
+		for (Entry<LocalDate, Collection<FundTransaction>> entry : distributions.entrySet()) {
 			if (entry.getKey().isAfter(startDate) && entry.getKey().isBefore(endDate)) {
-				Collection<Transaction> transactionList = entry.getValue();
-				for (Transaction transaction : transactionList) {
+				Collection<FundTransaction> transactionList = entry.getValue();
+				for (FundTransaction transaction : transactionList) {
 					transactionsAmount = transactionsAmount.add(transaction.getTransastionPrincipal());
 				}
 			}
@@ -191,10 +200,10 @@ public class PortfolioFund extends MutualFund {
 	public BigDecimal getWithdrawalTotalForDate(LocalDate date) {
 		BigDecimal withdrawalAmount = new BigDecimal(0);
 
-		for (Entry<LocalDate, Collection<Transaction>> entry : withdrawals.entrySet()) {
+		for (Entry<LocalDate, Collection<FundTransaction>> entry : withdrawals.entrySet()) {
 			if (entry.getKey().isEqual(date)) {
-				Collection<Transaction> transactionList = entry.getValue();
-				for (Transaction transaction : transactionList) {
+				Collection<FundTransaction> transactionList = entry.getValue();
+				for (FundTransaction transaction : transactionList) {
 					withdrawalAmount = withdrawalAmount.add(transaction.getTransastionPrincipal());
 				}
 			}
@@ -205,10 +214,10 @@ public class PortfolioFund extends MutualFund {
 	public BigDecimal geWithdrawalsBetweenDates(LocalDate startDate, LocalDate endDate) {
 		BigDecimal transactionsAmount = new BigDecimal(0);
 
-		for (Entry<LocalDate, Collection<Transaction>> entry : withdrawals.entrySet()) {
+		for (Entry<LocalDate, Collection<FundTransaction>> entry : withdrawals.entrySet()) {
 			if (entry.getKey().isAfter(startDate) && entry.getKey().isBefore(endDate)) {
-				Collection<Transaction> transactionList = entry.getValue();
-				for (Transaction transaction : transactionList) {
+				Collection<FundTransaction> transactionList = entry.getValue();
+				for (FundTransaction transaction : transactionList) {
 					transactionsAmount = transactionsAmount.add(transaction.getTransastionPrincipal());
 				}
 			}
@@ -219,10 +228,10 @@ public class PortfolioFund extends MutualFund {
 	public BigDecimal getWithdrawalsUpToDate(LocalDate date) {
 		BigDecimal withdrawalAmount = new BigDecimal(0);
 
-		for (Entry<LocalDate, Collection<Transaction>> entry : withdrawals.entrySet()) {
+		for (Entry<LocalDate, Collection<FundTransaction>> entry : withdrawals.entrySet()) {
 			if (!entry.getKey().isBefore(date)) {
-				Collection<Transaction> transactionList = entry.getValue();
-				for (Transaction transaction : transactionList) {
+				Collection<FundTransaction> transactionList = entry.getValue();
+				for (FundTransaction transaction : transactionList) {
 					withdrawalAmount = withdrawalAmount.add(transaction.getTransastionPrincipal());
 				}
 			}
@@ -233,10 +242,10 @@ public class PortfolioFund extends MutualFund {
 	public BigDecimal getExchangeTotalFromDate(LocalDate date) {
 		BigDecimal exchangeAmount = new BigDecimal(0);
 
-		for (Entry<LocalDate, Collection<Transaction>> entry : exchanges.entrySet()) {
+		for (Entry<LocalDate, Collection<FundTransaction>> entry : exchanges.entrySet()) {
 			if (!entry.getKey().isBefore(date)) {
-				Collection<Transaction> transactionList = entry.getValue();
-				for (Transaction transaction : transactionList) {
+				Collection<FundTransaction> transactionList = entry.getValue();
+				for (FundTransaction transaction : transactionList) {
 					exchangeAmount = exchangeAmount.add(transaction.getTransastionPrincipal());
 				}
 			}
@@ -247,12 +256,12 @@ public class PortfolioFund extends MutualFund {
 	public void addWithdrawal(LocalDate transactionDate, String transactionType, Float transactionShares,
 			BigDecimal transactionSharePrice, BigDecimal transastionPrincipal, String transactionSourceFile) {
 
-		Transaction newTransaction = new Transaction(transactionDate, getSymbol(), transactionType, transactionShares,
+		FundTransaction newTransaction = new FundTransaction(transactionDate, getSymbol(), transactionType, transactionShares,
 				transactionSharePrice, transastionPrincipal, transactionSourceFile);
 
-		Collection<Transaction> transactionsForDate = withdrawals.get(transactionDate);
+		Collection<FundTransaction> transactionsForDate = withdrawals.get(transactionDate);
 		if (transactionsForDate != null) {
-			for (Transaction transaction : transactionsForDate) {
+			for (FundTransaction transaction : transactionsForDate) {
 				if (transaction.getTransactionType().contentEquals(transactionType) 
 						&& !transaction.getTransactionSourceFile().contentEquals(transactionSourceFile)) {
 					// duplicate, sell into two different accounts
@@ -262,7 +271,7 @@ public class PortfolioFund extends MutualFund {
 		} else {
 			transactionsForDate = withdrawals.get(transactionDate.minusDays(1));
 			if (transactionsForDate != null) {
-				for (Transaction transaction : transactionsForDate) {
+				for (FundTransaction transaction : transactionsForDate) {
 					if (transaction.getTransactionType().contentEquals(transactionType)
 							&& !transaction.getTransactionSourceFile().contentEquals(transactionSourceFile)) {
 						// duplicate, sell into two different accounts
@@ -270,7 +279,7 @@ public class PortfolioFund extends MutualFund {
 					}
 				}
 			}
-			transactionsForDate = new ArrayList<Transaction>();
+			transactionsForDate = new ArrayList<FundTransaction>();
 			withdrawals.put(transactionDate, transactionsForDate);
 		}
 //		System.out.println(transactionDate + ": "
@@ -283,12 +292,12 @@ public class PortfolioFund extends MutualFund {
 
 	public void addExchange(LocalDate transactionDate, String transactionType, Float transactionShares,
 			BigDecimal transactionSharePrice, BigDecimal principalAmount, String transactionSourceFile) {
-		Transaction newTransaction = new Transaction(transactionDate, getSymbol(), transactionType, transactionShares,
+		FundTransaction newTransaction = new FundTransaction(transactionDate, getSymbol(), transactionType, transactionShares,
 				transactionSharePrice, principalAmount, transactionSourceFile);
 
-		Collection<Transaction> transactionsForDate = exchanges.get(transactionDate);
+		Collection<FundTransaction> transactionsForDate = exchanges.get(transactionDate);
 		if (transactionsForDate != null) {
-			for (Transaction transaction : transactionsForDate) {
+			for (FundTransaction transaction : transactionsForDate) {
 				if (transaction.getTransactionType().contentEquals(transactionType)
 						&& !transaction.getTransactionSourceFile().contentEquals(transactionSourceFile)) {
 					// duplicate
@@ -298,7 +307,7 @@ public class PortfolioFund extends MutualFund {
 		} else {
 			transactionsForDate = exchanges.get(transactionDate.minusDays(1));
 			if (transactionsForDate != null) {
-				for (Transaction transaction : transactionsForDate) {
+				for (FundTransaction transaction : transactionsForDate) {
 					if (transaction.getTransactionType().contentEquals(transactionType)
 							&& !transaction.getTransactionSourceFile().contentEquals(transactionSourceFile)) {
 						// duplicate
@@ -306,7 +315,7 @@ public class PortfolioFund extends MutualFund {
 					}
 				}
 			}
-			transactionsForDate = new ArrayList<Transaction>();
+			transactionsForDate = new ArrayList<FundTransaction>();
 			exchanges.put(transactionDate, transactionsForDate);
 		}
 //		System.out.println(
@@ -325,12 +334,12 @@ public class PortfolioFund extends MutualFund {
 			isClosed = true;			
 		}
 		
-		Transaction newTransaction = new Transaction(transactionDate, getSymbol(), transactionType, transactionShares,
+		FundTransaction newTransaction = new FundTransaction(transactionDate, getSymbol(), transactionType, transactionShares,
 				transactionSharePrice, transastionPrincipal, transactionSourceFile);
 
-		Collection<Transaction> transactionsForDate = shareConversions.get(transactionDate);
+		Collection<FundTransaction> transactionsForDate = shareConversions.get(transactionDate);
 		if (transactionsForDate != null) {
-			for (Transaction transaction : transactionsForDate) {
+			for (FundTransaction transaction : transactionsForDate) {
 				if (transaction.getTransactionType().contentEquals(transactionType)) {
 					// duplicate
 					return;
@@ -339,14 +348,14 @@ public class PortfolioFund extends MutualFund {
 		} else {
 			transactionsForDate = shareConversions.get(transactionDate.minusDays(1));
 			if (transactionsForDate != null) {
-				for (Transaction transaction : transactionsForDate) {
+				for (FundTransaction transaction : transactionsForDate) {
 					if (transaction.getTransactionType().contentEquals(transactionType)) {
 						// duplicate
 						return;
 					}
 				}
 			}
-			transactionsForDate = new ArrayList<Transaction>();
+			transactionsForDate = new ArrayList<FundTransaction>();
 			shareConversions.put(transactionDate, transactionsForDate);
 		}
 //		System.out.println(transactionDate + ": "
@@ -359,23 +368,23 @@ public class PortfolioFund extends MutualFund {
 	public BigDecimal getConversionsUpToDate(LocalDate historicalDate) {
 		BigDecimal conversionAmount = new BigDecimal(0);
 
-		for (Entry<LocalDate, Collection<Transaction>> entry : shareConversions.entrySet()) {
+		for (Entry<LocalDate, Collection<FundTransaction>> entry : shareConversions.entrySet()) {
 			if (!entry.getKey().isBefore(historicalDate)) {
-				Collection<Transaction> transactionList = entry.getValue();
-				for (Transaction transaction : transactionList) {
+				Collection<FundTransaction> transactionList = entry.getValue();
+				for (FundTransaction transaction : transactionList) {
 					conversionAmount = conversionAmount.add(transaction.getTransastionPrincipal());
 				}
 			}
 		}
 		return conversionAmount;
 	}
-	public Float getConversionsSharesUpToDate(LocalDate historicalDate) {
-		Float conversionSharesAmount = 0f;
+	public Double getConversionsSharesUpToDate(LocalDate historicalDate) {
+		Double conversionSharesAmount = (double) 0;
 
-		for (Entry<LocalDate, Collection<Transaction>> entry : shareConversions.entrySet()) {
+		for (Entry<LocalDate, Collection<FundTransaction>> entry : shareConversions.entrySet()) {
 			if (!entry.getKey().isBefore(historicalDate)) {
-				Collection<Transaction> transactionList = entry.getValue();
-				for (Transaction transaction : transactionList) {
+				Collection<FundTransaction> transactionList = entry.getValue();
+				for (FundTransaction transaction : transactionList) {
 					conversionSharesAmount = conversionSharesAmount + transaction.getTransastionShares();
 				}
 			}
@@ -387,35 +396,35 @@ public class PortfolioFund extends MutualFund {
 		return getCategoriesMap().get(FundCategory.CASH).compareTo(BigDecimal.ZERO) != 0;
 	}
 
-	public List<Entry<LocalDate, Transaction>> getTransactionsBetweenDates(LocalDate startDate, LocalDate endDate) {
-		List<Entry<LocalDate, Transaction>> transactions = new ArrayList<>();
+	public List<Entry<LocalDate, FundTransaction>> getTransactionsBetweenDates(LocalDate startDate, LocalDate endDate) {
+		List<Entry<LocalDate, FundTransaction>> transactions = new ArrayList<>();
 		
-		for (Entry<LocalDate, Collection<Transaction>> entry : income.entrySet()) {
+		for (Entry<LocalDate, Collection<FundTransaction>> entry : income.entrySet()) {
 			LocalDate transactionDate = entry.getKey();
 			if (transactionDate.isBefore(endDate) && transactionDate.isAfter(startDate)) {
-				Collection<Transaction> transactionList = entry.getValue();
-				for (Transaction transaction : transactionList) {
-					Entry<LocalDate, Transaction> transactionEntry = Map.entry(transaction.getTransactionDate(), transaction);
+				Collection<FundTransaction> transactionList = entry.getValue();
+				for (FundTransaction transaction : transactionList) {
+					Entry<LocalDate, FundTransaction> transactionEntry = Map.entry(transaction.getTransactionDate(), transaction);
 					transactions.add(transactionEntry);
 				}
 			}
 		}
-		for (Entry<LocalDate, Collection<Transaction>> entry : withdrawals.entrySet()) {
+		for (Entry<LocalDate, Collection<FundTransaction>> entry : withdrawals.entrySet()) {
 			LocalDate transactionDate = entry.getKey();
 			if (transactionDate.isBefore(endDate) && transactionDate.isAfter(startDate)) {
-				Collection<Transaction> transactionList = entry.getValue();
-				for (Transaction transaction : transactionList) {
-					Entry<LocalDate, Transaction> transactionEntry = Map.entry(transaction.getTransactionDate(), transaction);
+				Collection<FundTransaction> transactionList = entry.getValue();
+				for (FundTransaction transaction : transactionList) {
+					Entry<LocalDate, FundTransaction> transactionEntry = Map.entry(transaction.getTransactionDate(), transaction);
 					transactions.add(transactionEntry);
 				}
 			}
 		}
-		for (Entry<LocalDate, Collection<Transaction>> entry : exchanges.entrySet()) {
+		for (Entry<LocalDate, Collection<FundTransaction>> entry : exchanges.entrySet()) {
 			LocalDate transactionDate = entry.getKey();
 			if (transactionDate.isBefore(endDate) && transactionDate.isAfter(startDate)) {
-				Collection<Transaction> transactionList = entry.getValue();
-				for (Transaction transaction : transactionList) {
-					Entry<LocalDate, Transaction> transactionEntry = Map.entry(transaction.getTransactionDate(), transaction);
+				Collection<FundTransaction> transactionList = entry.getValue();
+				for (FundTransaction transaction : transactionList) {
+					Entry<LocalDate, FundTransaction> transactionEntry = Map.entry(transaction.getTransactionDate(), transaction);
 					transactions.add(transactionEntry);
 				}
 			}

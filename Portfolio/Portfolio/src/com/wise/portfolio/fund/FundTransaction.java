@@ -3,7 +3,7 @@ package com.wise.portfolio.fund;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
-public class Transaction {
+public class FundTransaction {
 
 	private String transactionFundSymbol;
 	public String getTransactionFundSymbol() {
@@ -37,7 +37,7 @@ public class Transaction {
 	public void setTransastionPrincipal(BigDecimal transastionPrincipal) {
 		this.transastionPrincipal = transastionPrincipal;
 	}
-	public Transaction(LocalDate transactionDate, String transactionFundSymbol, String transactionType, Float transastionShares,
+	public FundTransaction(LocalDate transactionDate, String transactionFundSymbol, String transactionType, Float transastionShares,
 			BigDecimal transastionSharePrice, BigDecimal transastionPrincipal, String transactionSourceFile) {
 		super();
 		this.transactionFundSymbol = transactionFundSymbol;
