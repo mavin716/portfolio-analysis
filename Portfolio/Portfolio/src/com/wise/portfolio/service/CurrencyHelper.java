@@ -1,9 +1,8 @@
 package com.wise.portfolio.service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.text.NumberFormat;
-
-import com.itextpdf.layout.element.IBlockElement;
 
 public class CurrencyHelper {
 
@@ -11,7 +10,7 @@ public class CurrencyHelper {
 		if (total.compareTo(BigDecimal.ZERO) == 0 || amount.compareTo(BigDecimal.ZERO) == 0) {
 			return BigDecimal.ZERO;
 		} else {
-			return amount.divide(total, 4, BigDecimal.ROUND_HALF_UP).setScale(4, BigDecimal.ROUND_UP);
+			return amount.divide(total, 4, RoundingMode.HALF_UP).setScale(4, RoundingMode.HALF_UP);
 		}
 	}
 

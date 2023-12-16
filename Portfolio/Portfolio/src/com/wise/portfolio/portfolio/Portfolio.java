@@ -26,7 +26,6 @@ public class Portfolio {
 		this.fundSymbolNameMap = fundSymbolNameMap;
 	}
 
-	
 	public Map<String, String> getFundSymbolNameMap() {
 		return fundSymbolNameMap;
 	}
@@ -89,7 +88,7 @@ public class Portfolio {
 	private void loadTotalValue() {
 		totalValue = fundMap.values().stream().filter(fund -> !fund.isClosed()).map(PortfolioFund::getValue)
 				.reduce(new BigDecimal(0, MathContext.DECIMAL32), (total, fundValue) -> total = total.add(fundValue))
-				.setScale(2, BigDecimal.ROUND_UP);
+				.setScale(2, RoundingMode.HALF_UP);
 	}
 
 	public BigDecimal getValueByCategory(FundCategory category) {
@@ -97,7 +96,7 @@ public class Portfolio {
 		return fundMap.values().stream().filter(fund -> fund.getCategoriesMap().containsKey(category))
 				.map(fund -> fund.getValueByCategory(category))
 				.reduce(new BigDecimal(0, MathContext.DECIMAL32), (value, fundValue) -> value = value.add(fundValue))
-				.setScale(2, BigDecimal.ROUND_UP);
+				.setScale(2, RoundingMode.HALF_UP);
 	}
 
 	/**
@@ -107,13 +106,13 @@ public class Portfolio {
 	 * @return
 	 */
 	public Float getPercentageByCategory(FundCategory category) {
-		Float percentage = new Float(0);
+		Float percentage = 0f;
 
 		BigDecimal totalValue = getTotalValue();
 		BigDecimal categoryValue = getValueByCategory(category);
 
 		if (categoryValue != null) {
-			percentage = categoryValue.divide(totalValue, 4, RoundingMode.DOWN).setScale(2, BigDecimal.ROUND_UP)
+			percentage = categoryValue.divide(totalValue, 4, RoundingMode.DOWN).setScale(2, RoundingMode.HALF_UP)
 					.floatValue();
 		}
 		return percentage;
@@ -127,8 +126,8 @@ public class Portfolio {
 //        System.out.println("Before adjusting fund:  " + String.format("%60s", fund.getName()) + " shares:  "
 //                + NumberFormat.getNumberInstance().format(fund.getShares()) + " value:  "
 //                + NumberFormat.getCurrencyInstance().format(fund.getValue()));
-		BigDecimal numSharesAdjust = value.divide(fund.getCurrentPrice(), 4, BigDecimal.ROUND_HALF_UP).setScale(2,
-				BigDecimal.ROUND_HALF_UP);
+		BigDecimal numSharesAdjust = value.divide(fund.getCurrentPrice(), 4, RoundingMode.HALF_UP).setScale(2,
+				RoundingMode.HALF_UP);
 //        System.out.println("numSharesAdjust:  " + numSharesAdjust);
 		double adjustedShares = fund.getShares() + numSharesAdjust.doubleValue();
 		fund.setShares(adjustedShares);
@@ -143,7 +142,7 @@ public class Portfolio {
 		BigDecimal prespentValue = fundMap.values().stream().map(PortfolioFund::getPreSpent)
 				.reduce(new BigDecimal(0, MathContext.DECIMAL32),
 						(total, prespentFundValue) -> total = total.add(prespentFundValue))
-				.setScale(2, BigDecimal.ROUND_UP);
+				.setScale(2, RoundingMode.HALF_UP);
 		return prespentValue;
 	}
 

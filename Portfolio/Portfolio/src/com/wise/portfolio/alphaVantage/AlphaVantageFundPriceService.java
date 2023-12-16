@@ -13,12 +13,15 @@ import org.apache.http.impl.client.HttpClients;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
+import com.wise.portfolio.fund.FundPriceHistory;
 import com.wise.portfolio.portfolio.Portfolio;
 import com.wise.portfolio.service.PortfolioPriceHistory;
 
 public class AlphaVantageFundPriceService {
 
 	private static final String ALPHA_VANTAGE_URL = "https://www.alphavantage.co/query";
+//	private static final String ALPHA_VANTAGE_FUNCTION = "TIME_SERIES_MONTHLY";
+	private static final String ALPHA_VANTAGE_FUNCTION = "TIME_SERIES_DAILY";
 	private static final String ALPHA_VANTAGE_APIKEY = "85MODZ3M0IN6CT0R";
 
 	public static boolean loadFundHistoryFromAlphaVantage(Portfolio portfolio, String symbol, boolean retry)
@@ -28,17 +31,18 @@ public class AlphaVantageFundPriceService {
 
 		BigDecimal closingPrice = BigDecimal.ZERO;
 		CloseableHttpClient httpclient = HttpClients.createDefault();
-		String url = ALPHA_VANTAGE_URL + "?function=TIME_SERIES_MONTHLY&outputsize=compact&symbol=" + symbol
+		String url = ALPHA_VANTAGE_URL + "?function=" + ALPHA_VANTAGE_FUNCTION + "&outputsize=compact&symbol=" + symbol
 				+ "&apikey=" + ALPHA_VANTAGE_APIKEY + "&outputsize=full";
 		HttpGet httpget = new HttpGet(url);
 		try {
 			HttpResponse httpresponse = httpclient.execute(httpget);
 			System.out.println(httpresponse.getStatusLine());
 			if (httpresponse.getStatusLine().getStatusCode() != 200) {
-				System.out.println("Sleep for 10 seconds and try again");
-				Thread.sleep(10000);
-				boolean success = loadFundHistoryFromAlphaVantage(portfolio, symbol, false);
-				return success;
+//				System.out.println("Sleep for 10 seconds and try again");
+//				Thread.sleep(10000);
+//				boolean success = loadFundHistoryFromAlphaVantage(portfolio, symbol, false);
+//				return success;
+				return false;
 			}
 
 			StringBuffer response = new StringBuffer();
@@ -46,6 +50,7 @@ public class AlphaVantageFundPriceService {
 			while (sc.hasNext()) {
 				response.append(sc.nextLine());
 			}
+			System.out.println("response " + response.substring(0, 100));
 			sc.close();
 
 			// json object mapper
@@ -59,7 +64,7 @@ public class AlphaVantageFundPriceService {
 				boolean success = false;
 				System.out.println(response.toString());
 				if (retry) {
-					int tries = 7;
+					int tries = 3;
 					while (tries-- > 0 && !success) {
 						System.out.println("Sleep for 10 seconds and try again");
 						Thread.sleep(10000);
@@ -74,15 +79,14 @@ public class AlphaVantageFundPriceService {
 				return success;
 			}
 			PortfolioPriceHistory priceHistory = portfolio.getPriceHistory();
-			LocalDate oldestDate = priceHistory.getOldestDate();
 			for (Entry<String, TimeSeries> entry : series.getTimeSeries().entrySet()) {
 
 				LocalDate date = LocalDate.parse(entry.getKey());
 				
 				// Only use dates BEFORE download files (they are inconsistent with downloads and ruin the integrity
-				if (date.isAfter(oldestDate)) {
-					continue;
-				}
+//				if (date.isAfter(priceHistory.getOldestDate())) {
+//					continue;
+//				}
 				
 				if (date.isBefore(earliestAlphaVantageDate)) {
 					earliestAlphaVantageDate = date;
@@ -90,10 +94,13 @@ public class AlphaVantageFundPriceService {
 
 				TimeSeries timeSeries = entry.getValue();
 				closingPrice = new BigDecimal(timeSeries.getClose());
-//				System.out.println("date:  " + date.toString() + " closing price:  "
-//						+ CurrencyHelper.formatAsCurrencyString(closingPrice));
 
-				priceHistory.addFundPrice(symbol, date, closingPrice, "AlphaVantage Service");
+				FundPriceHistory fundPriceHistory = priceHistory.getAlphaVantagePriceHistory().get(symbol);
+				if (fundPriceHistory == null) {
+					fundPriceHistory = new FundPriceHistory(symbol);
+					priceHistory.getAlphaVantagePriceHistory().put(symbol, fundPriceHistory);
+				}
+				priceHistory.getAlphaVantagePriceHistory().get(symbol).addFundPrice(date, closingPrice);
 
 			}
 

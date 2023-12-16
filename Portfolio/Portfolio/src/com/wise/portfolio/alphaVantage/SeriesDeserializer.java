@@ -1,22 +1,13 @@
 package com.wise.portfolio.alphaVantage;
 
 import java.io.IOException;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
-import com.fasterxml.jackson.core.JacksonException;
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.databind.DeserializationContext;
-import com.fasterxml.jackson.databind.JsonDeserializer;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JsonDeserializer;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.wise.portfolio.alphaVantage.Metadata;
-import com.wise.portfolio.alphaVantage.Series;
-import com.wise.portfolio.alphaVantage.TimeSeries;
-
-import java.io.IOException;
-import java.util.LinkedHashMap;
-import java.util.Map;
 
 public class SeriesDeserializer extends JsonDeserializer<Series> {
 

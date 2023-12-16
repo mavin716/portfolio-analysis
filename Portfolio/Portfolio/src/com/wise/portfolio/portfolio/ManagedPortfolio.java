@@ -22,10 +22,10 @@ import com.wise.portfolio.service.PortfolioPriceHistory;
 public class ManagedPortfolio extends Portfolio {
 
 	private Map<String, Map<FundCategory, BigDecimal>> desiredFundAllocationMaps = new HashMap<>();
-	private List<PortfolioTransaction> portfolioTransactions = new ArrayList<>();
+	private List<PortfolioTransaction> portfolioScheduledTransactions = new ArrayList<>();
 
 	public List<PortfolioTransaction> getPortfolioTransactions() {
-		return portfolioTransactions;
+		return portfolioScheduledTransactions;
 	}
 
 	public Map<String, Map<FundCategory, BigDecimal>> getDesiredFundAllocationMaps() {
@@ -38,7 +38,7 @@ public class ManagedPortfolio extends Portfolio {
 
 	public BigDecimal getFundDeviation(PortfolioFund fund) {
 		if (fund.isClosed()) {
-			//return BigDecimal.ZERO;
+			// return BigDecimal.ZERO;
 		}
 		if (fund.getValue().compareTo(BigDecimal.ZERO) == 0) {
 			return BigDecimal.ZERO;
@@ -63,7 +63,7 @@ public class ManagedPortfolio extends Portfolio {
 
 	public BigDecimal getFundDeviation(PortfolioFund fund, BigDecimal portfolioAdjustment) {
 		if (fund.isClosed()) {
-			//return BigDecimal.ZERO;
+			// return BigDecimal.ZERO;
 		}
 		BigDecimal totalPortfolioValueAfterAdjustment = getTotalValue().subtract(portfolioAdjustment);
 		BigDecimal fundTargetPercentage = fund.getPercentageByCategory(FundCategory.TOTAL);
@@ -79,8 +79,9 @@ public class ManagedPortfolio extends Portfolio {
 		}
 
 		BigDecimal deviation = BigDecimal.ZERO;
-		if (fund.getValue().compareTo(BigDecimal.ZERO) != 0) {
-			BigDecimal currentPercentage = fund.getValue().divide(totalPortfolioValueAfterAdjustment, 6,
+		BigDecimal fundValue = fund.getValue();
+		if (fundValue.compareTo(BigDecimal.ZERO) != 0) {
+			BigDecimal currentPercentage = fundValue.divide(totalPortfolioValueAfterAdjustment, 6,
 					RoundingMode.HALF_DOWN);
 			deviation = currentPercentage.subtract(fundTargetPercentage);
 		}
@@ -102,8 +103,9 @@ public class ManagedPortfolio extends Portfolio {
 	public List<PortfolioFund> getFundsByCategory(FundCategory category) {
 
 		return getFundMap().values().stream()
-				.filter(fund -> fund.getCategoriesMap().get(category) != null && fund.getCategoriesMap().get(category).compareTo(BigDecimal.ZERO) > 0).sorted()
-				.collect(Collectors.toList());
+				.filter(fund -> fund.getCategoriesMap().get(category) != null
+						&& fund.getCategoriesMap().get(category).compareTo(BigDecimal.ZERO) > 0)
+				.sorted().collect(Collectors.toList());
 
 	}
 
@@ -143,7 +145,8 @@ public class ManagedPortfolio extends Portfolio {
 			historicalDate = historicalDate.minusDays(1);
 		}
 
-		Map<LocalDate, BigDecimal> fundPriceMap = getPriceHistory().getFundPrices().get("VFIAX");
+		Map<LocalDate, BigDecimal> fundPriceMap = getPriceHistory().getVanguardPriceHistory().get("VFIAX")
+				.getFundPricesMap();
 		BigDecimal value = fundPriceMap.get(historicalDate);
 		if (value == null) {
 			int tries = 30;
@@ -204,7 +207,7 @@ public class ManagedPortfolio extends Portfolio {
 		BigDecimal totalValueByDate = null;
 		totalValueByDate = getFundMap().values().stream().map(f -> getValueByDate(f, date)).filter(x -> x != null)
 				.reduce(new BigDecimal(0, MathContext.DECIMAL32), (total, fundValue) -> total = total.add(fundValue))
-				.setScale(2, BigDecimal.ROUND_UP);
+				.setScale(2, RoundingMode.UP);
 		return totalValueByDate;
 	}
 
@@ -277,9 +280,9 @@ public class ManagedPortfolio extends Portfolio {
 		return recentWithdrawalTotal;
 	}
 
-	public void addPortfolioTransaction(PortfolioTransaction portfolioTransaction) {
-		portfolioTransactions.add(portfolioTransaction);
-		
+	public void addPortfolioScheduledTransaction(PortfolioTransaction portfolioTransaction) {
+		portfolioScheduledTransactions.add(portfolioTransaction);
+
 	}
 
 }

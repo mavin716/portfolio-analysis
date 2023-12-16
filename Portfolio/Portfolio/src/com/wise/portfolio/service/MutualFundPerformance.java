@@ -74,13 +74,12 @@ public class MutualFundPerformance {
 			return Double.valueOf(0);
 		}
 
-		// Adjust for dividends
-		// historicalValue =
-		// historicalValue.subtract(fund.getDistributionsAfterDate(historicalDate));
-		// Adjust for withdrawas
+		// Adjust historical value
 		BigDecimal withdrawals = portfolioFund.getWithdrawalsUpToDate(historicalDate);
 		BigDecimal exchanges = portfolioFund.getExchangeTotalFromDate(historicalDate);
-		historicalValue = historicalValue.subtract(withdrawals).subtract(exchanges);
+		BigDecimal converions = portfolioFund.getConversionsTotalFromDate(getFirstOfYearDate());
+		historicalValue = historicalValue.subtract(withdrawals).subtract(exchanges).add(converions);
+
 		Double rate = currentValue.subtract(historicalValue)
 				.divide(currentValue, PortfolioService.CURRENCY_SCALE, RoundingMode.HALF_UP).doubleValue();
 		return rate;
@@ -101,20 +100,20 @@ public class MutualFundPerformance {
 
 	public BigDecimal getClosestHistoricalPrice(LocalDate date, int days) {
 
-		BigDecimal historicalValue = portfolioPriceHistory.getPriceByDate(portfolioFund, date, true);
-		if (historicalValue != null) {
-			return historicalValue;
+		BigDecimal historicalPrice = portfolioPriceHistory.getPriceByDate(portfolioFund, date, true);
+		if (historicalPrice != null) {
+			return historicalPrice;
 		}
 		int tries = 0;
 		while (tries++ < days) {
 
-			historicalValue = portfolioPriceHistory.getPriceByDate(portfolioFund, date.minusDays(tries), true);
-			if (historicalValue != null) {
-				return historicalValue;
+			historicalPrice = portfolioPriceHistory.getPriceByDate(portfolioFund, date.minusDays(tries), true);
+			if (historicalPrice != null) {
+				return historicalPrice;
 			}
-			historicalValue = portfolioPriceHistory.getPriceByDate(portfolioFund, date.plusDays(tries), true);
-			if (historicalValue != null) {
-				return historicalValue;
+			historicalPrice = portfolioPriceHistory.getPriceByDate(portfolioFund, date.plusDays(tries), true);
+			if (historicalPrice != null) {
+				return historicalPrice;
 			}
 		}
 		return BigDecimal.ZERO;
@@ -265,8 +264,10 @@ public class MutualFundPerformance {
 	public BigDecimal getYtdValueChange() {
 		BigDecimal withdrawals = portfolioFund.getWithdrawalsUpToDate(getFirstOfYearDate());
 		BigDecimal exchanges = portfolioFund.getExchangeTotalFromDate(getFirstOfYearDate());
+		BigDecimal converions = portfolioFund.getConversionsTotalFromDate(getFirstOfYearDate());
 		BigDecimal historicalValue = getHistoricalValue(portfolioFund, getYtdDays() + 2);
-		BigDecimal ytdValueChange = portfolioFund.getValue().subtract(historicalValue).add(withdrawals).add(exchanges);
+		BigDecimal ytdValueChange = portfolioFund.getValue().subtract(historicalValue).add(withdrawals).add(exchanges)
+				.subtract(converions);
 		return ytdValueChange;
 	}
 
@@ -296,7 +297,7 @@ public class MutualFundPerformance {
 	public BigDecimal getPriceByDate(Fund fund, LocalDate date, boolean isExactDate) {
 		BigDecimal value = null;
 
-		Map<LocalDate, BigDecimal> fundPriceMap = portfolioPriceHistory.getFundPrices().get(fund.getSymbol());
+		Map<LocalDate, BigDecimal> fundPriceMap = portfolioPriceHistory.getVanguardPriceHistory().get(fund.getSymbol()).getFundPricesMap();
 		value = fundPriceMap.get(date);
 		if (value == null && !isExactDate) {
 			int tries = 30;
@@ -354,7 +355,7 @@ public class MutualFundPerformance {
 		BigDecimal historicalValue = portfolioPriceHistory.getFundValueByDate(portfolioFund, date, isExactDate);
 		if (currentValue != null && historicalValue != null) {
 			returns = currentValue.subtract(historicalValue).add(dividends).add(withdrawals).add(exchanges);
-//				returns = currentValue.subtract(historicalValue).add(dividends).add(withdrawals).add(exchanges).subtract(conversions);
+				returns = currentValue.subtract(historicalValue).add(dividends).add(withdrawals).add(exchanges).subtract(conversions);
 //				System.out.println("fund:  " + portfolioFund.getShortName() + " date:  " + date);
 //				System.out.println("currentValue:  " + CurrencyHelper.formatAsCurrencyString(currentValue));
 //				System.out.println("historicalValue:  " + CurrencyHelper.formatAsCurrencyString(historicalValue));

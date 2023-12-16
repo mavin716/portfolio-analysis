@@ -11,16 +11,12 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
-import java.time.format.TextStyle;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
-
-import org.jfree.data.time.TimePeriod;
 
 import com.itextpdf.kernel.events.PdfDocumentEvent;
 import com.itextpdf.kernel.geom.PageSize;
@@ -29,8 +25,8 @@ import com.itextpdf.kernel.pdf.PdfWriter;
 import com.itextpdf.layout.Document;
 import com.itextpdf.layout.element.Paragraph;
 import com.itextpdf.layout.property.HorizontalAlignment;
+import com.wise.portfolio.alphaVantage.AlphaVantageFundPriceService;
 import com.wise.portfolio.fund.PortfolioFund;
-import com.wise.portfolio.fund.FundTransaction;
 import com.wise.portfolio.pdf.FooterHandler;
 import com.wise.portfolio.pdf.HeaderHandler;
 import com.wise.portfolio.portfolio.ManagedPortfolio;
@@ -41,6 +37,7 @@ import com.wise.portfolio.service.PortfolioService;
 
 public class PortfolioApp {
 
+	// TODO need configuration file
 	private static final String DOWNLOAD_PATH = "C:\\Users\\mavin\\Downloads\\";
 //	private static final String CURRENT_DOWNLOAD_FILE_PATH = "C:\\Users\\mavin\\My Drive\\";
 	private static final String CURRENT_DOWNLOAD_FILE_PATH = "C:\\Users\\mavin\\Downloads\\";
@@ -61,20 +58,9 @@ public class PortfolioApp {
 			.add(STATE_WITHOLD_TAXES_PERCENT);
 	private static final BigDecimal AFTER_TAXES_WITHDRAW_AMOUNT_PERCENTAGE = BigDecimal.ONE
 			.subtract(WITHOLD_TAXES_PERCENT);
-
-	private static final BigDecimal CONDO_MORTGAGE_MONTHLY_SHARE_AMOUNT = new BigDecimal(600);
-	private static final int CONDO_MORTGAGE_WITHDRAW_DAY_OF_MONTH = 27;
-	private static final BigDecimal MONTHLY_EXPENSES_AMOUNT = new BigDecimal(1000);
-
-	private LocalDate SCHOOL_TAX_DUE_DATE = LocalDate.of(LocalDate.now().getYear(), 10, 1);
-	private static final BigDecimal SCHOOL_TAX_WITHDRAWAL_AMOUNT = new BigDecimal(4200);
-
-	private LocalDate PROPERTY_TAX_DUE_DATE = LocalDate.of(LocalDate.now().getYear(), 2, 1);
-	private static final BigDecimal PROPERTY_TAX_WITHDRAWAL_AMOUNT = new BigDecimal(3100);
-
-	private LocalDate HOMEOWNERS_INSURANCE_DUE_DATE = LocalDate.of(LocalDate.now().getYear(), 10, 19);
-	private static final BigDecimal HOMEOWNERS_INSURANCE_AMOUNT = new BigDecimal(813);
-	private static final BigDecimal AUTO_INSURANCE_SEMI_YEARLY_AMOUNT = new BigDecimal(436);
+	
+	private static final int RECENT_TRANSACTIONS_DAYS = 90;
+	private static final long PORTFOLIO_TRANSACTION_REPORT_WINDOW = 10;
 
 	public static void main(String[] args) {
 
@@ -103,7 +89,7 @@ public class PortfolioApp {
 			// portfolioService.updateDownloadFilenames(portfolio,
 			// DOWNLOAD_FILENAME_PREFIX);
 
-			// Get price history via alphaVantage
+			// Load price history via alphaVantage
 			for (Entry<String, PortfolioFund> entry : portfolio.getFundMap().entrySet()) {
 				if (entry.getValue().getShares() == 0) {
 					continue;
@@ -114,17 +100,15 @@ public class PortfolioApp {
 //				}
 				// not working, returning values which differ greatly from vanguard download
 				// files
-//				String symbol = entry.getKey();
+				String symbol = entry.getKey();
 //				AlphaVantageFundPriceService.loadFundHistoryFromAlphaVantage(portfolio, symbol, true);
-//				AlphaVantageFundPriceService.loadFundHistoryFromAlphaVantage(portfolio, symbol, false);
+				AlphaVantageFundPriceService.loadFundHistoryFromAlphaVantage(portfolio, symbol, false);
 			}
 
-			// Load fund allocation file
 			portfolioService.loadFundAllocation(ALLOCATION_FILE);
 
 			portfolioService.loadPortfolioScheduleFile(SCHEDULE_FILE);
 
-			// save all prices in spreadsheet
 			portfolioService.savePortfolioData();
 
 			portfolioService.setFundColors();
@@ -145,30 +129,30 @@ public class PortfolioApp {
 							+ " " + LocalTime.now().format(DateTimeFormatter.ofPattern("hh:mm a"))).setFontSize(14)
 							.setHorizontalAlignment(HorizontalAlignment.CENTER));
 			HeaderHandler headerHandler = new HeaderHandler();
+			pdfDoc.addEventHandler(PdfDocumentEvent.START_PAGE, headerHandler);
 			FooterHandler footerHandler = new FooterHandler();
 			pdfDoc.addEventHandler(PdfDocumentEvent.END_PAGE, footerHandler);
-			pdfDoc.addEventHandler(PdfDocumentEvent.START_PAGE, headerHandler);
 
-			//
-			LocalDate today = LocalDate.now();
+			portfolioService.printRecentTransactionsSpreadsheet(
+					"Recent Transactions (" + RECENT_TRANSACTIONS_DAYS + " days)", RECENT_TRANSACTIONS_DAYS, portfolio,
+					document);
 
-			int numDays = 30;
-			portfolioService.printRecentTransactionsSpreadsheet("Recent Transactions (" + numDays + " days)", numDays,
-					portfolio, document);
-
-			boolean needsUpdate = false;
-
+			// Process scheduled portfolio transactions
+			boolean updateScedulerFile = false;
+			// Aggregate transfers to allow multiple transactions in one day
 			List<PortfolioTransaction> transferTransactions = new ArrayList<>();
-			for (PortfolioTransaction transaction : portfolio.getPortfolioTransactions()) {
+			LocalDate today = LocalDate.now();
+			List<PortfolioTransaction> transactions = portfolio.getPortfolioTransactions();
+					for (PortfolioTransaction transaction : transactions) {
 				LocalDate transactionDate = transaction.getDate();
-				if (!today.isAfter(transactionDate) && today.isAfter(transactionDate.minusDays(5))) {
+				if (!today.isAfter(transactionDate) && today.isAfter(transactionDate.minusDays(PORTFOLIO_TRANSACTION_REPORT_WINDOW))) {
 					if (transaction.getType().equalsIgnoreCase("Withdraw")) {
 						processPortfolioTransactionWithdraw(transaction, portfolioService, document);
 					} else {
 						transferTransactions.add(transaction);
 					}
 					if (transaction.isRecurring() && today.isEqual(transactionDate)) {
-						needsUpdate = true;
+						updateScedulerFile = true;
 						switch (transaction.getRecurringPeriod()) {
 						case "Month":
 							transaction.setDate(transactionDate.plusMonths(1));
@@ -184,58 +168,59 @@ public class PortfolioApp {
 				processPortfolioTransactionTransfer(transferTransactions, portfolioService, document, portfolio);
 			}
 			// update next run date
-			if (needsUpdate) {
+			if (updateScedulerFile) {
 				portfolioService.updatePortfolioSchedule(SCHEDULE_FILE, portfolio.getPortfolioTransactions());
 			}
 
-			// Property Tax
-			LocalDate withdrawalDate = PROPERTY_TAX_DUE_DATE.minusDays(15);
-			if (today.isBefore(PROPERTY_TAX_DUE_DATE.minusDays(5)) && today.isAfter(withdrawalDate)) {
-				headerHandler.setHeader("propety tax withdrawal");
-				pdfDoc.addNewPage();
-				printOctInsuranceWithdrawalSpreadsheet(document, portfolioService);
-			}
-
-			// School tax
-			withdrawalDate = SCHOOL_TAX_DUE_DATE.minusDays(15);
-			if (today.isBefore(SCHOOL_TAX_DUE_DATE.minusDays(5)) && today.isAfter(withdrawalDate)) {
-				headerHandler.setHeader("school tax withdrawal");
-				pdfDoc.addNewPage();
-				printSchoolTaxWithdrawalSpreadsheet(document, portfolioService);
-			}
-
-			// Homeowners insurance and half auto insurance
-			withdrawalDate = HOMEOWNERS_INSURANCE_DUE_DATE.minusDays(15);
-			if (today.isBefore(HOMEOWNERS_INSURANCE_DUE_DATE) && today.isAfter(withdrawalDate)) {
-				BigDecimal insuranceWithdrawalAmount = HOMEOWNERS_INSURANCE_AMOUNT
-						.add(AUTO_INSURANCE_SEMI_YEARLY_AMOUNT);
-				BigDecimal recentWithdrawalAmount = portfolio.getRecentWithdrawalAmount(10);
-				if (recentWithdrawalAmount.compareTo(insuranceWithdrawalAmount) < 0) {
-					headerHandler.setHeader("homeowners insurance withdrawal");
-					pdfDoc.addNewPage();
-					printOctInsuranceWithdrawalSpreadsheet(document, portfolioService);
-				}
-			}
-
-			// Monthly withdrawal,
-			if (today.getDayOfMonth() > 20) {
-				pdfDoc.addNewPage();
-				// if before 24th include mortgage payment (automatically withdrawn)
-				if (today.getDayOfMonth() <= CONDO_MORTGAGE_WITHDRAW_DAY_OF_MONTH && today.getDayOfMonth() > 19) {
-					// Withdrawal including auto withdrawal $600 mortgage from MM
-					headerHandler.setHeader("monthly withdrawal plus $600 MM Mortage");
-					printMonthlyWithdrawalWithCondoMortgageSpreadsheet(document, portfolioService);
-				} else {
-					// Withdrawal excluding automatic withdrawal for mortgage
-					headerHandler.setHeader("monthly withdrawal");
-					printMonthlyWithdrawalSpreadsheet(document, portfolioService);
-				}
-			}
-			if (today.getDayOfMonth() < 16 && today.getDayOfMonth() > 10) {
-				headerHandler.setHeader("fixed expenses transfer include transfer $600 into Fed MM");
-				pdfDoc.addNewPage();
-				printFixedExpensesTransferSpreadsheet(document, portfolioService);
-			}
+			// use scheduler
+//			// Property Tax
+//			LocalDate withdrawalDate = PROPERTY_TAX_DUE_DATE.minusDays(15);
+//			if (today.isBefore(PROPERTY_TAX_DUE_DATE.minusDays(5)) && today.isAfter(withdrawalDate)) {
+//				headerHandler.setHeader("propety tax withdrawal");
+//				pdfDoc.addNewPage();
+//				printOctInsuranceWithdrawalSpreadsheet(document, portfolioService);
+//			}
+//
+//			// School tax
+//			withdrawalDate = SCHOOL_TAX_DUE_DATE.minusDays(15);
+//			if (today.isBefore(SCHOOL_TAX_DUE_DATE.minusDays(5)) && today.isAfter(withdrawalDate)) {
+//				headerHandler.setHeader("school tax withdrawal");
+//				pdfDoc.addNewPage();
+//				printSchoolTaxWithdrawalSpreadsheet(document, portfolioService);
+//			}
+//
+//			// Homeowners insurance and half auto insurance
+//			withdrawalDate = HOMEOWNERS_INSURANCE_DUE_DATE.minusDays(15);
+//			if (today.isBefore(HOMEOWNERS_INSURANCE_DUE_DATE) && today.isAfter(withdrawalDate)) {
+//				BigDecimal insuranceWithdrawalAmount = HOMEOWNERS_INSURANCE_AMOUNT
+//						.add(AUTO_INSURANCE_SEMI_YEARLY_AMOUNT);
+//				BigDecimal recentWithdrawalAmount = portfolio.getRecentWithdrawalAmount(10);
+//				if (recentWithdrawalAmount.compareTo(insuranceWithdrawalAmount) < 0) {
+//					headerHandler.setHeader("homeowners insurance withdrawal");
+//					pdfDoc.addNewPage();
+//					printOctInsuranceWithdrawalSpreadsheet(document, portfolioService);
+//				}
+//			}
+//
+//			// Monthly withdrawal,
+//			if (today.getDayOfMonth() > 20) {
+//				pdfDoc.addNewPage();
+//				// if before 24th include mortgage payment (automatically withdrawn)
+//				if (today.getDayOfMonth() <= CONDO_MORTGAGE_WITHDRAW_DAY_OF_MONTH && today.getDayOfMonth() > 19) {
+//					// Withdrawal including auto withdrawal $600 mortgage from MM
+//					headerHandler.setHeader("monthly withdrawal plus $600 MM Mortage");
+//					printMonthlyWithdrawalWithCondoMortgageSpreadsheet(document, portfolioService);
+//				} else {
+//					// Withdrawal excluding automatic withdrawal for mortgage
+//					headerHandler.setHeader("monthly withdrawal");
+//					printMonthlyWithdrawalSpreadsheet(document, portfolioService);
+//				}
+//			}
+//			if (today.getDayOfMonth() < 16 && today.getDayOfMonth() > 10) {
+//				headerHandler.setHeader("fixed expenses transfer include transfer $600 into Fed MM");
+//				pdfDoc.addNewPage();
+//				printFixedExpensesTransferSpreadsheet(document, portfolioService);
+//			}
 
 			headerHandler.setHeader("performance table");
 			pdfDoc.addNewPage();
@@ -520,168 +505,6 @@ public class PortfolioApp {
 
 		portfolioService.printWithdrawalSpreadsheet(title, portfolio, BigDecimal.ZERO, transfers, document);
 
-	}
-
-	/**
-	 * Calculate the monthly transfers into the MM fixed expenses account and
-	 * generate a withdrawal spreadsheet of the values.
-	 * 
-	 * @param portfolio
-	 * @param document
-	 * @param portfolioService
-	 */
-	private void printFixedExpensesTransferSpreadsheet(Document document, PortfolioService portfolioService) {
-
-		ManagedPortfolio portfolio = portfolioService.getPortfolio();
-		BigDecimal cashMMTransferIn = new BigDecimal(1000);
-		BigDecimal fedMMTansferIn = new BigDecimal(1000);
-
-		String month = LocalDate.now().plusMonths(1).getMonth().getDisplayName(TextStyle.FULL, Locale.US);
-		String title = month + " Fixed Expenses Transfer (including "
-				+ CurrencyHelper.formatAsCurrencyString(CONDO_MORTGAGE_MONTHLY_SHARE_AMOUNT)
-				+ " into Fed MM for Condo Mortgage)";
-		System.out.println(title);
-
-		BigDecimal condoMortgageAmountIncludingTaxes = CONDO_MORTGAGE_MONTHLY_SHARE_AMOUNT
-				.divide(AFTER_TAXES_WITHDRAW_AMOUNT_PERCENTAGE, 0, RoundingMode.UP);
-
-		BigDecimal cashReservesNetWithdrawal = BigDecimal.ZERO;
-		BigDecimal federalMMNetWithdrawal = BigDecimal.ZERO;
-		Map<String, BigDecimal> withdrawalMap = new LinkedHashMap<>();
-		if (cashMMTransferIn.compareTo(BigDecimal.ZERO) > 0) {
-			cashReservesNetWithdrawal = cashReservesNetWithdrawal.subtract(cashMMTransferIn);
-		}
-		if (fedMMTansferIn.compareTo(BigDecimal.ZERO) > 0) {
-			federalMMNetWithdrawal = federalMMNetWithdrawal.subtract(fedMMTansferIn);
-		}
-		withdrawalMap.put("VMRXX", cashReservesNetWithdrawal);
-		withdrawalMap.put("VMFXX", fedMMTansferIn.add(condoMortgageAmountIncludingTaxes));
-
-		Map<String, BigDecimal> transfers = portfolioService.calculateFixedExpensesTransfer(withdrawalMap);
-
-		portfolioService.printWithdrawalSpreadsheet(title, portfolio, BigDecimal.ZERO, transfers, document);
-
-	}
-
-	private void printSchoolTaxWithdrawalSpreadsheet(Document document, PortfolioService portfolioService) {
-
-		ManagedPortfolio portfolio = portfolioService.getPortfolio();
-
-		BigDecimal withdrawAmount = SCHOOL_TAX_WITHDRAWAL_AMOUNT;
-		BigDecimal totalWithdrawalAmountIncludingTaxes = withdrawAmount.divide(AFTER_TAXES_WITHDRAW_AMOUNT_PERCENTAGE,
-				0, RoundingMode.UP);
-
-		String title = "School Tax Withdrawal Due " + DATE_FORMATTER.format(SCHOOL_TAX_DUE_DATE) + " "
-				+ CurrencyHelper.formatAsCurrencyString(totalWithdrawalAmountIncludingTaxes) + " net: "
-				+ CurrencyHelper.formatAsCurrencyString(withdrawAmount);
-		System.out.println(title);
-
-		// Calculate withdrawals
-		Map<String, BigDecimal> withdrawals = portfolioService.calculateWithdrawal(totalWithdrawalAmountIncludingTaxes,
-				BigDecimal.ZERO, SCHOOL_TAX_WITHDRAWAL_AMOUNT);
-
-		// print spreadsheet
-		portfolioService.printWithdrawalSpreadsheet(title, portfolio, totalWithdrawalAmountIncludingTaxes, withdrawals,
-				document);
-
-	}
-
-	private void printOctInsuranceWithdrawalSpreadsheet(Document document, PortfolioService portfolioService) {
-
-		ManagedPortfolio portfolio = portfolioService.getPortfolio();
-
-		BigDecimal withdrawAmount = HOMEOWNERS_INSURANCE_AMOUNT.add(AUTO_INSURANCE_SEMI_YEARLY_AMOUNT);
-		BigDecimal totalWithdrawalAmountIncludingTaxes = withdrawAmount.divide(AFTER_TAXES_WITHDRAW_AMOUNT_PERCENTAGE,
-				0, RoundingMode.UP);
-
-		String title = "Sept Insurance Withdrawal " + DATE_FORMATTER.format(SCHOOL_TAX_DUE_DATE) + " "
-				+ CurrencyHelper.formatAsCurrencyString(totalWithdrawalAmountIncludingTaxes) + " net: "
-				+ CurrencyHelper.formatAsCurrencyString(withdrawAmount);
-		System.out.println(title);
-
-		// Calculate withdrawals
-		Map<String, BigDecimal> withdrawals = portfolioService.calculateWithdrawal(totalWithdrawalAmountIncludingTaxes,
-				BigDecimal.ZERO, withdrawAmount);
-
-		// print spreadsheet
-		portfolioService.printWithdrawalSpreadsheet(title, portfolio, totalWithdrawalAmountIncludingTaxes, withdrawals,
-				document);
-
-	}
-
-	private void printMonthlyWithdrawalWithCondoMortgageSpreadsheet(Document document,
-			PortfolioService portfolioService) {
-
-		BigDecimal condoMortgageAmountIncludingTaxes = CONDO_MORTGAGE_MONTHLY_SHARE_AMOUNT
-				.divide(AFTER_TAXES_WITHDRAW_AMOUNT_PERCENTAGE, 0, RoundingMode.UP);
-
-		ManagedPortfolio portfolio = portfolioService.getPortfolio();
-		BigDecimal withdrawAmount = MONTHLY_EXPENSES_AMOUNT.add(CONDO_MORTGAGE_MONTHLY_SHARE_AMOUNT);
-		BigDecimal totalWithdrawalAmountIncludingTaxes = withdrawAmount.divide(AFTER_TAXES_WITHDRAW_AMOUNT_PERCENTAGE,
-				0, RoundingMode.UP);
-
-		String month = LocalDate.now().plusMonths(1).getMonth().getDisplayName(TextStyle.FULL, Locale.US);
-		String title = "Monthly Expenses for " + month
-				+ " (Including Automatic Monthly Condo Mortgage Share) Withdrawal "
-				+ CurrencyHelper.formatAsCurrencyString(totalWithdrawalAmountIncludingTaxes) + " Net:  "
-				+ CurrencyHelper.formatAsCurrencyString(withdrawAmount);
-		System.out.println(title);
-
-//		BigDecimal fedMMWithdrawal = CONDO_MORTGAGE_MONTHLY_SHARE_AMOUNT.divide(AFTER_TAXES_WITHDRAW_AMOUNT_PERCENTAGE,
-//				0, RoundingMode.UP);
-
-		Map<String, BigDecimal> withdrawals = portfolioService.calculateWithdrawal(totalWithdrawalAmountIncludingTaxes,
-				BigDecimal.ZERO, condoMortgageAmountIncludingTaxes);
-
-		// Calculate withdrawals and print spreadsheet
-		portfolioService.printWithdrawalSpreadsheet(title, portfolio, withdrawAmount, withdrawals, document);
-
-	}
-
-	private void printMonthlyWithdrawalSpreadsheet(Document document, PortfolioService portfolioService) {
-
-		ManagedPortfolio portfolio = portfolioService.getPortfolio();
-
-		BigDecimal withdrawAmount = MONTHLY_EXPENSES_AMOUNT;
-		BigDecimal totalWithdrawalAmount = withdrawAmount.divide(AFTER_TAXES_WITHDRAW_AMOUNT_PERCENTAGE, 4,
-				RoundingMode.UP);
-		// round up to nearest $5
-		totalWithdrawalAmount = totalWithdrawalAmount.divide(new BigDecimal(5), 0, RoundingMode.HALF_DOWN)
-				.setScale(2, RoundingMode.HALF_DOWN).multiply(new BigDecimal(5));
-
-		String month = LocalDate.now().plusMonths(1).getMonth().getDisplayName(TextStyle.FULL, Locale.US);
-		String title = "Monthly Expenses  for " + month + " "
-				+ CurrencyHelper.formatAsCurrencyString(totalWithdrawalAmount) + " Net:  "
-				+ CurrencyHelper.formatAsCurrencyString(withdrawAmount);
-		System.out.println(title);
-
-		Map<String, BigDecimal> withdrawals = portfolioService.calculateWithdrawal(totalWithdrawalAmount,
-				BigDecimal.ZERO, BigDecimal.ZERO);
-
-		// Calculate withdrawals and print spreadsheet
-		portfolioService.printWithdrawalSpreadsheet(title, portfolio, withdrawAmount, withdrawals, document);
-
-	}
-
-	private void printPropertyTaxWithdrawalSpreadsheet(Document document, PortfolioService portfolioService) {
-
-		ManagedPortfolio portfolio = portfolioService.getPortfolio();
-
-		BigDecimal withdrawAmount = PROPERTY_TAX_WITHDRAWAL_AMOUNT;
-		BigDecimal totalWithdrawalAmount = withdrawAmount.divide(AFTER_TAXES_WITHDRAW_AMOUNT_PERCENTAGE, 0,
-				RoundingMode.UP);
-
-		String title = "Property Tax Withdrawal Due " + DATE_FORMATTER.format(PROPERTY_TAX_DUE_DATE) + " "
-				+ CurrencyHelper.formatAsCurrencyString(totalWithdrawalAmount);
-		System.out.println(title);
-
-		// Net withdrawal adjusts for transfer to money market fixed accounts
-		Map<String, BigDecimal> withdrawals = portfolioService.calculateWithdrawal(totalWithdrawalAmount,
-				BigDecimal.ZERO, PROPERTY_TAX_WITHDRAWAL_AMOUNT);
-
-		// Calculate withdrawals and print spreadsheet
-		portfolioService.printWithdrawalSpreadsheet(title, portfolio, PROPERTY_TAX_WITHDRAWAL_AMOUNT, withdrawals,
-				document);
 	}
 
 }

@@ -6,6 +6,13 @@ import java.time.LocalDate;
 public class PortfolioTransaction {
 
 	String type;
+	String subType;
+	public String getSubType() {
+		return subType;
+	}
+	public void setSubType(String subType) {
+		this.subType = subType;
+	}
 	LocalDate date;
 	String fundSymbol;
 	public String getType() {
