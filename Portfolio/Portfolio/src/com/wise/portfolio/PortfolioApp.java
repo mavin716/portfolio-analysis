@@ -145,7 +145,7 @@ public class PortfolioApp {
 			List<PortfolioTransaction> transactions = portfolio.getPortfolioTransactions();
 					for (PortfolioTransaction transaction : transactions) {
 				LocalDate transactionDate = transaction.getDate();
-				if (!today.isAfter(transactionDate) && today.isAfter(transactionDate.minusDays(PORTFOLIO_TRANSACTION_REPORT_WINDOW))) {
+				if (today.isAfter(transactionDate.minusDays(PORTFOLIO_TRANSACTION_REPORT_WINDOW))) {
 					if (transaction.getType().equalsIgnoreCase("Withdraw")) {
 						processPortfolioTransactionWithdraw(transaction, portfolioService, document);
 					} else {

@@ -73,7 +73,7 @@ public class ManagedPortfolio extends Portfolio {
 			// $500 to override fundTargetPercentage
 			BigDecimal targetValue = totalPortfolioValueAfterAdjustment.multiply(fundTargetPercentage);
 			if (targetValue.compareTo(fund.getMinimumAmount()) < 0) {
-				fundTargetPercentage = fund.getMinimumAmount().add(new BigDecimal(500))
+				fundTargetPercentage = fund.getMinimumAmount().add(new BigDecimal(1000))
 						.divide(totalPortfolioValueAfterAdjustment, 6, RoundingMode.HALF_DOWN);
 			}
 		}
@@ -119,7 +119,7 @@ public class ManagedPortfolio extends Portfolio {
 		if (fund.getMinimumAmount() != null) {
 			if (fundTargetValue.compareTo(fund.getMinimumAmount()) < 0) {
 				// Don't withdrawal all of the excess
-				fundTargetPercentage = fund.getMinimumAmount().add(new BigDecimal(500)).divide(totalAfterWithdrawal, 4,
+				fundTargetPercentage = fund.getMinimumAmount().add(new BigDecimal(1000)).divide(totalAfterWithdrawal, 4,
 						RoundingMode.HALF_DOWN);
 			}
 		}

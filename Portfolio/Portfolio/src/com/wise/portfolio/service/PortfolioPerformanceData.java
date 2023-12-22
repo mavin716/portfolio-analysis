@@ -137,66 +137,66 @@ public class PortfolioPerformanceData {
 	}
 
 
-	BigDecimal portfolioCurrentValue = BigDecimal.ZERO;
+	private BigDecimal portfolioCurrentValue = BigDecimal.ZERO;
 
-	BigDecimal portfolioYtdDividends = BigDecimal.ZERO;
-	BigDecimal portfolioLastYearDividends = BigDecimal.ZERO;
-	BigDecimal portfolioLastYearWithdrawals = BigDecimal.ZERO;
+	private BigDecimal portfolioYtdDividends = BigDecimal.ZERO;
+	private BigDecimal portfolioLastYearDividends = BigDecimal.ZERO;
+	private BigDecimal portfolioLastYearWithdrawals = BigDecimal.ZERO;
 	public BigDecimal getPortfolioLastYearWithdrawals() {
 		return portfolioLastYearWithdrawals;
 	}
 
 
-	BigDecimal portfolioTotalCurrentPercentage = BigDecimal.ZERO;
-	BigDecimal portfolioTotalTargetPercentage = BigDecimal.ZERO;
+	private BigDecimal portfolioTotalCurrentPercentage = BigDecimal.ZERO;
+	private BigDecimal portfolioTotalTargetPercentage = BigDecimal.ZERO;
 	
-	BigDecimal portfolioYtdReturns = BigDecimal.ZERO;
-	BigDecimal portfolioYtdWithdrawals = BigDecimal.ZERO;
-	BigDecimal portfolioFirstOfYearValue = BigDecimal.ZERO;
-	BigDecimal portfolioFirstOfLastYearValue = BigDecimal.ZERO;
-	BigDecimal portfolioPreviousDayValue = BigDecimal.ZERO;
+	private BigDecimal portfolioYtdReturns = BigDecimal.ZERO;
+	private BigDecimal portfolioYtdWithdrawals = BigDecimal.ZERO;
+	private BigDecimal portfolioFirstOfYearValue = BigDecimal.ZERO;
+	private BigDecimal portfolioFirstOfLastYearValue = BigDecimal.ZERO;
+	private BigDecimal portfolioPreviousDayValue = BigDecimal.ZERO;
 	public BigDecimal getPortfolioFirstOfLastYearValue() {
 		return portfolioFirstOfLastYearValue;
 	}
 
 
-	BigDecimal portfolioPreviousDayValueChange = BigDecimal.ZERO;
+	private BigDecimal portfolioPreviousDayValueChange = BigDecimal.ZERO;
 	public BigDecimal getPortfolioPreviousDayValueChange() {
 		return portfolioPreviousDayValueChange;
 	}
 
-	BigDecimal portfolioYtdValueChange = BigDecimal.ZERO;
+	private BigDecimal portfolioYtdValueChange = BigDecimal.ZERO;
 	public BigDecimal getPortfolioYtdValueChange() {
 		return portfolioYtdValueChange;
 	}
 
-	BigDecimal portfolioYearAgoValue = BigDecimal.ZERO;
-	BigDecimal portfolioYearAgoReturns = BigDecimal.ZERO;
+	private BigDecimal portfolioYearAgoValue = BigDecimal.ZERO;
+	private BigDecimal portfolioYearAgoReturns = BigDecimal.ZERO;
 	public BigDecimal getPortfolioYearAgoReturns() {
 		return portfolioYearAgoReturns;
 	}
 
-	BigDecimal portfolioThreeYearsAgoReturns = BigDecimal.ZERO;
+	private BigDecimal portfolioThreeYearsAgoReturns = BigDecimal.ZERO;
 	public BigDecimal getPortfolioThreeYearsAgoReturns() {
 		return portfolioThreeYearsAgoReturns;
 	}
 
-	BigDecimal portfolioYearAgoWithdrawals = BigDecimal.ZERO;
-	BigDecimal portfolioThreeYearAgoValue = BigDecimal.ZERO;
-	BigDecimal portfolioThreeYearAgoWithdrawals = BigDecimal.ZERO;
+	private BigDecimal portfolioYearAgoWithdrawals = BigDecimal.ZERO;
+	private BigDecimal portfolioThreeYearAgoValue = BigDecimal.ZERO;
+	private BigDecimal portfolioThreeYearAgoWithdrawals = BigDecimal.ZERO;
 	
-	BigDecimal portfolioYtdFederalWithholding = BigDecimal.ZERO;
+	private BigDecimal portfolioYtdFederalWithholding = BigDecimal.ZERO;
 	public BigDecimal getPortfolioYtdFederalWithholding() {
 		return portfolioYtdFederalWithholding;
 	}
 
 
-	BigDecimal portfolioLastYearFederalWithholding = BigDecimal.ZERO;
+	private BigDecimal portfolioLastYearFederalWithholding = BigDecimal.ZERO;
 	public BigDecimal getPortfolioLastYearFederalWithholding() {
 		return portfolioLastYearFederalWithholding;
 	}
 
-	BigDecimal portfolioYtdStateWithholding = BigDecimal.ZERO;
+	private BigDecimal portfolioYtdStateWithholding = BigDecimal.ZERO;
 	public BigDecimal getPortfolioYtdStateWithholding() {
 		return portfolioYtdStateWithholding;
 	}
@@ -210,7 +210,42 @@ public class PortfolioPerformanceData {
 
 	public BigDecimal getPortfolioLastYearReturns() {
 		// TODO yearago or last year????
-		return portfolioYearAgoReturns;
+		return getPortfolioYearAgoReturns();
+	}
+
+
+	public void setPortfolioFirstOfLastYearValue(BigDecimal portfolioFirstOfLastYearValue) {
+		this.portfolioFirstOfLastYearValue = portfolioFirstOfLastYearValue;
+	}
+
+
+	public void setPortfolioYearAgoReturns(BigDecimal portfolioYearAgoReturns) {
+		this.portfolioYearAgoReturns = portfolioYearAgoReturns;
+	}
+
+
+	public void setPortfolioYtdStateWithholding(BigDecimal portfolioYtdStateWithholding) {
+		this.portfolioYtdStateWithholding = portfolioYtdStateWithholding;
+	}
+
+
+	public void setPortfolioThreeYearsAgoReturns(BigDecimal portfolioThreeYearsAgoReturns) {
+		this.portfolioThreeYearsAgoReturns = portfolioThreeYearsAgoReturns;
+	}
+
+
+	public void setPortfolioYtdFederalWithholding(BigDecimal portfolioYtdFederalWithholding) {
+		this.portfolioYtdFederalWithholding = portfolioYtdFederalWithholding;
+	}
+
+
+	public void setPortfolioLastYearFederalWithholding(BigDecimal portfolioLastYearFederalWithholding) {
+		this.portfolioLastYearFederalWithholding = portfolioLastYearFederalWithholding;
+	}
+
+
+	public void setPortfolioPreviousDayValueChange(BigDecimal portfolioPreviousDayValueChange) {
+		this.portfolioPreviousDayValueChange = portfolioPreviousDayValueChange;
 	}
 
 
