@@ -1,6 +1,7 @@
 package com.wise.portfolio.fund;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
@@ -12,7 +13,7 @@ public class MutualFund implements Comparable<MutualFund>, Fund {
 		@Override
 		public int compare(PortfolioFund f1, PortfolioFund f2) {
 
-			return f2.getValue().compareTo(f1.getValue());
+			return f2.getCurrentValue().compareTo(f1.getCurrentValue());
 		}
 
 	}
@@ -36,17 +37,19 @@ public class MutualFund implements Comparable<MutualFund>, Fund {
 	}
 
 	protected Map<FundCategory, BigDecimal> categoriesMap = new HashMap<>();
+	private LocalDate currentPriceDate;
 
 	public String getName() {
 		return name;
 	}
 
 	public String getShortName() {
-		String shortName = name.replace("Vanguard ", "").replace(" Fund", "").replace(" Stock", "").replace(" and", " &")
-				.replace(" Class", "").replace(" Shares", "").replace(" Share", "").replace(" Money Market", " MM")
-				.replace("Intermediate", "Int").replace("International", "Intl").replace("Investor", "Inv").replace("Income", "Inc")
-				.replace("Investment", "Invmt").replace("Index", "Idx").replace("Admiral", "Adm").replace("Growth", "Grwth")
-				.replace("Small", "Sm").replace("Federal", "Fed").replace("Equity", "Eq").replace("Market", "Mkt").replace("Reserves", "Rsv");
+		String shortName = name.replace("Vanguard ", "").replace(" Fund", "").replace(" Stock", "")
+				.replace(" and", " &").replace(" Class", "").replace(" Shares", "").replace(" Share", "")
+				.replace(" Money Market", " MM").replace("Intermediate", "Int").replace("International", "Intl")
+				.replace("Investor", "Inv").replace("Income", "Inc").replace("Investment", "Invmt")
+				.replace("Index", "Idx").replace("Admiral", "Adm").replace("Growth", "Grwth").replace("Small", "Sm")
+				.replace("Federal", "Fed").replace("Equity", "Eq").replace("Market", "Mkt").replace("Reserves", "Rsv");
 		return shortName;
 	}
 
@@ -66,8 +69,13 @@ public class MutualFund implements Comparable<MutualFund>, Fund {
 		return currentPrice;
 	}
 
-	public void setCurrentPrice(BigDecimal currentPrice) {
-		this.currentPrice = currentPrice;
+	public void setCurrentPrice(BigDecimal currentPrice, LocalDate currentPriceDate) {
+		// TODO iff currentPriceDate is later than replace
+		
+		if (this.currentPriceDate == null || currentPriceDate.isAfter(this.currentPriceDate)) {
+			this.currentPrice = currentPrice;
+			this.currentPriceDate = currentPriceDate;
+		}
 	}
 
 	public Map<FundCategory, BigDecimal> getCategoriesMap() {

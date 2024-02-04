@@ -38,12 +38,12 @@ public class ManagedPortfolio extends Portfolio {
 
 	public BigDecimal getFundDeviation(PortfolioFund fund) {
 		if (fund.isClosed()) {
-			// return BigDecimal.ZERO;
-		}
-		if (fund.getValue().compareTo(BigDecimal.ZERO) == 0) {
 			return BigDecimal.ZERO;
 		}
-		BigDecimal currentPercentage = fund.getValue().divide(getTotalValue(), 6, RoundingMode.HALF_DOWN);
+		if (fund.getCurrentValue().compareTo(BigDecimal.ZERO) == 0) {
+			return BigDecimal.ZERO;
+		}
+		BigDecimal currentPercentage = fund.getCurrentValue().divide(getTotalValue(), 6, RoundingMode.HALF_DOWN);
 		BigDecimal targetPercentage = fund.getPercentageByCategory(FundCategory.TOTAL);
 
 //		BigDecimal minimumAmount = fund.getMinimumAmount();
@@ -63,7 +63,7 @@ public class ManagedPortfolio extends Portfolio {
 
 	public BigDecimal getFundDeviation(PortfolioFund fund, BigDecimal portfolioAdjustment) {
 		if (fund.isClosed()) {
-			// return BigDecimal.ZERO;
+			return BigDecimal.ZERO;
 		}
 		BigDecimal totalPortfolioValueAfterAdjustment = getTotalValue().subtract(portfolioAdjustment);
 		BigDecimal fundTargetPercentage = fund.getPercentageByCategory(FundCategory.TOTAL);
@@ -79,7 +79,7 @@ public class ManagedPortfolio extends Portfolio {
 		}
 
 		BigDecimal deviation = BigDecimal.ZERO;
-		BigDecimal fundValue = fund.getValue();
+		BigDecimal fundValue = fund.getCurrentValue();
 		if (fundValue.compareTo(BigDecimal.ZERO) != 0) {
 			BigDecimal currentPercentage = fundValue.divide(totalPortfolioValueAfterAdjustment, 6,
 					RoundingMode.HALF_DOWN);
@@ -88,16 +88,21 @@ public class ManagedPortfolio extends Portfolio {
 		return deviation;
 	}
 
-	public double calculateAnnualizedReturn(PortfolioFund fund, int years) {
-		// (1 + 2.5) ^ 1/5 - 1 = 0.28
-		double returns = 0f;
+	public double calculateAnnualizedRateOfReturn(PortfolioFund fund, int years) {
+
+		double rateOfReturn = 0f;
+
 		MutualFundPerformance performance = new MutualFundPerformance(this, fund);
 		LocalDate date = LocalDate.now().minusYears(years);
-		Double fundReturns = performance.getPerformanceRateByDate(date);
-		returns = Math.pow(1 + fundReturns,
+		Double fundReturns = performance.getPerformanceReturnsByDate(date);
+
+		// Ex.
+		// (1 + 2.5) ^ 1/5 - 1 = 0.28
+		// where 2.5 is total returns for 5 years
+		rateOfReturn = Math.pow(1 + fundReturns,
 				BigDecimal.ONE.divide(new BigDecimal(years), 4, RoundingMode.HALF_DOWN).doubleValue());
 
-		return returns - 1;
+		return rateOfReturn - 1;
 	}
 
 	public List<PortfolioFund> getFundsByCategory(FundCategory category) {
@@ -125,23 +130,23 @@ public class ManagedPortfolio extends Portfolio {
 		}
 
 		BigDecimal deviation = BigDecimal.ZERO;
-		if (fund.getValue().compareTo(BigDecimal.ZERO) != 0) {
+		if (fund.getCurrentValue().compareTo(BigDecimal.ZERO) != 0) {
 			BigDecimal currentPercentage = newFundBalance.divide(totalAfterWithdrawal, 4, RoundingMode.HALF_DOWN);
 			deviation = currentPercentage.subtract(fundTargetPercentage);
 		}
 		return deviation;
 	}
 
-	public LocalDate getClosestHistoricalDate(long rankDays) {
-		LocalDate historicalDate = LocalDate.now().minusDays(rankDays);
+	public LocalDate getClosestHistoricalDate(long days) {
+		LocalDate historicalDate = LocalDate.now().minusDays(days);
 
 		// Find the nearest date
 		if (historicalDate.getDayOfWeek() == DayOfWeek.SUNDAY) {
-			rankDays--;
+			days--;
 			historicalDate = historicalDate.minusDays(1);
 		}
 		if (historicalDate.getDayOfWeek() == DayOfWeek.SATURDAY) {
-			rankDays--;
+			days--;
 			historicalDate = historicalDate.minusDays(1);
 		}
 
@@ -158,7 +163,7 @@ public class ManagedPortfolio extends Portfolio {
 				}
 			}
 		}
-		return LocalDate.now().minusDays(rankDays);
+		return LocalDate.now().minusDays(days);
 
 	}
 
@@ -166,6 +171,7 @@ public class ManagedPortfolio extends Portfolio {
 		PortfolioPriceHistory priceHistory = getPriceHistory();
 
 		BigDecimal historicalValue = BigDecimal.ZERO;
+		historicalValue.setScale(2);
 
 		LocalDate historicalDate = LocalDate.now().minusDays(days);
 		BigDecimal historicPrice = priceHistory.getPriceByDate(fund, historicalDate, false);
@@ -184,20 +190,20 @@ public class ManagedPortfolio extends Portfolio {
 	public BigDecimal getClosestHistoricalPrice(PortfolioFund fund, LocalDate date, int days) {
 
 		PortfolioPriceHistory priceHistory = getPriceHistory();
-		BigDecimal historicalValue = priceHistory.getPriceByDate(fund, date, true);
-		if (historicalValue != null) {
-			return historicalValue;
+		BigDecimal historicalPrice = priceHistory.getPriceByDate(fund, date, true);
+		if (historicalPrice != null) {
+			return historicalPrice;
 		}
 		int tries = 0;
 		while (tries++ < days) {
 
-			historicalValue = priceHistory.getPriceByDate(fund, date.minusDays(tries), true);
-			if (historicalValue != null) {
-				return historicalValue;
+			historicalPrice = priceHistory.getPriceByDate(fund, date.minusDays(tries), true);
+			if (historicalPrice != null) {
+				return historicalPrice;
 			}
-			historicalValue = priceHistory.getPriceByDate(fund, date.plusDays(tries), true);
-			if (historicalValue != null) {
-				return historicalValue;
+			historicalPrice = priceHistory.getPriceByDate(fund, date.plusDays(tries), true);
+			if (historicalPrice != null) {
+				return historicalPrice;
 			}
 		}
 		return null;
@@ -239,21 +245,25 @@ public class ManagedPortfolio extends Portfolio {
 		return value;
 	}
 
-	public BigDecimal getTargetValue(String fundSynbol) {
-		BigDecimal targetPercentage = desiredFundAllocationMaps.get(fundSynbol).get(FundCategory.TOTAL);
+	public BigDecimal getTargetValue(String fundSymbol) {
+		BigDecimal targetPercentage = getTargetPercentage(fundSymbol);
 		return this.getTotalValue().multiply(targetPercentage);
 	}
 
-	public List<Entry<LocalDate, FundTransaction>> getRecentTransactions(List<String> transactionTypes, int days) {
+	private BigDecimal getTargetPercentage(String fundSymbol) {
+		return desiredFundAllocationMaps.get(fundSymbol).get(FundCategory.TOTAL);
+	}
 
-		LocalDate startDate = LocalDate.now().minusDays(days);
+	public List<Entry<LocalDate, FundTransaction>> getRecentTransactions(List<String> transactionTypes, long l) {
+
+		LocalDate startDate = LocalDate.now().minusDays(l);
 		List<Entry<LocalDate, FundTransaction>> transactions = new ArrayList<>();
 		for (PortfolioFund fund : getFundMap().values()) {
 			for (Entry<LocalDate, FundTransaction> transactionEntry : fund.getTransactionsBetweenDates(startDate,
 					LocalDate.now())) {
 				if (transactionTypes != null) {
 					for (String filterdType : transactionTypes) {
-						if (transactionEntry.getValue().getTransactionType().contains(filterdType)) {
+						if (transactionEntry.getValue().getTransactionType().equals(filterdType)) {
 							transactions.add(transactionEntry);
 							break;
 						}

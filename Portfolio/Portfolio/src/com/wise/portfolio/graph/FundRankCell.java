@@ -29,33 +29,34 @@ public class FundRankCell extends Cell {
 						.setMargin(0)
 						.setBackgroundColor(
 								calculateCurrencyFontColor(
-										new BigDecimal(fundPerformance.getPerformanceRateByDate(historicalDate))),
-								new BigDecimal(fundPerformance.getPerformanceRateByDate(historicalDate)).abs()
+										new BigDecimal(fundPerformance.getPerformanceReturnsByDate(historicalDate))),
+								new BigDecimal(fundPerformance.getPerformanceReturnsByDate(historicalDate)).abs()
 										.multiply(new BigDecimal(1000))
 										.divide(new BigDecimal(enhancedRankDaysList.get(rankDayIndex)), 4,
 												RoundingMode.HALF_DOWN)
 										.floatValue())
 						.add(CurrencyHelper
-								.formatPercentageString(fundPerformance.getPerformanceRateByDate(historicalDate))))
+								.formatPercentageString(fundPerformance.getPerformanceReturnsByDate(historicalDate))))
 				.add(new Cell() // share price
 						.setMargin(0)
 						.setBackgroundColor(calculateCurrentPriceColor(fundPerformance, historicalDate),
-								calculateCurrenPriceOpacity(fundPerformance, historicalDate))
+								calculateCurrentPriceOpacity(fundPerformance, historicalDate))
 						.add(CurrencyHelper.formatAsCurrencyString(
 								fundPerformance.getClosestHistoricalPrice(historicalDate, 30))));
 	}
 
-	private float calculateCurrenPriceOpacity(MutualFundPerformance fundPerformance, LocalDate date) {
-		LocalDate oldestDate = fundPerformance.getOldestDate();
-		BigDecimal minPrice = fundPerformance.getMinPricePairFromDate(oldestDate).getRight();
-		BigDecimal maxPrice = fundPerformance.getMaxPricePairFromDate(oldestDate).getRight();
-		BigDecimal fundPrice = fundPerformance.getPriceByDate(fundPerformance.getFund(), date, false);
-		BigDecimal halfRange = maxPrice.subtract(minPrice).divide(new BigDecimal(2), RoundingMode.HALF_UP);
-		BigDecimal midPrice = maxPrice.subtract(halfRange);
+	private float calculateCurrentPriceOpacity(MutualFundPerformance fundPerformance, LocalDate date) {
 
+		BigDecimal fundPrice = fundPerformance.getPriceByDate(fundPerformance.getFund(), date, false);
 		if (fundPrice == null) {
 			return 0f;
 		}
+
+		BigDecimal minPrice = fundPerformance.getMinPricePairFromDate(LocalDate.now().minusYears(5)).getRight();
+		BigDecimal maxPrice = fundPerformance.getMaxPricePairFromDate(fundPerformance.getOldestDate()).getRight();
+		BigDecimal halfRange = maxPrice.subtract(minPrice).divide(new BigDecimal(2), RoundingMode.HALF_UP);
+		BigDecimal midPrice = maxPrice.subtract(halfRange);
+
 		if (halfRange.compareTo(BigDecimal.ZERO) == 0) {
 			return 0f;
 		}
@@ -68,10 +69,9 @@ public class FundRankCell extends Cell {
 	}
 
 	private Color calculateCurrentPriceColor(MutualFundPerformance fundPerformance, LocalDate date) {
-		LocalDate oldestDate = fundPerformance.getOldestDate();
 
-		BigDecimal minPrice = fundPerformance.getMinPricePairFromDate(oldestDate).getRight();
-		BigDecimal maxPrice = fundPerformance.getMaxPricePairFromDate(oldestDate).getRight();
+		BigDecimal minPrice = fundPerformance.getMinPricePairFromDate(LocalDate.now().minusYears(5)).getRight();
+		BigDecimal maxPrice = fundPerformance.getMaxPricePairFromDate(fundPerformance.getOldestDate()).getRight();
 		BigDecimal fundPrice = fundPerformance.getClosestHistoricalPrice(date, 30);
 		BigDecimal range = maxPrice.subtract(minPrice);
 		BigDecimal midPrice = maxPrice.subtract(range.divide(new BigDecimal(2), RoundingMode.HALF_UP));

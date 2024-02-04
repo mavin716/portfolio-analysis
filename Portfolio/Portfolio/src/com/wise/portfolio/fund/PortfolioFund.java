@@ -3,6 +3,7 @@ package com.wise.portfolio.fund;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -94,12 +95,14 @@ public class PortfolioFund extends MutualFund {
 		this.shares = d;
 	}
 
-	public BigDecimal getValue() {
-		return currentPrice.multiply(new BigDecimal(shares)).setScale(2, RoundingMode.UP);
+
+	public BigDecimal getCurrentValue() {
+		BigDecimal value = currentPrice.multiply(new BigDecimal(shares)).setScale(2, RoundingMode.HALF_UP);
+		return value;
 	}
 
 	public BigDecimal getAvailableValue() {
-		BigDecimal value = currentPrice.multiply(new BigDecimal(shares)).setScale(2, RoundingMode.UP);
+		BigDecimal value = getCurrentValue();
 		if (preSpent.compareTo(BigDecimal.ZERO) > 0) {
 			value = value.subtract(preSpent);
 		}
@@ -416,8 +419,8 @@ public class PortfolioFund extends MutualFund {
 			if (transactionDate.isBefore(endDate) && transactionDate.isAfter(startDate)) {
 				Collection<FundTransaction> transactionList = entry.getValue();
 				for (FundTransaction transaction : transactionList) {
-					Entry<LocalDate, FundTransaction> transactionEntry = Map.entry(transaction.getTransactionDate(),
-							transaction);
+					Entry<LocalDate, FundTransaction> transactionEntry = new AbstractMap.SimpleEntry<>(
+							transaction.getTransactionDate(), transaction);
 					transactions.add(transactionEntry);
 				}
 			}
@@ -427,8 +430,8 @@ public class PortfolioFund extends MutualFund {
 			if (transactionDate.isBefore(endDate) && transactionDate.isAfter(startDate)) {
 				Collection<FundTransaction> transactionList = entry.getValue();
 				for (FundTransaction transaction : transactionList) {
-					Entry<LocalDate, FundTransaction> transactionEntry = Map.entry(transaction.getTransactionDate(),
-							transaction);
+					Entry<LocalDate, FundTransaction> transactionEntry = new AbstractMap.SimpleEntry<>(
+							transaction.getTransactionDate(), transaction);
 					transactions.add(transactionEntry);
 				}
 			}
@@ -438,8 +441,8 @@ public class PortfolioFund extends MutualFund {
 			if (transactionDate.isBefore(endDate) && transactionDate.isAfter(startDate)) {
 				Collection<FundTransaction> transactionList = entry.getValue();
 				for (FundTransaction transaction : transactionList) {
-					Entry<LocalDate, FundTransaction> transactionEntry = Map.entry(transaction.getTransactionDate(),
-							transaction);
+					Entry<LocalDate, FundTransaction> transactionEntry = new AbstractMap.SimpleEntry<>(
+							transaction.getTransactionDate(), transaction);
 					transactions.add(transactionEntry);
 				}
 			}

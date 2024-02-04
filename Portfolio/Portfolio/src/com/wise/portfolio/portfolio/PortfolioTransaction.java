@@ -61,4 +61,11 @@ public class PortfolioTransaction {
 	public void setAmount(BigDecimal amount) {
 		this.amount = amount;
 	}
+	private boolean isNetAmount;
+	public boolean isNetAmount() {
+		return isNetAmount;
+	}
+	public void setNetAmount(boolean isNetAmount) {
+		this.isNetAmount = isNetAmount;
+	}
 }

@@ -11,9 +11,11 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.wise.portfolio.fund.FundPriceHistory;
+import com.wise.portfolio.fund.PortfolioFund;
 import com.wise.portfolio.portfolio.Portfolio;
 import com.wise.portfolio.service.PortfolioPriceHistory;
 
@@ -24,7 +26,7 @@ public class AlphaVantageFundPriceService {
 	private static final String ALPHA_VANTAGE_FUNCTION = "TIME_SERIES_DAILY";
 	private static final String ALPHA_VANTAGE_APIKEY = "85MODZ3M0IN6CT0R";
 
-	public static boolean loadFundHistoryFromAlphaVantage(Portfolio portfolio, String symbol, boolean retry)
+	public static boolean retrieveFundHistoryFromAlphaVantage(Portfolio portfolio, String symbol, boolean retry)
 			throws IOException {
 
 		LocalDate earliestAlphaVantageDate = LocalDate.now();
@@ -33,15 +35,11 @@ public class AlphaVantageFundPriceService {
 		CloseableHttpClient httpclient = HttpClients.createDefault();
 		String url = ALPHA_VANTAGE_URL + "?function=" + ALPHA_VANTAGE_FUNCTION + "&outputsize=compact&symbol=" + symbol
 				+ "&apikey=" + ALPHA_VANTAGE_APIKEY + "&outputsize=full";
-		HttpGet httpget = new HttpGet(url);
 		try {
+			HttpGet httpget = new HttpGet(url);
 			HttpResponse httpresponse = httpclient.execute(httpget);
 			System.out.println(httpresponse.getStatusLine());
 			if (httpresponse.getStatusLine().getStatusCode() != 200) {
-//				System.out.println("Sleep for 10 seconds and try again");
-//				Thread.sleep(10000);
-//				boolean success = loadFundHistoryFromAlphaVantage(portfolio, symbol, false);
-//				return success;
 				return false;
 			}
 
@@ -50,26 +48,21 @@ public class AlphaVantageFundPriceService {
 			while (sc.hasNext()) {
 				response.append(sc.nextLine());
 			}
-			System.out.println("response " + response.substring(0, 100));
+			System.out.println("response " + response.substring(0, 50));
 			sc.close();
+			httpclient.close();
 
-			// json object mapper
-			ObjectMapper mapper = new ObjectMapper();
-			SimpleModule module = new SimpleModule();
-			module.addDeserializer(Series.class, new SeriesDeserializer());
-			mapper.registerModule(module);
-
-			Series series = mapper.readValue(response.toString(), Series.class);
-			if (series.getMetadata() == null) {
+			// Convert data into series of objects
+			Series series = convertResponseIntoSeries(response);
+			if (series == null || series.getMetadata() == null) {
 				boolean success = false;
-				System.out.println(response.toString());
 				if (retry) {
 					int tries = 3;
 					while (tries-- > 0 && !success) {
 						System.out.println("Sleep for 10 seconds and try again");
 						Thread.sleep(10000);
 						System.out.println("retries left:  " + tries);
-						success = loadFundHistoryFromAlphaVantage(portfolio, symbol, false);
+						success = retrieveFundHistoryFromAlphaVantage(portfolio, symbol, false);
 					}
 					if (tries <= 0 && !success) {
 						System.out.println("Exhausted retries");
@@ -78,15 +71,19 @@ public class AlphaVantageFundPriceService {
 				}
 				return success;
 			}
+			LocalDate mostRecentDate = null;
 			PortfolioPriceHistory priceHistory = portfolio.getPriceHistory();
+			PortfolioFund fund = portfolio.getFund(symbol);
 			for (Entry<String, TimeSeries> entry : series.getTimeSeries().entrySet()) {
 
 				LocalDate date = LocalDate.parse(entry.getKey());
-				
-				// Only use dates BEFORE download files (they are inconsistent with downloads and ruin the integrity
-//				if (date.isAfter(priceHistory.getOldestDate())) {
-//					continue;
-//				}
+
+				if (mostRecentDate == null) {
+					mostRecentDate = date;
+
+					fund.setCurrentPrice(closingPrice, mostRecentDate);
+					System.out.println(fund.getShortName() + "most recent date:  " + mostRecentDate);
+				}
 				
 				if (date.isBefore(earliestAlphaVantageDate)) {
 					earliestAlphaVantageDate = date;
@@ -100,11 +97,11 @@ public class AlphaVantageFundPriceService {
 					fundPriceHistory = new FundPriceHistory(symbol);
 					priceHistory.getAlphaVantagePriceHistory().put(symbol, fundPriceHistory);
 				}
-				priceHistory.getAlphaVantagePriceHistory().get(symbol).addFundPrice(date, closingPrice);
+				priceHistory.addAlphaVantagePrice(symbol, date, closingPrice);
 
 			}
+			System.out.println(fund.getShortName() + "oldest date:  " + earliestAlphaVantageDate);
 
-			httpclient.close();
 //			if (earliestAlphaVantageDate.isBefore(priceHistory.getOldestDate())) {
 //				priceHistory.setOldestDate(earliestAlphaVantageDate);
 //			}
@@ -113,6 +110,23 @@ public class AlphaVantageFundPriceService {
 		}
 
 		return true;
+	}
+
+	private static Series convertResponseIntoSeries(StringBuffer response) {
+		Series series = null;
+
+		// json object mapper
+		ObjectMapper mapper = new ObjectMapper();
+		SimpleModule module = new SimpleModule();
+		module.addDeserializer(Series.class, new SeriesDeserializer());
+		mapper.registerModule(module);
+
+		try {
+			series = mapper.readValue(response.toString(), Series.class);
+		} catch (JsonProcessingException e) {
+			System.out.println("Exception processing http response:  " + e.getLocalizedMessage());
+		}
+		return series;
 	}
 
 }

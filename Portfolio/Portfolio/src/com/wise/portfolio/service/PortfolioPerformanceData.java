@@ -249,5 +249,10 @@ public class PortfolioPerformanceData {
 	}
 
 
+	public void setPortfolioLastYearWithdrawals(BigDecimal portfolioLastYearWithdrawals) {
+		this.portfolioLastYearWithdrawals = portfolioLastYearWithdrawals;
+	}
+
+
 	
 }

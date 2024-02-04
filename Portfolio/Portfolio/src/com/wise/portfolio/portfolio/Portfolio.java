@@ -18,8 +18,6 @@ import com.wise.portfolio.service.PortfolioPriceHistory;
 
 public class Portfolio {
 
-	// Lazy load
-	private BigDecimal totalValue = null;
 	private Map<String, String> fundSymbolNameMap;
 
 	public void setFundSymbolNameMap(Map<String, String> fundSymbolNameMap) {
@@ -70,26 +68,19 @@ public class Portfolio {
 
 	public void setFundMap(Map<String, PortfolioFund> map) {
 		this.fundMap = map;
-		totalValue = null;
 	}
 
 	public void addFund(PortfolioFund fund) {
 		this.fundMap.put(fund.getSymbol(), fund);
-		totalValue = null;
 	}
 
 	public BigDecimal getTotalValue() {
-		// change to lazy load and cache total - no, will not exclude prespent value
 
-		loadTotalValue();
-		return totalValue;
-	}
-
-	private void loadTotalValue() {
-		totalValue = fundMap.values().stream().filter(fund -> !fund.isClosed()).map(PortfolioFund::getValue)
+		return fundMap.values().stream().filter(fund -> !fund.isClosed()).map(PortfolioFund::getCurrentValue)
 				.reduce(new BigDecimal(0, MathContext.DECIMAL32), (total, fundValue) -> total = total.add(fundValue))
 				.setScale(2, RoundingMode.HALF_UP);
 	}
+
 
 	public BigDecimal getValueByCategory(FundCategory category) {
 
@@ -134,7 +125,6 @@ public class Portfolio {
 //        System.out.println("After adjusting fund :  " + String.format("%60s", fund.getName()) + " shares:  "
 //                + NumberFormat.getNumberInstance().format(fund.getShares()) + " value:  "
 //                + NumberFormat.getCurrencyInstance().format(fund.getValue()));
-		totalValue = null;
 
 	}
 
@@ -177,7 +167,7 @@ public class Portfolio {
 		BigDecimal transactionsAmount = new BigDecimal(0);
 
 		for (Entry<LocalDate, Collection<FundTransaction>> entry : federalWithholdingTax.entrySet()) {
-			if (entry.getKey().isAfter(startDate) && entry.getKey().isBefore(endDate)) {
+			if (!entry.getKey().isBefore(startDate) && !entry.getKey().isAfter(endDate)) {
 				Collection<FundTransaction> transactionList = entry.getValue();
 				for (FundTransaction transaction : transactionList) {
 					transactionsAmount = transactionsAmount.add(transaction.getTransastionPrincipal());
@@ -215,7 +205,7 @@ public class Portfolio {
 		BigDecimal transactionsAmount = new BigDecimal(0);
 
 		for (Entry<LocalDate, Collection<FundTransaction>> entry : stateWithholdingTax.entrySet()) {
-			if (entry.getKey().isAfter(startDate) && entry.getKey().isBefore(endDate)) {
+			if (!entry.getKey().isBefore(startDate) && !entry.getKey().isAfter(endDate)) {
 				Collection<FundTransaction> transactionList = entry.getValue();
 				for (FundTransaction transaction : transactionList) {
 					transactionsAmount = transactionsAmount.add(transaction.getTransastionPrincipal());

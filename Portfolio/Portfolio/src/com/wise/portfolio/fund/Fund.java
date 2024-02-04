@@ -1,6 +1,7 @@
 package com.wise.portfolio.fund;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 public interface Fund
 {
@@ -11,6 +12,6 @@ public interface Fund
     public void setSymbol(String symbol);
 
     public BigDecimal getCurrentPrice();
-    public void setCurrentPrice(BigDecimal currentPrice);
+    public void setCurrentPrice(BigDecimal currentPrice, LocalDate currentDate);
 
 }

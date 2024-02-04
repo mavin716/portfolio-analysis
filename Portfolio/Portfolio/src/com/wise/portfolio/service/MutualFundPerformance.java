@@ -13,11 +13,21 @@ import java.util.Map;
 import org.apache.commons.lang3.tuple.Pair;
 
 import com.wise.portfolio.fund.Fund;
+import com.wise.portfolio.fund.FundPriceHistory;
 import com.wise.portfolio.fund.MutualFund.FundCategory;
 import com.wise.portfolio.fund.PortfolioFund;
 import com.wise.portfolio.portfolio.Portfolio;
 
+/**
+ * MutualFundPerformance encapsulates fund performance into class for use by
+ * lambda expressions
+ * 
+ * @author mavin
+ *
+ */
 public class MutualFundPerformance {
+
+	public static final int CURRENCY_SCALE = 6;
 
 	private Portfolio portfolio;
 	private PortfolioPriceHistory portfolioPriceHistory;
@@ -30,11 +40,10 @@ public class MutualFundPerformance {
 		this.portfolioPriceHistory = portfolio.getPriceHistory();
 		this.portfolioFund = fund;
 
-		BigDecimal beginYearPrice = getClosestHistoricalPrice(getFirstOfYearDate(), 30);
+		BigDecimal beginYearPrice = getClosestHistoricalPrice(getFirstOfYearBusinessDate(), 30);
 		if (beginYearPrice == null) {
 			return;
 		}
-		setCurrentSharePrice(fund.getCurrentPrice());
 		setYtdChange(
 				CurrencyHelper.calculatePercentage(fund.getCurrentPrice().subtract(beginYearPrice), beginYearPrice));
 		Map<FundCategory, BigDecimal> currentPercentageOfTotal = new HashMap<>();
@@ -42,43 +51,43 @@ public class MutualFundPerformance {
 
 	}
 
-	public Double getPerformanceRateByDate(LocalDate historicalDate) {
+	/**
+	 * @param historicalDate
+	 * @return
+	 */
+	public Double getPerformanceReturnsByDate(LocalDate historicalDate) {
 
-		BigDecimal historicalPrice = portfolioPriceHistory.getPriceByDate(portfolioFund, historicalDate, false);
-		Double historicalShares = portfolioPriceHistory.getSharesByDate(portfolioFund, historicalDate, false);
 		BigDecimal historicalValue = portfolioPriceHistory.getFundValueByDate(portfolioFund, historicalDate, false);
-		BigDecimal returns = getReturnsByDate(historicalDate, false);
-		if (historicalPrice == null || historicalShares == null || historicalValue == null || returns == null) {
-			return Double.valueOf(0);
-		}
+		if (historicalValue == null || historicalValue.intValue() == 0) {
 
-		if (historicalPrice == null || historicalPrice.compareTo(BigDecimal.ZERO) == 0) {
-			// check for linked account
-			PortfolioFund oldFund = portfolioFund.getOldFund(portfolio);
-			if (oldFund != null) {
-				historicalPrice = portfolioPriceHistory.getPriceByDate(oldFund, portfolioFund.getOldFundConverted(),
-						false);
-				if (historicalPrice == null) {
-					return Double.valueOf(0);
-				}
-				historicalShares = oldFund.getConversionsSharesUpToDate(historicalDate);
-				// will be conversion out so negative shares
-				historicalShares = 1 - historicalShares;
-			} else {
-				return Double.valueOf(0);
+			// Use alphaVantage price to calculate rate
+			BigDecimal historicalPrice = null;
+			FundPriceHistory alphaVantageFundPriceHistry = portfolioPriceHistory.getAlphaVantagePriceHistory()
+					.get(portfolioFund.getSymbol());
+			if (alphaVantageFundPriceHistry != null) {
+				historicalPrice = alphaVantageFundPriceHistry.getPriceByDate(historicalDate);
 			}
-		}
 
-		BigDecimal currentValue = portfolioFund.getValue();
-		if (currentValue.intValue() == 0 || historicalValue.intValue() == 0) {
-			return Double.valueOf(0);
+			if (historicalPrice == null) {
+				return (double) 0;
+			}
+			BigDecimal currentSharePrice = portfolioFund.getCurrentPrice();
+			BigDecimal priceDifference = currentSharePrice.subtract(historicalPrice);
+			Double rate = priceDifference
+					.divide(currentSharePrice, PortfolioService.CURRENCY_SCALE, RoundingMode.HALF_UP).doubleValue();
+			return rate;
 		}
 
 		// Adjust historical value
 		BigDecimal withdrawals = portfolioFund.getWithdrawalsUpToDate(historicalDate);
 		BigDecimal exchanges = portfolioFund.getExchangeTotalFromDate(historicalDate);
-		BigDecimal converions = portfolioFund.getConversionsTotalFromDate(getFirstOfYearDate());
+		BigDecimal converions = portfolioFund.getConversionsTotalFromDate(getFirstOfYearBusinessDate());
 		historicalValue = historicalValue.subtract(withdrawals).subtract(exchanges).add(converions);
+
+		BigDecimal currentValue = portfolioFund.getCurrentValue();
+		if (currentValue.intValue() == 0) {
+			return Double.valueOf(0);
+		}
 
 		Double rate = currentValue.subtract(historicalValue)
 				.divide(currentValue, PortfolioService.CURRENCY_SCALE, RoundingMode.HALF_UP).doubleValue();
@@ -86,7 +95,7 @@ public class MutualFundPerformance {
 
 	}
 
-	private static LocalDate getFirstOfYearDate() {
+	private static LocalDate getFirstOfYearBusinessDate() {
 		LocalDate firstOfYearDate = LocalDate.of(LocalDate.now().getYear(), 1, 1);
 
 		if (firstOfYearDate.getDayOfWeek() == DayOfWeek.SUNDAY) {
@@ -119,30 +128,30 @@ public class MutualFundPerformance {
 		return BigDecimal.ZERO;
 	}
 
-	public BigDecimal getDeviation(FundCategory category) {
+	public BigDecimal getDeviationFromTargetByCategory(FundCategory category) {
 
-		BigDecimal currentPercentage = portfolioFund.getValue()
+		BigDecimal currentPercentage = portfolioFund.getCurrentValue()
 				.multiply(portfolioFund.getPercentageByCategory(category))
-				.divide(portfolio.getTotalValue(), 6, RoundingMode.HALF_DOWN);
+				.divide(portfolio.getTotalValue(), CURRENCY_SCALE, RoundingMode.HALF_DOWN);
 
 		BigDecimal fundTotalPercentage = portfolioFund.getPercentageByCategory(FundCategory.TOTAL);
 		BigDecimal fundCategoryPercentage = portfolioFund.getPercentageByCategory(category);
-		BigDecimal targetCategoryPercentage = fundCategoryPercentage.multiply(fundTotalPercentage).setScale(4,
-				RoundingMode.UP);
+		BigDecimal targetCategoryPercentage = fundCategoryPercentage.multiply(fundTotalPercentage)
+				.setScale(CURRENCY_SCALE, RoundingMode.UP);
 
 		BigDecimal deviation = currentPercentage.subtract(targetCategoryPercentage);
 
 		return deviation;
 	}
 
-	public BigDecimal getSurplusDeficit(FundCategory category) {
+	public BigDecimal getSurplusDeficitByCategory(FundCategory category) {
 
 		BigDecimal fundTotalPercentage = portfolioFund.getPercentageByCategory(FundCategory.TOTAL);
 		BigDecimal fundCategoryPercentage = portfolioFund.getPercentageByCategory(category);
-		BigDecimal targetCategoryPercentage = fundCategoryPercentage.multiply(fundTotalPercentage).setScale(4,
-				RoundingMode.UP);
+		BigDecimal targetCategoryPercentage = fundCategoryPercentage.multiply(fundTotalPercentage)
+				.setScale(CURRENCY_SCALE, RoundingMode.UP);
 
-		BigDecimal diffValue = portfolioFund.getValue().multiply(fundCategoryPercentage)
+		BigDecimal diffValue = portfolioFund.getCurrentValue().multiply(fundCategoryPercentage)
 				.subtract(portfolio.getTotalValue().multiply(targetCategoryPercentage));
 
 		return diffValue;
@@ -157,7 +166,7 @@ public class MutualFundPerformance {
 	}
 
 	public Pair<LocalDate, BigDecimal> getMinPricePair() {
-		return portfolioPriceHistory.getMinPriceFromDate(portfolioFund, portfolioPriceHistory.getOldestDate());
+		return portfolioPriceHistory.getMinPriceFromDate(portfolioFund, LocalDate.now().minusYears(5));
 	}
 
 	public Pair<LocalDate, BigDecimal> getMinPricePairFromDate(LocalDate date) {
@@ -165,7 +174,7 @@ public class MutualFundPerformance {
 	}
 
 	public Pair<LocalDate, BigDecimal> getMaxPricePair() {
-		return portfolioPriceHistory.getMaxPriceFromDate(portfolioFund, portfolioPriceHistory.getOldestDate());
+		return portfolioPriceHistory.getMaxPriceFromDate(portfolioFund, LocalDate.now().minusYears(5));
 	}
 
 	public Pair<LocalDate, BigDecimal> getMaxPricePairFromDate(LocalDate date) {
@@ -189,11 +198,7 @@ public class MutualFundPerformance {
 	}
 
 	public BigDecimal getCurrentSharePrice() {
-		return currentSharePrice;
-	}
-
-	public void setCurrentSharePrice(BigDecimal currentSharePrice) {
-		this.currentSharePrice = currentSharePrice;
+		return portfolioFund.getCurrentPrice();
 	}
 
 	public Map<FundCategory, BigDecimal> getCurrentPercentageTotal() {
@@ -212,13 +217,11 @@ public class MutualFundPerformance {
 		this.targetPercentageTotal = targetPercentageTotal;
 	}
 
-//	private BigDecimal firstOfYearPrice;
 	private BigDecimal ytdChange;
 	private BigDecimal ytdDividends;
-	private BigDecimal currentSharePrice;
+//	private BigDecimal currentSharePrice;
 	private Map<FundCategory, BigDecimal> currentPercentageTotal;
 	private Map<FundCategory, BigDecimal> targetPercentageTotal;
-//	private Map<FundCategory, BigDecimal> targetValue;
 
 	public BigDecimal getDayPriceChange() {
 
@@ -241,7 +244,7 @@ public class MutualFundPerformance {
 			previousBusinessDay = previousBusinessDay.minusDays(1);
 		}
 
-		BigDecimal previousPrice = getPriceByDate(portfolioFund, previousBusinessDay, true);
+		BigDecimal previousPrice = getPriceByDate(portfolioFund, previousBusinessDay, false);
 		BigDecimal currentPrice = portfolioFund.getCurrentPrice();
 		BigDecimal dayPriceChange = BigDecimal.ZERO;
 		if (previousPrice != null) {
@@ -258,29 +261,26 @@ public class MutualFundPerformance {
 
 	public BigDecimal getFirstOfYearPrice() {
 		// TODO Auto-generated method stub
-		return getClosestHistoricalPrice(getFirstOfYearDate(), 5);
+		return getClosestHistoricalPrice(getFirstOfYearBusinessDate(), 5);
 	}
 
 	public BigDecimal getYtdValueChange() {
-		BigDecimal withdrawals = portfolioFund.getWithdrawalsUpToDate(getFirstOfYearDate());
-		BigDecimal exchanges = portfolioFund.getExchangeTotalFromDate(getFirstOfYearDate());
-		BigDecimal converions = portfolioFund.getConversionsTotalFromDate(getFirstOfYearDate());
-		BigDecimal historicalValue = getHistoricalValue(portfolioFund, getYtdDays() + 2);
-		BigDecimal ytdValueChange = portfolioFund.getValue().subtract(historicalValue).add(withdrawals).add(exchanges)
-				.subtract(converions);
+		LocalDate firstOfYearDate = getFirstOfYearBusinessDate();
+
+		BigDecimal withdrawals = portfolioFund.getWithdrawalsUpToDate(firstOfYearDate);
+		BigDecimal exchanges = portfolioFund.getExchangeTotalFromDate(firstOfYearDate);
+		BigDecimal converions = portfolioFund.getConversionsTotalFromDate(firstOfYearDate);
+
+		BigDecimal historicalValue = getHistoricalValue(portfolioFund, firstOfYearDate);
+
+		BigDecimal ytdValueChange = portfolioFund.getCurrentValue().subtract(historicalValue).add(withdrawals)
+				.add(exchanges).subtract(converions);
 		return ytdValueChange;
 	}
 
-	private static int getYtdDays() {
-		Period period = getFirstOfYearDate().until(LocalDate.now());
-		Integer ytdDays = period.getYears() * 365 + period.getMonths() * 30 + period.getDays();
-		return ytdDays;
-	}
-
-	private BigDecimal getHistoricalValue(PortfolioFund fund, int days) {
+	private BigDecimal getHistoricalValue(PortfolioFund fund, LocalDate historicalDate) {
 		BigDecimal historicalValue = BigDecimal.ZERO;
 
-		LocalDate historicalDate = LocalDate.now().minusDays(days);
 		BigDecimal historicPrice = getPriceByDate(fund, historicalDate, false);
 		if (historicPrice == null) {
 			historicPrice = BigDecimal.ZERO;
@@ -297,15 +297,26 @@ public class MutualFundPerformance {
 	public BigDecimal getPriceByDate(Fund fund, LocalDate date, boolean isExactDate) {
 		BigDecimal value = null;
 
-		Map<LocalDate, BigDecimal> fundPriceMap = portfolioPriceHistory.getVanguardPriceHistory().get(fund.getSymbol()).getFundPricesMap();
+		Map<LocalDate, BigDecimal> fundPriceMap = portfolioPriceHistory.getVanguardPriceHistory().get(fund.getSymbol())
+				.getFundPricesMap();
 		value = fundPriceMap.get(date);
 		if (value == null && !isExactDate) {
-			int tries = 30;
+			int tries = 10;
 			while (tries-- > 0) {
-				date = date.minus(1, ChronoUnit.DAYS);
+				date = date.minusDays(1);
 				value = fundPriceMap.get(date);
 				if (value != null) {
 					return value;
+				}
+			}
+		}
+		if (value == null) {
+			if (value == null) {
+				FundPriceHistory priceHistory = portfolioPriceHistory.getAlphaVantagePriceHistory()
+						.get(fund.getSymbol());
+				if (priceHistory != null) {
+					fundPriceMap = priceHistory.getFundPricesMap();
+					value = fundPriceMap.get(date);
 				}
 			}
 		}
@@ -330,7 +341,6 @@ public class MutualFundPerformance {
 			return (double) 0;
 		}
 
-		// used by some functions expecting number so for now just return zero
 		return null;
 	}
 
@@ -351,11 +361,12 @@ public class MutualFundPerformance {
 		BigDecimal withdrawals = portfolioFund.getWithdrawalsUpToDate(date);
 		BigDecimal exchanges = portfolioFund.getExchangeTotalFromDate(date);
 		BigDecimal dividends = portfolioFund.getDistributionsAfterDate(date);
-		BigDecimal currentValue = portfolioFund.getValue();
+		BigDecimal currentValue = portfolioFund.getCurrentValue();
 		BigDecimal historicalValue = portfolioPriceHistory.getFundValueByDate(portfolioFund, date, isExactDate);
 		if (currentValue != null && historicalValue != null) {
 			returns = currentValue.subtract(historicalValue).add(dividends).add(withdrawals).add(exchanges);
-				returns = currentValue.subtract(historicalValue).add(dividends).add(withdrawals).add(exchanges).subtract(conversions);
+			returns = currentValue.subtract(historicalValue).add(dividends).add(withdrawals).add(exchanges)
+					.subtract(conversions);
 //				System.out.println("fund:  " + portfolioFund.getShortName() + " date:  " + date);
 //				System.out.println("currentValue:  " + CurrencyHelper.formatAsCurrencyString(currentValue));
 //				System.out.println("historicalValue:  " + CurrencyHelper.formatAsCurrencyString(historicalValue));
@@ -384,11 +395,6 @@ public class MutualFundPerformance {
 
 	public PortfolioFund getFund() {
 		return portfolioFund;
-	}
-
-	public BigDecimal getDividendsFromDate(LocalDate historicalDate) {
-		// TODO Auto-generated method stub
-		return null;
 	}
 
 	public LocalDate getOldestDate() {

@@ -7,6 +7,9 @@ import java.util.Map;
 import java.util.TreeMap;
 
 public class FundPriceHistory {
+	public static final int CURRENCY_SCALE = 6;
+
+	
 	public FundPriceHistory(String fundSymbol) {
 		super();
 		this.fundSymbol = fundSymbol;
@@ -31,8 +34,9 @@ public class FundPriceHistory {
 			return;
 		}
 
-		price = price.setScale(6, RoundingMode.HALF_DOWN);
+		price = price.setScale(CURRENCY_SCALE, RoundingMode.HALF_DOWN);
 		fundPriceMap.put(date, price);
+		
 
 	}
 
@@ -54,4 +58,9 @@ public class FundPriceHistory {
 		return fundPriceMap;
 	}
 
+	public LocalDate getOldestDate() {
+		// Sorted map
+		LocalDate date =  fundPriceMap.keySet().iterator().next();
+		return date;
+	}
 }
