@@ -29,6 +29,7 @@ import com.wise.portfolio.fund.Fund;
 import com.wise.portfolio.fund.FundPriceHistory;
 import com.wise.portfolio.fund.MutualFund.FundCategory;
 import com.wise.portfolio.fund.PortfolioFund;
+import com.wise.portfolio.portfolio.ManagedPortfolio;
 import com.wise.portfolio.portfolio.Portfolio;
 
 public class PortfolioPriceHistory {
@@ -152,9 +153,6 @@ public class PortfolioPriceHistory {
 			mostRecentDay = date;
 		}
 		Map<String, PortfolioFund> funds = portfolio.getFundMap();
-		if (funds == null) {
-			funds = new HashMap<>();
-		}
 		// initialize shares
 		for (Entry<String, PortfolioFund> entry : funds.entrySet()) {
 			PortfolioFund fund = entry.getValue();
@@ -315,7 +313,7 @@ public class PortfolioPriceHistory {
 		} catch (Exception e) {
 			System.out.println("Exception processing transactions:  " + e);
 		}
-		portfolio.setFundMap(funds);
+//		portfolio.setFundMap(funds);
 
 	}
 
@@ -355,6 +353,7 @@ public class PortfolioPriceHistory {
 				fund = new PortfolioFund();
 				fund.setSymbol(symbol);
 				fund.setName(name);
+				funds.put(symbol, fund);
 			}
 
 			int dateIndex = 2;
@@ -379,7 +378,7 @@ public class PortfolioPriceHistory {
 
 		}
 
-		portfolio.setFundMap(funds);
+//		portfolio.setFundMap(funds);
 
 	}
 
@@ -391,9 +390,6 @@ public class PortfolioPriceHistory {
 		}
 
 		Map<String, PortfolioFund> funds = portfolio.getFundMap();
-		if (funds == null) {
-			return;
-		}
 
 		List<List<String>> fundLines = readHistoryCSVFile(historyFilePath);
 		List<String> headingLine = fundLines.remove(0); // first line is headings
@@ -419,6 +415,7 @@ public class PortfolioPriceHistory {
 				fund = new PortfolioFund();
 				fund.setSymbol(symbol);
 				fund.setName(name);
+				funds.put(symbol, fund);
 			}
 
 			int dateIndex = 2;
@@ -464,9 +461,6 @@ public class PortfolioPriceHistory {
 		}
 
 		Map<String, PortfolioFund> funds = portfolio.getFundMap();
-		if (funds == null) {
-			funds = new HashMap<>();
-		}
 
 		List<List<String>> fundLines = readHistoryCSVFile(sharesFilePath);
 		List<String> headingLine = fundLines.remove(0); // first line is headings
@@ -493,6 +487,7 @@ public class PortfolioPriceHistory {
 				fund = new PortfolioFund();
 				fund.setSymbol(symbol);
 				fund.setName(name);
+				funds.put(symbol, fund);
 			}
 
 			int dateIndex = 2;
@@ -513,7 +508,7 @@ public class PortfolioPriceHistory {
 
 		}
 
-		portfolio.setFundMap(funds);
+		//portfolio.setFundMap(funds);
 
 	}
 
@@ -598,6 +593,20 @@ public class PortfolioPriceHistory {
 		return getMaxPrice(fund).getRight().subtract(getMinPrice(fund).getRight());
 	}
 
+	public BigDecimal getMaxValue(ManagedPortfolio portfolio) {
+		
+		BigDecimal maxValue = BigDecimal.ZERO;
+		
+		for (Entry<String, Pair<LocalDate, BigDecimal>> entry : fundsMaxPriceMap.entrySet()) {
+			PortfolioFund fund = portfolio.getFund(entry.getKey());
+			double shares = fund.getShares();
+			BigDecimal fundMaxValue = entry.getValue().getRight().multiply(new BigDecimal(shares));
+			maxValue = maxValue.add(fundMaxValue);
+		}
+		return maxValue;
+		
+		
+	}
 	public Pair<LocalDate, BigDecimal> getMaxPriceFromDate(PortfolioFund fund, LocalDate date) {
 
 		Pair<LocalDate, BigDecimal> maxPrice = fundsMaxPriceMap.get(fund.getSymbol());

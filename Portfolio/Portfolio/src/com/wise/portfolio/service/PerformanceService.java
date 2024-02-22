@@ -162,8 +162,14 @@ public class PerformanceService {
 		fundReturns = portfolio.getTotalValue().subtract(historicalValue).divide(historicalValue, 4,
 				RoundingMode.HALF_UP);
 
-		double rate = PortfolioService.calculateAnnualizedReturn(fundReturns, 3);
-		performanceData.setPortfolioThreeYearsAgoReturns(new BigDecimal(rate));
+		try {
+			double rate = PortfolioService.calculateAnnualizedReturn(fundReturns, 3);
+			performanceData.setPortfolioThreeYearsAgoReturns(new BigDecimal(rate));
+			
+		} catch (Exception e) {
+			e.printStackTrace();
+			System.out.println(e.getMessage());
+		}
 		return performanceData;
 	}
 

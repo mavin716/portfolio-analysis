@@ -40,14 +40,16 @@ public class MutualFundPerformance {
 		this.portfolioPriceHistory = portfolio.getPriceHistory();
 		this.portfolioFund = fund;
 
-		BigDecimal beginYearPrice = getClosestHistoricalPrice(getFirstOfYearBusinessDate(), 30);
-		if (beginYearPrice == null) {
-			return;
+		if (fund != null) {
+			BigDecimal beginYearPrice = getClosestHistoricalPrice(getFirstOfYearBusinessDate(), 30);
+			if (beginYearPrice == null) {
+				return;
+			}
+			setYtdChange(CurrencyHelper.calculatePercentage(fund.getCurrentPrice().subtract(beginYearPrice),
+					beginYearPrice));
+			Map<FundCategory, BigDecimal> currentPercentageOfTotal = new HashMap<>();
+			setCurrentPercentageTotal(currentPercentageOfTotal);
 		}
-		setYtdChange(
-				CurrencyHelper.calculatePercentage(fund.getCurrentPrice().subtract(beginYearPrice), beginYearPrice));
-		Map<FundCategory, BigDecimal> currentPercentageOfTotal = new HashMap<>();
-		setCurrentPercentageTotal(currentPercentageOfTotal);
 
 	}
 
