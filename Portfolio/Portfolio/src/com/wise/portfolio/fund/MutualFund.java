@@ -82,9 +82,6 @@ public class MutualFund implements Comparable<MutualFund>, Fund {
 		return categoriesMap;
 	}
 
-	public void setCategoriesMap(Map<FundCategory, BigDecimal> categoriesMap) {
-		this.categoriesMap = categoriesMap;
-	}
 
 	public void addCategory(FundCategory category, BigDecimal percentage) {
 		categoriesMap.put(category, percentage);

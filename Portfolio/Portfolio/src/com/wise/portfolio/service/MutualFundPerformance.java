@@ -77,6 +77,7 @@ public class MutualFundPerformance {
 			BigDecimal priceDifference = currentSharePrice.subtract(historicalPrice);
 			Double rate = priceDifference
 					.divide(currentSharePrice, PortfolioService.CURRENCY_SCALE, RoundingMode.HALF_UP).doubleValue();
+			// doesn't include income....
 			return rate;
 		}
 
@@ -332,7 +333,7 @@ public class MutualFundPerformance {
 		Map<LocalDate, Double> fundSharesMap = portfolioPriceHistory.getFundShares().get(fund.getSymbol());
 		value = fundSharesMap.get(date);
 		if (!isExactDate) {
-			int tries = 30;
+			int tries = 15;
 			while (tries-- > 0) {
 				value = fundSharesMap.get(date);
 				if (value != null) {

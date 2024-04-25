@@ -18,6 +18,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.apache.commons.lang3.tuple.Pair;
+
 import com.itextpdf.kernel.events.PdfDocumentEvent;
 import com.itextpdf.kernel.geom.PageSize;
 import com.itextpdf.kernel.pdf.PdfDocument;
@@ -62,7 +64,7 @@ public class PortfolioApp {
 
 	private static final int RECENT_TRANSACTIONS_DAYS = 30;
 
-	private static final long PORTFOLIO_TRANSACTION_REPORT_WINDOW = 12;
+	private static final long PORTFOLIO_TRANSACTION_REPORT_WINDOW = 5;
 
 	public static void main(String[] args) {
 
@@ -141,10 +143,31 @@ public class PortfolioApp {
 			document.setMargins(30f, 10f, 30f, 10f);
 
 			// Document Title
+			LocalDate lastBusinessDay = LocalDate.now();
+			if (LocalTime.now().getHour() < 18) {
+				lastBusinessDay = lastBusinessDay.minusDays(1);
+			}
+			if (lastBusinessDay.getDayOfWeek() == DayOfWeek.SATURDAY) {
+				lastBusinessDay = lastBusinessDay.minusDays(1);
+			}
+			LocalDate previousBusinessDay = lastBusinessDay.minusDays(1);
+			if (previousBusinessDay.getDayOfWeek() == DayOfWeek.SUNDAY) {
+				previousBusinessDay = previousBusinessDay.minusDays(1);
+			}
+			if (previousBusinessDay.getDayOfWeek() == DayOfWeek.SATURDAY) {
+				previousBusinessDay = previousBusinessDay.minusDays(1);
+			}
+
+			BigDecimal currentTotalValue = portfolio.getTotalValueByDate(lastBusinessDay);
+			BigDecimal previousTotalValue = portfolio.getTotalValueByDate(previousBusinessDay);
+			BigDecimal difference = currentTotalValue.subtract(previousTotalValue);
+			String changeText = "Change:  " + NumberFormat.getCurrencyInstance().format(difference) + " Total:  "
+					+ NumberFormat.getCurrencyInstance().format(portfolio.getTotalValue());
+
 			document.add(
 					new Paragraph("Report run at " + LocalDate.now().format(DateTimeFormatter.ofPattern("MM/dd/yy"))
-							+ " " + LocalTime.now().format(DateTimeFormatter.ofPattern("hh:mm a"))).setFontSize(14)
-							.setHorizontalAlignment(HorizontalAlignment.CENTER));
+							+ " " + LocalTime.now().format(DateTimeFormatter.ofPattern("hh:mm a")) + " " + changeText)
+							.setFontSize(14).setHorizontalAlignment(HorizontalAlignment.CENTER));
 			HeaderHandler headerHandler = new HeaderHandler();
 			pdfDoc.addEventHandler(PdfDocumentEvent.START_PAGE, headerHandler);
 			FooterHandler footerHandler = new FooterHandler();
@@ -152,19 +175,28 @@ public class PortfolioApp {
 
 			System.out.println("Print performance table");
 			headerHandler.setHeader("performance table");
+			footerHandler.setFooter("* 10 yr return doesn't include income");
 			pdfDoc.addNewPage();
 			portfolioService.printPerformanceTable(document);
 
 			headerHandler.setHeader("portfolio performance table");
+			footerHandler.setFooter("");
 			pdfDoc.addNewPage();
 			portfolioService.printPortfolioPerformanceTable(document);
+
+			headerHandler.setHeader("Scheduled Transactions");
+			pdfDoc.addNewPage();
+			portfolioService.printScheduledTransactionsSpreadsheet("Scheduled Transactions",
+					portfolio.getPortfolioTransactions(), document);
 
 			portfolioService.printRecentTransactionsSpreadsheet(
 					"Recent Transactions (" + RECENT_TRANSACTIONS_DAYS + " days)", RECENT_TRANSACTIONS_DAYS, portfolio,
 					document);
 
-			portfolioService.printYTDWithdrawsSpreadsheet("YTD Withdrawals", portfolio, document,
+			portfolioService.printYTDDistributionsSpreadsheet("YTD Withdrawals", portfolio, document,
 					PortfolioService.getYtdDays());
+			portfolioService.printFutureWithdrawalsSpreadsheet("Future Withdrawals", portfolio, document,
+					FEDERAL_WITHOLD_TAXES_PERCENT, STATE_WITHOLD_TAXES_PERCENT);
 
 			// Process scheduled portfolio transactions
 			processScheduledPortfolioTransactions(document);
@@ -181,7 +213,7 @@ public class PortfolioApp {
 			pdfDoc.addNewPage();
 			for (PortfolioFund fund : portfolio.getFundMap().values()) {
 				if (fund.isClosed())
-				 continue;
+					continue;
 				portfolioService.printFundPerformanceLineGraph(fund.getSymbol(), document, pdfDoc,
 						LocalDate.now().minusYears(5), LocalDate.now());
 			}
@@ -197,7 +229,8 @@ public class PortfolioApp {
 					fundSynbols.add(fund.getSymbol());
 				}
 			}
-			portfolioService.printPerformanceLineGraphs("fund price > $200", fundSynbols, document, pdfDoc, startDate, endDate);
+			portfolioService.printPerformanceLineGraphs("fund price > $200", fundSynbols, document, pdfDoc, startDate,
+					endDate);
 
 			pdfDoc.addNewPage();
 			fundSynbols = new ArrayList<String>();
@@ -207,7 +240,8 @@ public class PortfolioApp {
 					fundSynbols.add(fund.getSymbol());
 				}
 			}
-			portfolioService.printPerformanceLineGraphs("fund price > $150 and < $200", fundSynbols, document, pdfDoc, startDate, endDate);
+			portfolioService.printPerformanceLineGraphs("fund price > $150 and < $200", fundSynbols, document, pdfDoc,
+					startDate, endDate);
 
 			pdfDoc.addNewPage();
 			fundSynbols = new ArrayList<String>();
@@ -217,7 +251,8 @@ public class PortfolioApp {
 					fundSynbols.add(fund.getSymbol());
 				}
 			}
-			portfolioService.printPerformanceLineGraphs("fund price > $100 and < $150", fundSynbols, document, pdfDoc, startDate, endDate);
+			portfolioService.printPerformanceLineGraphs("fund price > $100 and < $150", fundSynbols, document, pdfDoc,
+					startDate, endDate);
 
 			pdfDoc.addNewPage();
 			fundSynbols = new ArrayList<String>();
@@ -227,7 +262,8 @@ public class PortfolioApp {
 					fundSynbols.add(fund.getSymbol());
 				}
 			}
-			portfolioService.printPerformanceLineGraphs("fund price > $50 and < $100", fundSynbols, document, pdfDoc, startDate, endDate);
+			portfolioService.printPerformanceLineGraphs("fund price > $50 and < $100", fundSynbols, document, pdfDoc,
+					startDate, endDate);
 
 			pdfDoc.addNewPage();
 			fundSynbols = new ArrayList<String>();
@@ -237,7 +273,8 @@ public class PortfolioApp {
 					fundSynbols.add(fund.getSymbol());
 				}
 			}
-			portfolioService.printPerformanceLineGraphs("fund price > $30 and < $50", fundSynbols, document, pdfDoc, startDate, endDate);
+			portfolioService.printPerformanceLineGraphs("fund price > $30 and < $50", fundSynbols, document, pdfDoc,
+					startDate, endDate);
 			pdfDoc.addNewPage();
 			fundSynbols = new ArrayList<String>();
 			for (PortfolioFund fund : portfolio.getFundMap().values()) {
@@ -246,7 +283,8 @@ public class PortfolioApp {
 					fundSynbols.add(fund.getSymbol());
 				}
 			}
-			portfolioService.printPerformanceLineGraphs("fund price > $15 and < $30", fundSynbols, document, pdfDoc, startDate, endDate);
+			portfolioService.printPerformanceLineGraphs("fund price > $15 and < $30", fundSynbols, document, pdfDoc,
+					startDate, endDate);
 
 			pdfDoc.addNewPage();
 			fundSynbols = new ArrayList<String>();
@@ -256,7 +294,8 @@ public class PortfolioApp {
 					fundSynbols.add(fund.getSymbol());
 				}
 			}
-			portfolioService.printPerformanceLineGraphs("fund price > $1 and < $15", fundSynbols, document, pdfDoc, startDate, endDate);
+			portfolioService.printPerformanceLineGraphs("fund price > $1 and < $15", fundSynbols, document, pdfDoc,
+					startDate, endDate);
 
 			// portfolioService.printTrends(portfolio);
 
@@ -284,24 +323,6 @@ public class PortfolioApp {
 			document.close();
 			System.out.println("PDF Created");
 
-			LocalDate lastBusinessDay = LocalDate.now();
-			if (LocalTime.now().getHour() < 18) {
-				lastBusinessDay = lastBusinessDay.minusDays(1);
-			}
-			if (lastBusinessDay.getDayOfWeek() == DayOfWeek.SATURDAY) {
-				lastBusinessDay = lastBusinessDay.minusDays(1);
-			}
-			LocalDate previousBusinessDay = lastBusinessDay.minusDays(1);
-			if (previousBusinessDay.getDayOfWeek() == DayOfWeek.SUNDAY) {
-				previousBusinessDay = previousBusinessDay.minusDays(1);
-			}
-			if (previousBusinessDay.getDayOfWeek() == DayOfWeek.SATURDAY) {
-				previousBusinessDay = previousBusinessDay.minusDays(1);
-			}
-
-			BigDecimal currentTotalValue = portfolio.getTotalValueByDate(lastBusinessDay);
-			BigDecimal previousTotalValue = portfolio.getTotalValueByDate(previousBusinessDay);
-			BigDecimal difference = currentTotalValue.subtract(previousTotalValue);
 			String subject = "YEAH";
 			if (difference.compareTo(BigDecimal.ZERO) < 0) {
 				subject = "NOOO";
@@ -321,12 +342,14 @@ public class PortfolioApp {
 	}
 
 	private void processScheduledPortfolioTransactions(Document document) {
-		boolean updateScedulerFile = false;
 
 		// Aggregate transfers to allow multiple transactions in one day
 		List<PortfolioTransaction> transferTransactions = new ArrayList<>();
+		List<PortfolioTransaction> withdrawTransactions = new ArrayList<>();
 		LocalDate today = LocalDate.now();
+		LocalDate withdrawDate = today;
 		List<PortfolioTransaction> transactions = portfolio.getPortfolioTransactions();
+		List<PortfolioTransaction> updatedTransactions = new ArrayList<>();
 		for (PortfolioTransaction transaction : transactions) {
 			LocalDate transactionDate = transaction.getDate();
 			if (transactionDate.getDayOfWeek() == DayOfWeek.SATURDAY) {
@@ -337,30 +360,83 @@ public class PortfolioApp {
 			}
 			if (today.isAfter(transactionDate.minusDays(PORTFOLIO_TRANSACTION_REPORT_WINDOW))) {
 				if (transaction.getType().equalsIgnoreCase("Withdraw")) {
-					processPortfolioTransactionWithdraw(transaction, portfolioService, document);
+					// TODO bundle 'like' withdrawals for same date
+					withdrawDate = transaction.getDate();
+					withdrawTransactions.add(transaction);
 				} else {
 					transferTransactions.add(transaction);
 				}
-				if (transaction.isRecurring() && today.isAfter(transactionDate)) {
-					updateScedulerFile = true;
+				while (transaction.isRecurring() && today.isAfter(transactionDate)) {
 					switch (transaction.getRecurringPeriod()) {
 					case "Month":
-						transaction.setDate(transactionDate.plusMonths(1));
+						transactionDate = transactionDate.plusMonths(1);
 						break;
 					case "Year":
-						transaction.setDate(transactionDate.plusYears(1));
+						transactionDate = transactionDate.plusYears(1);
+						break;
+					default:
+						System.out.print("Unknown recurrng period:  " + transaction.getRecurringPeriod());
+						transactionDate = transactionDate.plusYears(99);
 						break;
 					}
+					transaction.setDate(transactionDate);
 				}
 			}
+			if (transaction.getDate().isAfter(today)) {
+				updatedTransactions.add(transaction);
+			}
+		}
+		if (withdrawTransactions.size() > 0) {
+			processPortfolioTransactionWithdraw(withdrawDate, withdrawTransactions, portfolioService, document,
+					portfolio);
 		}
 		if (transferTransactions.size() > 0) {
 			processPortfolioTransactionTransfer(transferTransactions, portfolioService, document, portfolio);
 		}
 		// update next run date
-		if (updateScedulerFile) {
-			portfolioService.updatePortfolioSchedule(SCHEDULE_FILE, portfolio.getPortfolioTransactions());
+		portfolioService.updatePortfolioSchedule(SCHEDULE_FILE, updatedTransactions);
+
+	}
+
+	private void processPortfolioTransactionWithdraw(LocalDate withdrawDate,
+			List<PortfolioTransaction> withdrawTransactions, PortfolioService portfolioService, Document document,
+			ManagedPortfolio portfolio2) {
+
+		ManagedPortfolio portfolio = portfolioService.getPortfolio();
+
+		String title = "Withdrawal scheduled for " + DATE_FORMATTER.format(withdrawDate);
+		BigDecimal withdrawAmount = BigDecimal.ZERO;
+		BigDecimal totalWithdrawalAmountIncludingTaxes = withdrawAmount;
+		List<Pair<String, BigDecimal>> fundWithdrawals = new ArrayList<>();
+
+		for (PortfolioTransaction transaction : withdrawTransactions) {
+			withdrawAmount = withdrawAmount.add(transaction.getAmount());
+			totalWithdrawalAmountIncludingTaxes = withdrawAmount;
+
+			if (transaction.getFundSymbol() != null && transaction.getFundSymbol().length() > 0) {
+				fundWithdrawals.add(Pair.of(transaction.getFundSymbol(), transaction.getAmount()));
+			}
+			if (transaction.isNetAmount()) {
+				// add in taxes which will be distributed across portfolio
+				// to include taxes in selected fund, add to amount and set Is Net Amount to
+				// true
+				totalWithdrawalAmountIncludingTaxes = withdrawAmount.divide(AFTER_TAXES_WITHDRAW_AMOUNT_PERCENTAGE, 0,
+						RoundingMode.UP);
+			}
+			title += "; " + transaction.getDescription();
 		}
+		BigDecimal netAmount = totalWithdrawalAmountIncludingTaxes.multiply(AFTER_TAXES_WITHDRAW_AMOUNT_PERCENTAGE);
+		title += " " + CurrencyHelper.formatAsCurrencyString(totalWithdrawalAmountIncludingTaxes) + " Net: "
+				+ CurrencyHelper.formatAsCurrencyString(netAmount);
+		System.out.println(title);
+
+		// Calculate withdrawals
+		Map<String, BigDecimal> withdrawals = portfolioService.calculateWithdrawal(totalWithdrawalAmountIncludingTaxes,
+				fundWithdrawals);
+
+		// print spreadsheet
+		portfolioService.printWithdrawalSpreadsheet(title, portfolio, withdrawAmount,
+				totalWithdrawalAmountIncludingTaxes, withdrawals, document);
 
 	}
 
@@ -383,8 +459,10 @@ public class PortfolioApp {
 					+ " " + CurrencyHelper.formatAsCurrencyString(totalWithdrawalAmountIncludingTaxes) + " net: "
 					+ CurrencyHelper.formatAsCurrencyString(withdrawAmount);
 		} else {
+			BigDecimal netAmount = withdrawAmount.multiply(AFTER_TAXES_WITHDRAW_AMOUNT_PERCENTAGE);
 			title = transaction.getDescription() + " Scheduled for " + DATE_FORMATTER.format(transaction.getDate())
-					+ " " + CurrencyHelper.formatAsCurrencyString(totalWithdrawalAmountIncludingTaxes);
+					+ " " + CurrencyHelper.formatAsCurrencyString(totalWithdrawalAmountIncludingTaxes) + " Net: "
+					+ CurrencyHelper.formatAsCurrencyString(netAmount);
 
 		}
 

@@ -31,7 +31,7 @@ public class FooterHandler implements IEventHandler {
 	public static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("MM/dd/yy hh:mm a");
     public  PdfFont font = null;
 
-    protected String footer;
+    protected String footer = "";
     protected Rectangle rectangle = new Rectangle(500, 803, 30, 30);
     
 	PdfFormXObject template = new PdfFormXObject(rectangle);
@@ -49,7 +49,9 @@ public class FooterHandler implements IEventHandler {
         canvas.beginText();
         canvas.moveText(50, 10);
         canvas.showText(String.format("Page %d ", docEvent.getDocument().getPageNumber(page)));
-        canvas.moveText(1000, 0);
+        canvas.moveText(500, 0);
+        canvas.showText(footer);
+        canvas.moveText(500 - footer.length(), 0);
         canvas.showText(LocalDateTime.now().format(TIME_FORMATTER));
         canvas.endText();
         canvas.stroke();

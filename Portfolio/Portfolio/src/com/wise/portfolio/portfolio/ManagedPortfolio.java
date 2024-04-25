@@ -7,9 +7,12 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.Map.Entry;
 import java.util.stream.Collectors;
 
@@ -25,7 +28,15 @@ public class ManagedPortfolio extends Portfolio {
 	private List<PortfolioTransaction> portfolioScheduledTransactions = new ArrayList<>();
 
 	public List<PortfolioTransaction> getPortfolioTransactions() {
+
+		Collections.sort(portfolioScheduledTransactions, new Comparator<PortfolioTransaction>() {
+			@Override
+			public int compare(PortfolioTransaction o1, PortfolioTransaction o2) {
+				return o1.getDate().compareTo(o2.getDate());
+			}
+		});
 		return portfolioScheduledTransactions;
+
 	}
 
 	public Map<String, Map<FundCategory, BigDecimal>> getDesiredFundAllocationMaps() {

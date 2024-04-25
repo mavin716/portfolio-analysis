@@ -10,7 +10,7 @@ public class CurrencyHelper {
 		if (total.compareTo(BigDecimal.ZERO) == 0 || amount.compareTo(BigDecimal.ZERO) == 0) {
 			return BigDecimal.ZERO;
 		} else {
-			return amount.divide(total, 4, RoundingMode.HALF_UP).setScale(4, RoundingMode.HALF_UP);
+			return amount.divide(total, 6, RoundingMode.DOWN).setScale(6, RoundingMode.DOWN);
 		}
 	}
 
