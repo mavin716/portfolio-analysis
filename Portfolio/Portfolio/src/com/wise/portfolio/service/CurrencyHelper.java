@@ -18,24 +18,24 @@ public class CurrencyHelper {
 		return NumberFormat.getCurrencyInstance().format(n);
 	}
 
-	public static String formatPercentageString(Double desiredCategoryPercentage) {
-		return desiredCategoryPercentage == null ? String.format("%6s", "N/A%")
-				: String.format("%(6.2f", (desiredCategoryPercentage * 100)) + "%";
+	public static String formatPercentageString(Double percentage) {
+		return percentage == null ? String.format("%6s", "N/A%")
+				: String.format("%(6.2f", (percentage * 100)) + "%";
 	}
 
-	public static String formatPercentageString(BigDecimal desiredCategoryPercentage) {
-		return desiredCategoryPercentage == null ? String.format("%6s", "N/A%")
-				: String.format("%(6.2f", (desiredCategoryPercentage.multiply(new BigDecimal(100)))) + "%";
+	public static String formatPercentageString(BigDecimal percentage) {
+		return percentage == null ? String.format("%6s", "N/A%")
+				: String.format("%(6.2f", (percentage.multiply(new BigDecimal(100)))) + "%";
 	}
 
-	public static String formatPercentageString3(BigDecimal desiredCategoryPercentage) {
-		return desiredCategoryPercentage == null ? String.format("%6s", "N/A%")
-				: String.format("%(6.3f", (desiredCategoryPercentage.multiply(new BigDecimal(100)))) + "%";
+	public static String formatPercentageString3(BigDecimal percentage) {
+		return percentage == null ? String.format("%6s", "N/A%")
+				: String.format("%(6.3f", (percentage.multiply(new BigDecimal(100)))) + "%";
 	}
 
-	public static String formatPercentageString4(BigDecimal desiredCategoryPercentage) {
-		return desiredCategoryPercentage == null ? String.format("%6s", "N/A%")
-				: String.format("%(6.4f", (desiredCategoryPercentage.multiply(new BigDecimal(100)))) + "%";
+	public static String formatPercentageString4(BigDecimal percentage) {
+		return percentage == null ? String.format("%6s", "N/A%")
+				: String.format("%(6.4f", (percentage.multiply(new BigDecimal(100)))) + "%";
 	}
 
 

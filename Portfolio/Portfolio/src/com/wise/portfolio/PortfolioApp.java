@@ -12,6 +12,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -28,6 +29,7 @@ import com.itextpdf.layout.Document;
 import com.itextpdf.layout.element.Paragraph;
 import com.itextpdf.layout.property.HorizontalAlignment;
 import com.wise.portfolio.alphaVantage.AlphaVantageFundPriceService;
+import com.wise.portfolio.fund.FundTransaction;
 import com.wise.portfolio.fund.PortfolioFund;
 import com.wise.portfolio.pdf.FooterHandler;
 import com.wise.portfolio.pdf.HeaderHandler;
@@ -49,7 +51,7 @@ public class PortfolioApp {
 	private static final String DOWNLOAD_FILENAME_PREFIX = "ofxdownload";
 	private static final String CURRENT_DOWNLOAD_FILE = CURRENT_DOWNLOAD_FILE_PATH + DOWNLOAD_FILENAME_PREFIX + ".csv";
 	private static final String ALLOCATION_FILE = DOWNLOAD_PATH + "allocation.csv";
-	private String SCHEDULE_FILE = DOWNLOAD_PATH + "Schedule.csv";
+	private static final String SCHEDULE_FILE = DOWNLOAD_PATH + "Schedule.csv";
 	private static final String ALPHA_VANTAGE_PRICE_HISTORY_FILENAME = "alphaVantagePriceHistory.csv";
 
 	private static final String FUND_SYMBOLS_MAP_FILE = "allocation.csv";
@@ -64,7 +66,7 @@ public class PortfolioApp {
 
 	private static final int RECENT_TRANSACTIONS_DAYS = 30;
 
-	private static final long PORTFOLIO_TRANSACTION_REPORT_WINDOW = 5;
+	private static final long PORTFOLIO_TRANSACTION_REPORT_WINDOW = 7;
 
 	public static void main(String[] args) {
 
@@ -105,11 +107,8 @@ public class PortfolioApp {
 //				if (!success) {
 //					break;
 //				}
-				// not working, returning values which differ greatly from vanguard download
-				// files
 				String symbol = entry.getKey();
 				System.out.println("Retrieve Alpha Vantage prices for " + portfolio.getFundName(symbol));
-//				AlphaVantageFundPriceService.loadFundHistoryFromAlphaVantage(portfolio, symbol, true);
 				boolean success = AlphaVantageFundPriceService.retrieveFundHistoryFromAlphaVantage(portfolio, symbol,
 						false);
 				if (!success) {
@@ -136,7 +135,7 @@ public class PortfolioApp {
 			portfolioPdfFile = new File(PORTFOLIO_PDF_FILE);
 			portfolioPdfFile.delete();
 
-			PdfWriter writer = new PdfWriter(PORTFOLIO_PDF_FILE);
+			PdfWriter writer = new PdfWriter(portfolioPdfFile);
 			PdfDocument pdfDoc = new PdfDocument(writer);
 
 			Document document = new Document(pdfDoc, PageSize.LEDGER);
@@ -145,6 +144,9 @@ public class PortfolioApp {
 			// Document Title
 			LocalDate lastBusinessDay = LocalDate.now();
 			if (LocalTime.now().getHour() < 18) {
+				lastBusinessDay = lastBusinessDay.minusDays(1);
+			}
+			if (lastBusinessDay.getDayOfWeek() == DayOfWeek.SUNDAY) {
 				lastBusinessDay = lastBusinessDay.minusDays(1);
 			}
 			if (lastBusinessDay.getDayOfWeek() == DayOfWeek.SATURDAY) {
@@ -173,6 +175,9 @@ public class PortfolioApp {
 			FooterHandler footerHandler = new FooterHandler();
 			pdfDoc.addEventHandler(PdfDocumentEvent.END_PAGE, footerHandler);
 
+			// Process scheduled portfolio transactions
+			processScheduledPortfolioTransactions(document);
+
 			System.out.println("Print performance table");
 			headerHandler.setHeader("performance table");
 			footerHandler.setFooter("* 10 yr return doesn't include income");
@@ -197,9 +202,6 @@ public class PortfolioApp {
 					PortfolioService.getYtdDays());
 			portfolioService.printFutureWithdrawalsSpreadsheet("Future Withdrawals", portfolio, document,
 					FEDERAL_WITHOLD_TAXES_PERCENT, STATE_WITHOLD_TAXES_PERCENT);
-
-			// Process scheduled portfolio transactions
-			processScheduledPortfolioTransactions(document);
 
 			// Add price performance graphs,
 			System.out.println("Print graphs");
@@ -366,21 +368,21 @@ public class PortfolioApp {
 				} else {
 					transferTransactions.add(transaction);
 				}
-				while (transaction.isRecurring() && today.isAfter(transactionDate)) {
-					switch (transaction.getRecurringPeriod()) {
-					case "Month":
-						transactionDate = transactionDate.plusMonths(1);
-						break;
-					case "Year":
-						transactionDate = transactionDate.plusYears(1);
-						break;
-					default:
-						System.out.print("Unknown recurrng period:  " + transaction.getRecurringPeriod());
-						transactionDate = transactionDate.plusYears(99);
-						break;
-					}
-					transaction.setDate(transactionDate);
+			}
+			while (transaction.isRecurring() && !today.isBefore(transactionDate)) {
+				switch (transaction.getRecurringPeriod()) {
+				case "Month":
+					transactionDate = transactionDate.plusMonths(1);
+					break;
+				case "Year":
+					transactionDate = transactionDate.plusYears(1);
+					break;
+				default:
+					System.out.print("Unknown recurrng period:  " + transaction.getRecurringPeriod());
+					transactionDate = transactionDate.plusYears(99);
+					break;
 				}
+				transaction.setDate(transactionDate);
 			}
 			if (transaction.getDate().isAfter(today)) {
 				updatedTransactions.add(transaction);
@@ -406,12 +408,14 @@ public class PortfolioApp {
 
 		String title = "Withdrawal scheduled for " + DATE_FORMATTER.format(withdrawDate);
 		BigDecimal withdrawAmount = BigDecimal.ZERO;
-		BigDecimal totalWithdrawalAmountIncludingTaxes = withdrawAmount;
+		BigDecimal totalAddlTaxes = BigDecimal.ZERO;
+		BigDecimal totalWithdrawalIncludingTaxes = withdrawAmount;
 		List<Pair<String, BigDecimal>> fundWithdrawals = new ArrayList<>();
+
+		withdrawTransactions.sort(Comparator.comparing(PortfolioTransaction::getAmount).reversed());
 
 		for (PortfolioTransaction transaction : withdrawTransactions) {
 			withdrawAmount = withdrawAmount.add(transaction.getAmount());
-			totalWithdrawalAmountIncludingTaxes = withdrawAmount;
 
 			if (transaction.getFundSymbol() != null && transaction.getFundSymbol().length() > 0) {
 				fundWithdrawals.add(Pair.of(transaction.getFundSymbol(), transaction.getAmount()));
@@ -420,63 +424,28 @@ public class PortfolioApp {
 				// add in taxes which will be distributed across portfolio
 				// to include taxes in selected fund, add to amount and set Is Net Amount to
 				// true
-				totalWithdrawalAmountIncludingTaxes = withdrawAmount.divide(AFTER_TAXES_WITHDRAW_AMOUNT_PERCENTAGE, 0,
-						RoundingMode.UP);
+				totalAddlTaxes = totalAddlTaxes.add(transaction.getAmount().multiply(WITHOLD_TAXES_PERCENT));
 			}
 			title += "; " + transaction.getDescription();
 		}
-		BigDecimal netAmount = totalWithdrawalAmountIncludingTaxes.multiply(AFTER_TAXES_WITHDRAW_AMOUNT_PERCENTAGE);
-		title += " " + CurrencyHelper.formatAsCurrencyString(totalWithdrawalAmountIncludingTaxes) + " Net: "
+		
+		totalWithdrawalIncludingTaxes = withdrawAmount.add(totalAddlTaxes);
+		BigDecimal netAmount = totalWithdrawalIncludingTaxes.multiply(AFTER_TAXES_WITHDRAW_AMOUNT_PERCENTAGE);
+		title += " " + CurrencyHelper.formatAsCurrencyString(totalWithdrawalIncludingTaxes) + " Net: "
 				+ CurrencyHelper.formatAsCurrencyString(netAmount);
 		System.out.println(title);
 
 		// Calculate withdrawals
-		Map<String, BigDecimal> withdrawals = portfolioService.calculateWithdrawal(totalWithdrawalAmountIncludingTaxes,
+		Map<String, BigDecimal> withdrawals = portfolioService.calculateWithdrawal(totalWithdrawalIncludingTaxes,
 				fundWithdrawals);
 
 		// print spreadsheet
 		portfolioService.printWithdrawalSpreadsheet(title, portfolio, withdrawAmount,
-				totalWithdrawalAmountIncludingTaxes, withdrawals, document);
+				totalWithdrawalIncludingTaxes, withdrawals, document);
 
 	}
 
-	private void processPortfolioTransactionWithdraw(PortfolioTransaction transaction,
-			PortfolioService portfolioService, Document document) {
 
-		ManagedPortfolio portfolio = portfolioService.getPortfolio();
-
-		BigDecimal withdrawAmount = transaction.getAmount();
-		BigDecimal totalWithdrawalAmountIncludingTaxes = withdrawAmount;
-
-		String title;
-		if (transaction.isNetAmount()) {
-			// add in taxes which will be distributed across portfolio
-			// to include taxes in selected fund, add to amount and set Is Net Amount to
-			// true
-			totalWithdrawalAmountIncludingTaxes = withdrawAmount.divide(AFTER_TAXES_WITHDRAW_AMOUNT_PERCENTAGE, 0,
-					RoundingMode.UP);
-			title = transaction.getDescription() + " Scheduled for " + DATE_FORMATTER.format(transaction.getDate())
-					+ " " + CurrencyHelper.formatAsCurrencyString(totalWithdrawalAmountIncludingTaxes) + " net: "
-					+ CurrencyHelper.formatAsCurrencyString(withdrawAmount);
-		} else {
-			BigDecimal netAmount = withdrawAmount.multiply(AFTER_TAXES_WITHDRAW_AMOUNT_PERCENTAGE);
-			title = transaction.getDescription() + " Scheduled for " + DATE_FORMATTER.format(transaction.getDate())
-					+ " " + CurrencyHelper.formatAsCurrencyString(totalWithdrawalAmountIncludingTaxes) + " Net: "
-					+ CurrencyHelper.formatAsCurrencyString(netAmount);
-
-		}
-
-		System.out.println(title);
-
-		// Calculate withdrawals
-		Map<String, BigDecimal> withdrawals = portfolioService.calculateWithdrawal(withdrawAmount,
-				totalWithdrawalAmountIncludingTaxes, transaction.getFundSymbol(), false);
-
-		// print spreadsheet
-		portfolioService.printWithdrawalSpreadsheet(title, portfolio, withdrawAmount,
-				totalWithdrawalAmountIncludingTaxes, withdrawals, document);
-
-	}
 
 	private void processPortfolioTransactionTransfer(List<PortfolioTransaction> transactions,
 			PortfolioService portfolioService, Document document, ManagedPortfolio portfolio) {
@@ -485,6 +454,8 @@ public class PortfolioApp {
 
 		String title = "";
 		LocalDate date = LocalDate.now();
+		transactions.sort(Comparator.comparing(PortfolioTransaction::getAmount).reversed());
+
 		for (PortfolioTransaction transaction : transactions) {
 			withdrawalMap.put(transaction.getFundSymbol(), BigDecimal.ZERO.subtract(transaction.getAmount()));
 			title = transaction.getDescription();
@@ -495,6 +466,7 @@ public class PortfolioApp {
 
 		Map<String, BigDecimal> transfers = portfolioService.calculateFixedExpensesTransfer(withdrawalMap);
 
+		
 		portfolioService.printWithdrawalSpreadsheet(title, portfolio, BigDecimal.ZERO, BigDecimal.ZERO, transfers,
 				document);
 

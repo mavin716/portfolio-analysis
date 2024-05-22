@@ -135,7 +135,7 @@ public class ManagedPortfolio extends Portfolio {
 		if (fund.getMinimumAmount() != null) {
 			if (fundTargetValue.compareTo(fund.getMinimumAmount()) < 0) {
 				// Don't withdrawal all of the excess
-				fundTargetPercentage = fund.getMinimumAmount().add(new BigDecimal(1000)).divide(totalAfterWithdrawal, 4,
+				fundTargetPercentage = fund.getMinimumAmount().add(new BigDecimal(1000)).divide(totalAfterWithdrawal, 5,
 						RoundingMode.HALF_DOWN);
 			}
 		}
@@ -221,8 +221,9 @@ public class ManagedPortfolio extends Portfolio {
 	}
 
 	public BigDecimal getTotalValueByDate(LocalDate date) {
-		BigDecimal totalValueByDate = null;
-		totalValueByDate = getFundMap().values().stream().map(f -> getValueByDate(f, date)).filter(x -> x != null)
+		
+		BigDecimal totalValueByDate = getFundMap().values().stream().map(f -> getValueByDate(f, date))
+				.filter(x -> x != null)
 				.reduce(new BigDecimal(0, MathContext.DECIMAL32), (total, fundValue) -> total = total.add(fundValue))
 				.setScale(2, RoundingMode.UP);
 		return totalValueByDate;
@@ -233,14 +234,16 @@ public class ManagedPortfolio extends Portfolio {
 		if (fund.isClosed()) {
 			return BigDecimal.ZERO;
 		}
-		PortfolioPriceHistory priceHistory = getPriceHistory();
-		BigDecimal value = new BigDecimal(0);
+		BigDecimal value = BigDecimal.ZERO;
 
-		BigDecimal price = priceHistory.getPriceByDate(fund, date, false);
+		PortfolioPriceHistory priceHistory = getPriceHistory();
+		
 		double shares = priceHistory.getSharesByDate(fund, date, false);
 		if (shares <= 0) {
 			return value;
 		}
+		
+		BigDecimal price = priceHistory.getPriceByDate(fund, date, false);
 		int tries = 30;
 		while (tries-- > 0) {
 			if (price != null && price.compareTo(BigDecimal.ZERO) > 0) {
@@ -249,7 +252,7 @@ public class ManagedPortfolio extends Portfolio {
 					return value;
 				}
 			}
-			date = date.minus(1, ChronoUnit.DAYS);
+			date = date.minusDays(1);
 			price = priceHistory.getPriceByDate(fund, date, true);
 		}
 
@@ -265,9 +268,9 @@ public class ManagedPortfolio extends Portfolio {
 		return desiredFundAllocationMaps.get(fundSymbol).get(FundCategory.TOTAL);
 	}
 
-	public List<Entry<LocalDate, FundTransaction>> getRecentTransactions(List<String> transactionTypes, long l) {
+	public List<Entry<LocalDate, FundTransaction>> getRecentTransactions(List<String> transactionTypes, long days) {
 
-		LocalDate startDate = LocalDate.now().minusDays(l);
+		LocalDate startDate = LocalDate.now().minusDays(days);
 		List<Entry<LocalDate, FundTransaction>> transactions = new ArrayList<>();
 		for (PortfolioFund fund : getFundMap().values()) {
 			for (Entry<LocalDate, FundTransaction> transactionEntry : fund.getTransactionsBetweenDates(startDate,
