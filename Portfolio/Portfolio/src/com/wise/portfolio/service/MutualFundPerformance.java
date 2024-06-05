@@ -41,6 +41,9 @@ public class MutualFundPerformance {
 		this.portfolioFund = fund;
 
 		if (fund != null) {
+			if (fund.getCurrentPrice() == null) {
+				return;
+			}
 			BigDecimal beginYearPrice = getClosestHistoricalPrice(getFirstOfYearBusinessDate(), 30);
 			if (beginYearPrice == null) {
 				return;
@@ -299,9 +302,14 @@ public class MutualFundPerformance {
 
 	public BigDecimal getPriceByDate(Fund fund, LocalDate date, boolean isExactDate) {
 		BigDecimal value = null;
-
-		Map<LocalDate, BigDecimal> fundPriceMap = portfolioPriceHistory.getVanguardPriceHistory().get(fund.getSymbol())
-				.getFundPricesMap();
+		FundPriceHistory priceHistory = portfolioPriceHistory.getVanguardPriceHistory().get(fund.getSymbol());
+		if (priceHistory == null) {
+			priceHistory = portfolioPriceHistory.getAlphaVantagePriceHistory().get(fund.getSymbol());
+			if (priceHistory == null) {
+				return value;
+			}
+		}
+		Map<LocalDate, BigDecimal> fundPriceMap = priceHistory.getFundPricesMap();
 		value = fundPriceMap.get(date);
 		if (value == null && !isExactDate) {
 			int tries = 10;
@@ -315,8 +323,7 @@ public class MutualFundPerformance {
 		}
 		if (value == null) {
 			if (value == null) {
-				FundPriceHistory priceHistory = portfolioPriceHistory.getAlphaVantagePriceHistory()
-						.get(fund.getSymbol());
+				priceHistory = portfolioPriceHistory.getAlphaVantagePriceHistory().get(fund.getSymbol());
 				if (priceHistory != null) {
 					fundPriceMap = priceHistory.getFundPricesMap();
 					value = fundPriceMap.get(date);
@@ -328,9 +335,12 @@ public class MutualFundPerformance {
 	}
 
 	public Double getSharesByDate(Fund fund, LocalDate date, boolean isExactDate) {
-		Double value;
+		Double value = new Double(0);
 
 		Map<LocalDate, Double> fundSharesMap = portfolioPriceHistory.getFundShares().get(fund.getSymbol());
+		if (fundSharesMap ==  null) {
+			return value;
+		}
 		value = fundSharesMap.get(date);
 		if (!isExactDate) {
 			int tries = 15;

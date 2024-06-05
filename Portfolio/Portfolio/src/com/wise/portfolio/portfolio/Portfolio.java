@@ -58,16 +58,12 @@ public class Portfolio {
 
 	}
 
-	public Map<String, PortfolioFund> getFundMap() {
+	protected Map<String, PortfolioFund> getFundMap() {
 		return fundMap;
 	}
 
 	public PortfolioFund getFund(String symbol) {
 		return fundMap.get(symbol);
-	}
-
-	public void setFundMap(Map<String, PortfolioFund> map) {
-		this.fundMap = map;
 	}
 
 	public void addFund(PortfolioFund fund) {
@@ -76,11 +72,11 @@ public class Portfolio {
 
 	public BigDecimal getTotalValue() {
 
-		return fundMap.values().stream().filter(fund -> !fund.isClosed()).map(PortfolioFund::getCurrentValue)
+		return fundMap.values().stream().filter(fund -> !fund.isClosed())
+				.map(PortfolioFund::getCurrentValue)
 				.reduce(new BigDecimal(0, MathContext.DECIMAL32), (total, fundValue) -> total = total.add(fundValue))
 				.setScale(2, RoundingMode.HALF_UP);
 	}
-
 
 	public BigDecimal getValueByCategory(FundCategory category) {
 
@@ -216,12 +212,15 @@ public class Portfolio {
 	}
 
 	public Collection<String> getFundSymbols() {
-		// TODO Auto-generated method stub
-		return fundSymbolNameMap.values();
+		return fundSymbolNameMap.keySet();
 	}
 
 	public String getFundName(String fundSymbol) {
 		return fundSymbolNameMap.get(fundSymbol);
+	}
+
+	public Collection<PortfolioFund> getFunds() {
+		return this.getFundMap().values();
 	}
 
 }

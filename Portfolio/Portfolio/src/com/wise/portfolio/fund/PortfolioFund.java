@@ -97,6 +97,9 @@ public class PortfolioFund extends MutualFund {
 
 
 	public BigDecimal getCurrentValue() {
+		if (isClosed) {
+			return BigDecimal.ZERO;
+		}
 		BigDecimal value = currentPrice.multiply(new BigDecimal(shares)).setScale(2, RoundingMode.HALF_UP);
 		return value;
 	}

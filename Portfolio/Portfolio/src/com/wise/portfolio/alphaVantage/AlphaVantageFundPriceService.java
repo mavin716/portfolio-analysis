@@ -29,6 +29,7 @@ public class AlphaVantageFundPriceService {
 	public static boolean retrieveFundHistoryFromAlphaVantage(Portfolio portfolio, String symbol, boolean retry)
 			throws IOException {
 
+		System.out.println("Retrieve AV prices for:  " + portfolio.getFundName(symbol));
 		LocalDate earliestAlphaVantageDate = LocalDate.now();
 
 		BigDecimal closingPrice = BigDecimal.ZERO;
@@ -48,7 +49,7 @@ public class AlphaVantageFundPriceService {
 			while (sc.hasNext()) {
 				response.append(sc.nextLine());
 			}
-			System.out.println("response " + response.substring(0, 50));
+			System.out.println("response " + response.substring(0, 25));
 			sc.close();
 			httpclient.close();
 

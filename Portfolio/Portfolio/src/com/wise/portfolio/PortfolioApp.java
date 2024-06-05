@@ -1,6 +1,7 @@
 package com.wise.portfolio;
 
 import java.io.File;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.file.Files;
@@ -34,6 +35,7 @@ import com.wise.portfolio.fund.PortfolioFund;
 import com.wise.portfolio.pdf.FooterHandler;
 import com.wise.portfolio.pdf.HeaderHandler;
 import com.wise.portfolio.portfolio.ManagedPortfolio;
+import com.wise.portfolio.portfolio.Portfolio;
 import com.wise.portfolio.portfolio.PortfolioTransaction;
 import com.wise.portfolio.service.CurrencyHelper;
 import com.wise.portfolio.service.MailService;
@@ -66,7 +68,7 @@ public class PortfolioApp {
 
 	private static final int RECENT_TRANSACTIONS_DAYS = 30;
 
-	private static final long PORTFOLIO_TRANSACTION_REPORT_WINDOW = 7;
+	private static final long PORTFOLIO_TRANSACTION_REPORT_WINDOW = 8;
 
 	public static void main(String[] args) {
 
@@ -98,30 +100,40 @@ public class PortfolioApp {
 			// portfolioService.updateDownloadFilenames(portfolio,
 			// DOWNLOAD_FILENAME_PREFIX);
 
+			System.out.println("Load portfolio allocation");
+			portfolioService.loadFundAllocation(ALLOCATION_FILE);
+
 			// Load price history via alphaVantage
-			for (Entry<String, PortfolioFund> entry : portfolio.getFundMap().entrySet()) {
-				if (entry.getValue().getShares() == 0) {
-					// continue;
+			// randomize order of funds because the number exceeds daily quota
+			portfolio.getFunds().parallelStream().filter(f -> !f.isClosed() && !f.isMMFund())
+			.forEach(f -> {
+				try {
+					AlphaVantageFundPriceService.retrieveFundHistoryFromAlphaVantage(portfolio, f.getSymbol(),
+								false);
+				} catch (IOException e) {
+					System.out.println("Exception:  " + e.getMessage());
+					e.printStackTrace();
 				}
-//				boolean success = AlphaVantageFundPriceService.loadFundHistoryFromAlphaVantage(portfolio, entry.getKey(), true);
-//				if (!success) {
-//					break;
+			});
+//			for (PortfolioFund fund : portfolio.getFunds()) {
+//				if (fund.isClosed()) {
+//					// don't retrieve price history for closed funds since that will
+//					// increase the number of calls above the daily limit
+//					continue;
 //				}
-				String symbol = entry.getKey();
-				System.out.println("Retrieve Alpha Vantage prices for " + portfolio.getFundName(symbol));
-				boolean success = AlphaVantageFundPriceService.retrieveFundHistoryFromAlphaVantage(portfolio, symbol,
-						false);
-				if (!success) {
-					break;
-				}
-			}
+//				System.out.println("Retrieve Alpha Vantage prices for " + fund.getName() + " " + fund.getSymbol());
+//				boolean success = AlphaVantageFundPriceService.retrieveFundHistoryFromAlphaVantage(portfolio, fund.getSymbol(),
+//						false);
+//				// Do not stop retrieving because closed funds will return failure:  Invalid API call
+//				if (!success) {
+//					System.out.println("Failed to retrieve prices from Alpha Vantage service for fund: " + fund.getName());
+//					//break;
+//				}
+//			}
 
 			System.out.println("Loading Alpha Vantage Price History File");
 			portfolio.getPriceHistory().loadAlphaPriceHistoryFile(portfolio, DOWNLOAD_PATH,
 					ALPHA_VANTAGE_PRICE_HISTORY_FILENAME);
-
-			System.out.println("Load portfolio allocation");
-			portfolioService.loadFundAllocation(ALLOCATION_FILE);
 
 			System.out.println("Load portfolio schedule");
 			portfolioService.loadPortfolioScheduleFile(SCHEDULE_FILE);
@@ -207,14 +219,17 @@ public class PortfolioApp {
 			System.out.println("Print graphs");
 			headerHandler.setHeader("balance line graph");
 			pdfDoc.addNewPage();
-			portfolioService.printBalanceLineGraphs(document, pdfDoc, null, null);
+			portfolioService.printBalanceLineGraphs(document, pdfDoc, LocalDate.now().minusYears(4), LocalDate.now());
 
 			pdfDoc.addNewPage();
 			portfolioService.printBalanceLineGraphs(document, pdfDoc, LocalDate.now().minusYears(1), LocalDate.now());
 
 			pdfDoc.addNewPage();
-			for (PortfolioFund fund : portfolio.getFundMap().values()) {
-				if (fund.isClosed())
+			portfolioService.printBalanceLineGraphs(document, pdfDoc, LocalDate.now().minusMonths(1), LocalDate.now());
+
+			pdfDoc.addNewPage();
+			for (PortfolioFund fund : portfolio.getFunds()) {
+				if (fund.isClosed() || fund.getShares() == 0)
 					continue;
 				portfolioService.printFundPerformanceLineGraph(fund.getSymbol(), document, pdfDoc,
 						LocalDate.now().minusYears(5), LocalDate.now());
@@ -225,7 +240,7 @@ public class PortfolioApp {
 			LocalDate startDate = LocalDate.now().minusYears(10);
 			LocalDate endDate = LocalDate.now();
 			List<String> fundSynbols = new ArrayList<String>();
-			for (PortfolioFund fund : portfolio.getFundMap().values()) {
+			for (PortfolioFund fund : portfolio.getFunds()) {
 				BigDecimal maxPrice = portfolio.getPriceHistory().getMaxPrice(fund).getValue();
 				if (maxPrice.compareTo(new BigDecimal(200)) > 0) {
 					fundSynbols.add(fund.getSymbol());
@@ -236,7 +251,7 @@ public class PortfolioApp {
 
 			pdfDoc.addNewPage();
 			fundSynbols = new ArrayList<String>();
-			for (PortfolioFund fund : portfolio.getFundMap().values()) {
+			for (PortfolioFund fund : portfolio.getFunds()) {
 				BigDecimal maxPrice = portfolio.getPriceHistory().getMaxPrice(fund).getValue();
 				if (maxPrice.compareTo(new BigDecimal(200)) < 0 && maxPrice.compareTo(new BigDecimal(150)) > 0) {
 					fundSynbols.add(fund.getSymbol());
@@ -247,7 +262,7 @@ public class PortfolioApp {
 
 			pdfDoc.addNewPage();
 			fundSynbols = new ArrayList<String>();
-			for (PortfolioFund fund : portfolio.getFundMap().values()) {
+			for (PortfolioFund fund : portfolio.getFunds()) {
 				BigDecimal maxPrice = portfolio.getPriceHistory().getMaxPrice(fund).getValue();
 				if (maxPrice.compareTo(new BigDecimal(150)) < 0 && maxPrice.compareTo(new BigDecimal(100)) > 0) {
 					fundSynbols.add(fund.getSymbol());
@@ -258,7 +273,7 @@ public class PortfolioApp {
 
 			pdfDoc.addNewPage();
 			fundSynbols = new ArrayList<String>();
-			for (PortfolioFund fund : portfolio.getFundMap().values()) {
+			for (PortfolioFund fund : portfolio.getFunds()) {
 				BigDecimal maxPrice = portfolio.getPriceHistory().getMaxPrice(fund).getValue();
 				if (maxPrice.compareTo(new BigDecimal(100)) < 0 && maxPrice.compareTo(new BigDecimal(50)) > 0) {
 					fundSynbols.add(fund.getSymbol());
@@ -269,7 +284,7 @@ public class PortfolioApp {
 
 			pdfDoc.addNewPage();
 			fundSynbols = new ArrayList<String>();
-			for (PortfolioFund fund : portfolio.getFundMap().values()) {
+			for (PortfolioFund fund : portfolio.getFunds()) {
 				BigDecimal maxPrice = portfolio.getPriceHistory().getMaxPrice(fund).getValue();
 				if (maxPrice.compareTo(new BigDecimal(50)) < 0 && maxPrice.compareTo(new BigDecimal(30)) > 0) {
 					fundSynbols.add(fund.getSymbol());
@@ -279,7 +294,7 @@ public class PortfolioApp {
 					startDate, endDate);
 			pdfDoc.addNewPage();
 			fundSynbols = new ArrayList<String>();
-			for (PortfolioFund fund : portfolio.getFundMap().values()) {
+			for (PortfolioFund fund : portfolio.getFunds()) {
 				BigDecimal maxPrice = portfolio.getPriceHistory().getMaxPrice(fund).getValue();
 				if (maxPrice.compareTo(new BigDecimal(30)) < 0 && maxPrice.compareTo(new BigDecimal(15)) > 0) {
 					fundSynbols.add(fund.getSymbol());
@@ -290,7 +305,7 @@ public class PortfolioApp {
 
 			pdfDoc.addNewPage();
 			fundSynbols = new ArrayList<String>();
-			for (PortfolioFund fund : portfolio.getFundMap().values()) {
+			for (PortfolioFund fund : portfolio.getFunds()) {
 				BigDecimal maxPrice = portfolio.getPriceHistory().getMaxPrice(fund).getValue();
 				if (maxPrice.compareTo(new BigDecimal(15)) < 0 && maxPrice.compareTo(new BigDecimal(1)) > 0) {
 					fundSynbols.add(fund.getSymbol());
@@ -402,9 +417,9 @@ public class PortfolioApp {
 
 	private void processPortfolioTransactionWithdraw(LocalDate withdrawDate,
 			List<PortfolioTransaction> withdrawTransactions, PortfolioService portfolioService, Document document,
-			ManagedPortfolio portfolio2) {
+			Portfolio portfolio2) {
 
-		ManagedPortfolio portfolio = portfolioService.getPortfolio();
+		Portfolio portfolio = portfolioService.getPortfolio();
 
 		String title = "Withdrawal scheduled for " + DATE_FORMATTER.format(withdrawDate);
 		BigDecimal withdrawAmount = BigDecimal.ZERO;
@@ -413,6 +428,8 @@ public class PortfolioApp {
 		List<Pair<String, BigDecimal>> fundWithdrawals = new ArrayList<>();
 
 		withdrawTransactions.sort(Comparator.comparing(PortfolioTransaction::getAmount).reversed());
+
+		BigDecimal netWithdrawalAmount = BigDecimal.ZERO;
 
 		for (PortfolioTransaction transaction : withdrawTransactions) {
 			withdrawAmount = withdrawAmount.add(transaction.getAmount());
@@ -424,15 +441,19 @@ public class PortfolioApp {
 				// add in taxes which will be distributed across portfolio
 				// to include taxes in selected fund, add to amount and set Is Net Amount to
 				// true
-				totalAddlTaxes = totalAddlTaxes.add(transaction.getAmount().multiply(WITHOLD_TAXES_PERCENT));
+				netWithdrawalAmount = netWithdrawalAmount.add(transaction.getAmount());
+				totalAddlTaxes = totalAddlTaxes
+						.add(transaction.getAmount().multiply(WITHOLD_TAXES_PERCENT).setScale(2, RoundingMode.HALF_UP));
+			} else {
+				netWithdrawalAmount = netWithdrawalAmount
+						.add(transaction.getAmount().multiply(AFTER_TAXES_WITHDRAW_AMOUNT_PERCENTAGE));
 			}
 			title += "; " + transaction.getDescription();
 		}
-		
+
 		totalWithdrawalIncludingTaxes = withdrawAmount.add(totalAddlTaxes);
-		BigDecimal netAmount = totalWithdrawalIncludingTaxes.multiply(AFTER_TAXES_WITHDRAW_AMOUNT_PERCENTAGE);
 		title += " " + CurrencyHelper.formatAsCurrencyString(totalWithdrawalIncludingTaxes) + " Net: "
-				+ CurrencyHelper.formatAsCurrencyString(netAmount);
+				+ CurrencyHelper.formatAsCurrencyString(netWithdrawalAmount);
 		System.out.println(title);
 
 		// Calculate withdrawals
@@ -440,15 +461,13 @@ public class PortfolioApp {
 				fundWithdrawals);
 
 		// print spreadsheet
-		portfolioService.printWithdrawalSpreadsheet(title, portfolio, withdrawAmount,
-				totalWithdrawalIncludingTaxes, withdrawals, document);
+		portfolioService.printWithdrawalSpreadsheet(title, portfolio, withdrawAmount, totalWithdrawalIncludingTaxes,
+				withdrawals, document);
 
 	}
 
-
-
 	private void processPortfolioTransactionTransfer(List<PortfolioTransaction> transactions,
-			PortfolioService portfolioService, Document document, ManagedPortfolio portfolio) {
+			PortfolioService portfolioService, Document document, Portfolio portfolio) {
 
 		Map<String, BigDecimal> withdrawalMap = new LinkedHashMap<>();
 
@@ -466,7 +485,6 @@ public class PortfolioApp {
 
 		Map<String, BigDecimal> transfers = portfolioService.calculateFixedExpensesTransfer(withdrawalMap);
 
-		
 		portfolioService.printWithdrawalSpreadsheet(title, portfolio, BigDecimal.ZERO, BigDecimal.ZERO, transfers,
 				document);
 

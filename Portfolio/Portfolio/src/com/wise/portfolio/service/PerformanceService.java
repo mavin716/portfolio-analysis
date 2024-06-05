@@ -7,7 +7,6 @@ import java.time.temporal.ChronoUnit;
 
 import com.wise.portfolio.fund.MutualFund.FundCategory;
 import com.wise.portfolio.fund.PortfolioFund;
-import com.wise.portfolio.portfolio.ManagedPortfolio;
 import com.wise.portfolio.portfolio.Portfolio;
 
 public class PerformanceService {
@@ -81,7 +80,7 @@ public class PerformanceService {
 		return BigDecimal.ZERO;
 	}
 
-	public static PortfolioPerformanceData calculatePortfolioPerformanceData(ManagedPortfolio portfolio) {
+	public static PortfolioPerformanceData calculatePortfolioPerformanceData(Portfolio portfolio) {
 
 		PortfolioPerformanceData performanceData = new PortfolioPerformanceData();
 		LocalDate firstOfYearDate = getFirstOfYearDate();
@@ -90,7 +89,7 @@ public class PerformanceService {
 		LocalDate threeYearAgoDate = LocalDate.now().minusYears(1);
 
 		performanceData.setPortfolioCurrentValue(portfolio.getTotalValue());
-		for (PortfolioFund fund : portfolio.getFundMap().values()) {
+		for (PortfolioFund fund : portfolio.getFunds()) {
 
 			performanceData.setPortfolioPreviousDayValue(performanceData.getPortfolioPreviousDayValue()
 					.add(getValueByDate(fund.getSymbol(), LocalDate.now().minusDays(1))));

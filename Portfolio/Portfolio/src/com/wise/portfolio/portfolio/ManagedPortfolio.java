@@ -118,7 +118,7 @@ public class ManagedPortfolio extends Portfolio {
 
 	public List<PortfolioFund> getFundsByCategory(FundCategory category) {
 
-		return getFundMap().values().stream()
+		return getFunds().stream()
 				.filter(fund -> fund.getCategoriesMap().get(category) != null
 						&& fund.getCategoriesMap().get(category).compareTo(BigDecimal.ZERO) > 0)
 				.sorted().collect(Collectors.toList());

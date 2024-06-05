@@ -62,6 +62,9 @@ public class MutualFund implements Comparable<MutualFund>, Fund {
 	}
 
 	public void setSymbol(String symbol) {
+		if (symbol.length() == 0) {
+			return;
+		}
 		this.symbol = symbol;
 	}
 

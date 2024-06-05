@@ -79,7 +79,7 @@ public class VanguardPortfolioLoad {
 				priceHistory.loadPortfolioDownloadFile(portfolio, date, basePath + "\\" + filename);
 
 				BigDecimal withdrawals = BigDecimal.ZERO;
-				for (PortfolioFund fund : portfolio.getFundMap().values()) {
+				for (PortfolioFund fund : portfolio.getFunds()) {
 					if (fund != null) {
 						BigDecimal todayWithdrawals = fund.getWithdrawalTotalForDate(date);
 						// Check if Sell transaction didn't get included in yesterdays download but
@@ -93,7 +93,7 @@ public class VanguardPortfolioLoad {
 				}
 				yesterdayWithdrawals = withdrawals;
 				BigDecimal income = BigDecimal.ZERO;
-				for (PortfolioFund fund : portfolio.getFundMap().values()) {
+				for (PortfolioFund fund : portfolio.getFunds()) {
 					if (fund != null) {
 						income = income.add(fund.getDistributionsForDate(date));
 					}
