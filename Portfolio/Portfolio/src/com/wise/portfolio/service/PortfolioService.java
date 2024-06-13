@@ -54,8 +54,6 @@ import org.jfree.chart.axis.NumberAxis;
 import org.jfree.chart.axis.ValueAxis;
 import org.jfree.chart.plot.XYPlot;
 import org.jfree.chart.renderer.xy.ClusteredXYBarRenderer;
-import org.jfree.chart.renderer.xy.StandardXYBarPainter;
-import org.jfree.chart.renderer.xy.XYBarPainter;
 import org.jfree.chart.renderer.xy.XYBarRenderer;
 import org.jfree.chart.renderer.xy.XYItemRenderer;
 import org.jfree.chart.renderer.xy.XYLineAndShapeRenderer;
@@ -92,10 +90,11 @@ import com.wise.portfolio.fund.FundPriceHistory;
 import com.wise.portfolio.fund.FundTransaction;
 import com.wise.portfolio.fund.MutualFund.FundCategory;
 import com.wise.portfolio.fund.PortfolioFund;
-import com.wise.portfolio.graph.FundRankCell;
 import com.wise.portfolio.portfolio.ManagedPortfolio;
 import com.wise.portfolio.portfolio.Portfolio;
 import com.wise.portfolio.portfolio.PortfolioTransaction;
+import com.wise.portfolio.report.graph.PortfolioFundsPerformanceGraph;
+import com.wise.portfolio.report.table.FundRankCell;
 import com.wise.portfolio.vanguard.VanguardPortfolioLoad;
 
 public class PortfolioService {
@@ -738,7 +737,8 @@ public class PortfolioService {
 		return opacity;
 	}
 
-	private float calculateMovingAveragePriceOpacity(BigDecimal currentFundPrice, BigDecimal movingAveragePrice, int days) {
+	private float calculateMovingAveragePriceOpacity(BigDecimal currentFundPrice, BigDecimal movingAveragePrice,
+			int days) {
 		if (currentFundPrice == null) {
 			return 0f;
 		}
@@ -1226,7 +1226,6 @@ public class PortfolioService {
 		double[] priceArray = ArrayUtils.toPrimitive(prices.toArray(new Double[0]));
 
 		// Calculate the Internal Rate of Return using the guess
-		double irrDouble = Irr.irr(priceArray, guess);
 		float irr = new Float(Irr.irr(priceArray, guess)) - 1f;
 
 		return irr;
@@ -1866,23 +1865,12 @@ public class PortfolioService {
 	}
 
 	public void printPerformanceLineGraphs(String title, List<String> fundSynbols, Document document,
-			PdfDocument pdfDocument, LocalDate startDate, LocalDate endDate) {
+			PdfDocument pdfDocument, LocalDate startDate, LocalDate endDate, boolean includeMovingAverages) {
 
-		List<TimeSeriesCollection> datasets = new ArrayList<>();
-		datasets.add(createFundPriceHistoryDataset(fundSynbols, startDate, endDate, 10));
-		List<XYItemRenderer> renderers = new ArrayList<>();
-		XYLineAndShapeRenderer renderer = new XYLineAndShapeRenderer();
-		renderer.setDefaultShapesVisible(false);
-		renderers.add(renderer);
-
-		// datasets.add(createFundWithdrawalDataset(fundSynbols, startDate, endDate));
-		// XYBarRenderer barRenderer = new XYBarRenderer();
-		// renderer = new XYLineAndShapeRenderer();
-		// renderer.setDefaultItemLabelsVisible(true);
-		// barRenderer.setShadowVisible(false);
-		// renderers.add(renderer);
-
-		JFreeChart lineChart = createTimeSeriesChart(title, null, null, datasets, renderers, null, true, true, false);
+		PortfolioFundsPerformanceGraph graph = new PortfolioFundsPerformanceGraph(portfolio);
+		graph.setAxisPaints(axisPaints);
+		graph.setFundPaints(fundPaints);
+		JFreeChart lineChart = graph.createChart(startDate, endDate, 10, title, fundSynbols, includeMovingAverages);
 
 		addChartToDocument(lineChart, pdfDocument, document);
 
@@ -1933,8 +1921,8 @@ public class PortfolioService {
 //		renderer.setDefaultShapesVisible(false);
 //		renderers.add(renderer);
 
-		JFreeChart lineChart = createTimeSeriesChart(fund.getName() + " Price History", null, null, datasets, renderers, null,
-				true, true, false);
+		JFreeChart lineChart = createTimeSeriesChart(fund.getName() + " Price History", null, null, datasets, renderers,
+				null, true, true, false);
 
 		addChartToDocument(lineChart, pdfDocument, document);
 
@@ -1996,40 +1984,43 @@ public class PortfolioService {
 	public void printBalanceLineGraphs(Document document, PdfDocument pdfDocument, LocalDate startDate,
 			LocalDate endDate) {
 
-//		StandardXYToolTipGenerator toolTipGenerator = new StandardXYToolTipGenerator();
-
 		List<XYItemRenderer> renderers = new ArrayList<>();
 		List<TimeSeriesCollection> datasets = new ArrayList<>();
 
 		datasets.add(createBalanceDataset(startDate, endDate));
 		XYLineAndShapeRenderer renderer = new XYLineAndShapeRenderer();
-//		renderer.setSeriesToolTipGenerator(0, toolTipGenerator);
 		renderer.setDefaultShapesVisible(false);
 		renderers.add(renderer);
+		IntervalXYDataset withdrawalIntervalDataset = null;
+		if (startDate.until(endDate, ChronoUnit.DAYS) > 400) {
 
-//		datasets.add(createDividendDataset(startDate, endDate));
-//		renderer = new XYLineAndShapeRenderer();
-////		renderer.setSeriesToolTipGenerator(0, toolTipGenerator);
-//		renderer.setDefaultShapesVisible(true);
-//		renderers.add(renderer);
+			ClusteredXYBarRenderer barRenderer = new ClusteredXYBarRenderer();
+//			barRenderer.setUseYInterval(true);
+			barRenderer.setShadowVisible(false);
+//			barRenderer.setDrawBarOutline(true);
 
-//		TimeSeriesCollection withdrawalDataset = createWithdrawalDataset(startDate, endDate);
-//		datasets.add(withdrawalDataset);
-//		ClusteredXYBarRenderer barRenderer = new ClusteredXYBarRenderer();
-//		barRenderer.setUseYInterval(true);
-		
-		IntervalXYDataset withdrawalIntervalDataset = createWithdrawalIntervalDataset(startDate, endDate);
-//		datasets.add(withdrawalIntervalDataset);
-//		List<String> toolTips = new ArrayList<String>();
-//		toolTips.add("tooltip1");
-//		toolTips.add("tooltip2");
-//		toolTips.add("tooltip3");
-//		toolTipGenerator.
-//		barRenderer.setSeriesToolTipGenerator(0, toolTipGenerator);
+//			barRenderer.setDefaultOutlinePaint(java.awt.Color.BLACK);
+			barRenderer.setDefaultFillPaint(java.awt.Color.BLACK);
+			barRenderer.setDefaultItemLabelPaint(java.awt.Color.BLACK);
+			barRenderer.setSeriesFillPaint(0, java.awt.Color.BLACK);
+			barRenderer.setDefaultFillPaint(java.awt.Color.BLACK);
+			barRenderer.setDefaultPaint(java.awt.Color.BLACK);
+			barRenderer.setDefaultOutlinePaint(java.awt.Color.BLACK);
+			datasets.add(createDividendDataset(startDate, endDate));
+			renderers.add(renderer);
+
+			TimeSeriesCollection withdrawalDataset = createWithdrawalDataset(startDate, endDate);
+			datasets.add(withdrawalDataset);
+			renderers.add(barRenderer);
+
+		} else {
+			withdrawalIntervalDataset = createWithdrawalIntervalDataset(startDate, endDate);
+		}
 
 //		barRenderer.setShadowVisible(false);
 //		renderers.add(barRenderer);
-		JFreeChart lineChart = createTimeSeriesChart("Balance", null, null, datasets, renderers, withdrawalIntervalDataset, true, true, false);
+		JFreeChart lineChart = createTimeSeriesChart("Balance", null, null, datasets, renderers,
+				withdrawalIntervalDataset, true, true, false);
 
 		// TODO Attempt to configure stroke to be darker, doesn't seem to work....
 //		XYPlot plot = (XYPlot) lineChart.getPlot();
@@ -2045,49 +2036,123 @@ public class PortfolioService {
 	}
 
 	private XYIntervalSeriesCollection createWithdrawalIntervalDataset(LocalDate startDate, LocalDate endDate) {
+
 		XYIntervalSeriesCollection dataset = new XYIntervalSeriesCollection();
 
-		XYIntervalSeries withdrawalIntervalSeries = new XYIntervalSeries("Interval Withdrawals");
 		if (startDate == null) {
 			startDate = portfolio.getPriceHistory().getOldestDate();
 		}
 		if (endDate == null) {
 			endDate = LocalDate.now();
 		}
-		LocalDate graphDate = startDate;
-		while (!graphDate.isBefore(startDate) && !graphDate.isAfter(endDate)) {
-			final LocalDate date = graphDate;
-			BigDecimal withdrawalsByDate = portfolio.getFunds().stream().map(f -> f.getWithdrawalTotalForDate(date))
-					.reduce(BigDecimal.ZERO, BigDecimal::subtract);
+
+		XYIntervalSeries withdrawalIntervalSeries = new XYIntervalSeries("Withdrawals");
+		XYIntervalSeries increaseIntervalSeries = new XYIntervalSeries("Earnings");
+
+		LocalDate date = startDate;
+		while (!date.isAfter(endDate)) {
+
+			// Withdrawals are negative
+			final LocalDate finalDate = date;
+			BigDecimal withdrawalsByDate = portfolio.getFunds().stream()
+					.map(f -> f.getWithdrawalTotalForDate(finalDate)).reduce(BigDecimal.ZERO, BigDecimal::subtract);
+
 			if (withdrawalsByDate != null && withdrawalsByDate.compareTo(BigDecimal.ZERO) < 0) {
-				BigDecimal beforeBalance =  portfolio.getTotalValueByDate(graphDate.minusDays(1));
+
+				BigDecimal preWithdrawalBalance = portfolio.getTotalValueByDate(date.minusDays(1));
 				// withdrawal are negative
-				BigDecimal afterBalance = beforeBalance.add(withdrawalsByDate);
+				BigDecimal postWithdrawalChange = preWithdrawalBalance.add(withdrawalsByDate);
+				BigDecimal postWithdrawalBalance = portfolio.getTotalValueByDate(date);
 
-				LocalDate dayDate = graphDate.minusDays(1);
-				Day day = new Day(dayDate.getDayOfMonth(), dayDate.getMonthValue(), dayDate.getYear());
+				LocalDate graphDate = date.minusDays(1);
+				Day graphDay = new Day(graphDate.getDayOfMonth(), graphDate.getMonthValue(), graphDate.getYear());
 
-				XYIntervalDataItem item = new XYIntervalDataItem(day.getLastMillisecond(), day.getFirstMillisecond(),
-						day.getLastMillisecond(), afterBalance.longValue(), afterBalance.longValue(), beforeBalance.longValue());
-				withdrawalIntervalSeries.add(item, false);
+				XYIntervalDataItem withdrawalDataItem = new XYIntervalDataItem(graphDay.getLastMillisecond(),
+						graphDay.getFirstMillisecond(), graphDay.getLastMillisecond(), postWithdrawalChange.longValue(),
+						postWithdrawalChange.longValue(), preWithdrawalBalance.longValue());
+				withdrawalIntervalSeries.add(withdrawalDataItem, false);
+
+				XYIntervalDataItem earningsDataItem;
+				if (postWithdrawalBalance.compareTo(postWithdrawalChange) >= 0) {
+					// earnings are positive
+					earningsDataItem = new XYIntervalDataItem(graphDay.getLastMillisecond(),
+							graphDay.getFirstMillisecond(), graphDay.getLastMillisecond(),
+							postWithdrawalChange.longValue(), postWithdrawalChange.longValue(),
+							postWithdrawalBalance.longValue());
+				} else {
+					// earnings are negative
+					earningsDataItem = new XYIntervalDataItem(graphDay.getLastMillisecond(),
+							graphDay.getFirstMillisecond(), graphDay.getLastMillisecond(),
+							postWithdrawalBalance.longValue(), postWithdrawalBalance.longValue(),
+							postWithdrawalChange.longValue());
+
+				}
+				increaseIntervalSeries.add(earningsDataItem, false);
 
 			}
-			graphDate = graphDate.plusDays(1);
+			date = date.plusDays(1);
 		}
 		dataset.addSeries(withdrawalIntervalSeries);
+		dataset.addSeries(increaseIntervalSeries);
 		return dataset;
 	}
 
+//	private DefaultIntervalCategoryDataset createWithdrawalCategoryDataset(LocalDate startDate, LocalDate endDate) {
+//		DefaultIntervalCategoryDataset dataset = new DefaultIntervalCategoryDataset();
+//
+//		XYIntervalSeries withdrawalIntervalSeries = new XYIntervalSeries("Interval Withdrawals");
+//		XYIntervalSeries increaseIntervalSeries = new XYIntervalSeries("Interval Increase");
+//		if (startDate == null) {
+//			startDate = portfolio.getPriceHistory().getOldestDate();
+//		}
+//		if (endDate == null) {
+//			endDate = LocalDate.now();
+//		}
+//		LocalDate graphDate = startDate;
+//		while (!graphDate.isBefore(startDate) && !graphDate.isAfter(endDate)) {
+//			final LocalDate date = graphDate;
+//			BigDecimal withdrawalsByDate = portfolio.getFunds().stream().map(f -> f.getWithdrawalTotalForDate(date))
+//					.reduce(BigDecimal.ZERO, BigDecimal::subtract);
+//			if (withdrawalsByDate != null && withdrawalsByDate.compareTo(BigDecimal.ZERO) < 0) {
+//				BigDecimal beforeBalance = portfolio.getTotalValueByDate(graphDate);
+//				// withdrawal are negative
+//				BigDecimal balanceDifference = beforeBalance.add(withdrawalsByDate);
+//				BigDecimal actualBalance = portfolio.getTotalValueByDate(graphDate.plusDays(1));
+////				if (balanceDifference.compareTo(actualBalance) != 0) {
+////					System.out.println("Actual balance after withdraw doesn't equal afterBalance");
+////				}
+//
+//				// LocalDate dayDate = graphDate.minusDays(1);
+//				Day day = new Day(graphDate.getDayOfMonth(), graphDate.getMonthValue(), graphDate.getYear());
+//
+//				XYIntervalDataItem item = new XYIntervalDataItem(day.getLastMillisecond(), day.getFirstMillisecond(),
+//						day.getLastMillisecond(), balanceDifference.longValue(), balanceDifference.longValue(),
+//						beforeBalance.longValue());
+//				withdrawalIntervalSeries.add(item, false);
+//				XYIntervalDataItem item2 = new XYIntervalDataItem(day.getLastMillisecond(), day.getFirstMillisecond(),
+//						day.getLastMillisecond(), balanceDifference.longValue(), balanceDifference.longValue(),
+//						actualBalance.longValue());
+//				increaseIntervalSeries.add(item2, false);
+//
+//			}
+//			graphDate = graphDate.plusDays(1);
+//		}
+//		
+//		dataset.addSeries(withdrawalIntervalSeries);
+//		dataset.addSeries(increaseIntervalSeries);
+//		return dataset;
+//	}
+
 	public JFreeChart createTimeSeriesChart(String title, String timeAxisLabel, String valueAxisLabel,
-			List<TimeSeriesCollection> datasets, List<XYItemRenderer> renderers, IntervalXYDataset withdrawalIntervalDataset, boolean legend, boolean tooltips,
-			boolean urls) {
+			List<TimeSeriesCollection> datasets, List<XYItemRenderer> renderers,
+			IntervalXYDataset withdrawalIntervalDataset, boolean legend, boolean tooltips, boolean urls) {
 
 		XYPlot plot = new XYPlot();
 
 		// reduce the default margins
 		ValueAxis dateAxis = new DateAxis(timeAxisLabel);
-		dateAxis.setLowerMargin(0.02);
-		dateAxis.setUpperMargin(0.02);
+//		dateAxis.setLowerMargin(0.02);
+//		dateAxis.setUpperMargin(0.02);
 		plot.setDomainAxis(dateAxis);
 
 		for (int datasetIndex = 0; datasetIndex < datasets.size(); datasetIndex++) {
@@ -2133,9 +2198,11 @@ public class PortfolioService {
 					seriesColor = axisPaints[seriesIndex];
 				}
 				if (key.contains("Dividends")) {
+					seriesColor = java.awt.Color.BLUE;
 					currencyInstance.setMaximumFractionDigits(0);
 					renderer.setSeriesShape(seriesIndex, ShapeUtils.createDiamond(2f));
 				} else if (key.contains("Withdrawals")) {
+					seriesColor = java.awt.Color.BLACK;
 					currencyInstance.setMaximumFractionDigits(0);
 					renderer.setSeriesShape(seriesIndex, ShapeUtils.createDownTriangle(2f));
 				} else if (key.contains("Shares")) {
@@ -2145,14 +2212,14 @@ public class PortfolioService {
 					// currencyInstance.setMaximumFractionDigits(0);
 				} else if (key.contains("Balance")) {
 					currencyInstance.setMaximumFractionDigits(0);
-					seriesColor = new java.awt.Color(0, 0, 139);  // Light Blue
-					seriesColor =  java.awt.Color.YELLOW; 
-				}
-				if (extra.contains("Target")) {
 					seriesColor = java.awt.Color.GREEN;
 				}
+				if (extra.contains("Target")) {
+					seriesColor = java.awt.Color.BLUE;
+				}
 				if (extra.contains("MA")) {
-					seriesColor = java.awt.Color.MAGENTA.brighter().brighter();
+					seriesColor = seriesColor.darker().darker();
+//					seriesColor = java.awt.Color.MAGENTA.brighter().brighter();
 //					seriesColor = java.awt.Color.PINK;
 				}
 				if (extra.contains("Std")) {
@@ -2183,27 +2250,23 @@ public class PortfolioService {
 			plot.mapDatasetToRangeAxis(datasetIndex, datasetIndex);
 
 		}
-		ClusteredXYBarRenderer barRenderer = new ClusteredXYBarRenderer();
-		barRenderer.setUseYInterval(true);
-		barRenderer.setShadowVisible(false);
-//		barRenderer.setDrawBarOutline(true);
 
-//		barRenderer.setDefaultOutlinePaint(java.awt.Color.BLACK);
-		barRenderer.setDefaultFillPaint(java.awt.Color.BLACK);
-		barRenderer.setDefaultItemLabelPaint(java.awt.Color.BLACK);
-		barRenderer.setSeriesFillPaint(0, java.awt.Color.BLACK);
-		barRenderer.setDefaultFillPaint(java.awt.Color.BLACK);
-		barRenderer.setDefaultPaint(java.awt.Color.BLACK);
-		barRenderer.setDefaultOutlinePaint(java.awt.Color.BLACK);
-		StandardXYBarPainter painter = new StandardXYBarPainter();
+		if (withdrawalIntervalDataset != null) {
+			ClusteredXYBarRenderer barRenderer = new ClusteredXYBarRenderer();
+			barRenderer.setUseYInterval(true);
+			barRenderer.setShadowVisible(false);
+//			barRenderer.setDrawBarOutline(true);
 
-		barRenderer.setBarPainter(painter);
-		
-		plot.setDataset(datasets.size(), withdrawalIntervalDataset);
-		plot.setRenderer(datasets.size(), barRenderer);
+			barRenderer.setSeriesFillPaint(0, java.awt.Color.RED);
+			barRenderer.setSeriesFillPaint(1, java.awt.Color.GREEN);
+			barRenderer.setDefaultItemLabelsVisible(true);
+
+			plot.setDataset(datasets.size(), withdrawalIntervalDataset);
+			plot.setRenderer(datasets.size(), barRenderer);
+		}
 
 		JFreeChart chart = new JFreeChart(title, JFreeChart.DEFAULT_TITLE_FONT, plot, legend);
-		
+
 		return chart;
 
 	}
@@ -2550,11 +2613,17 @@ public class PortfolioService {
 			endDate = LocalDate.now();
 		}
 		LocalDate graphDate = startDate;
-		while (!graphDate.isBefore(startDate) && !graphDate.isAfter(endDate)) {
+		BigDecimal lastTotalByDate = BigDecimal.ZERO;
+		while (!graphDate.isAfter(endDate) ) {
 			BigDecimal totalByDate = portfolio.getTotalValueByDate(graphDate);
-			if (totalByDate != null && totalByDate.compareTo(BigDecimal.ZERO) > 0) {
+			if (totalByDate != null && totalByDate.compareTo(BigDecimal.ZERO) > 0 ) {
+//					&& graphDate.getDayOfWeek() != DayOfWeek.SATURDAY
+//					&& graphDate.getDayOfWeek() != DayOfWeek.SUNDAY) {
+				// if (totalByDate.compareTo(lastTotalByDate) != 0) {
 				timeSeries.add(new Day(graphDate.getDayOfMonth(), graphDate.getMonthValue(), graphDate.getYear()),
 						totalByDate);
+				lastTotalByDate = totalByDate;
+				// }
 
 			}
 			graphDate = graphDate.plusDays(1);
@@ -3162,8 +3231,6 @@ public class PortfolioService {
 
 		// Future withdrawal Totals
 		table.addCell(new Cell().add("Future Total").setBold());
-
-		// Total Withdrawal Amount
 		table.addCell(new Cell().add(CurrencyHelper.formatAsCurrencyString(totalNetWithdrawal)).setBold());
 		table.addCell(new Cell().add(CurrencyHelper.formatAsCurrencyString(totalFederalWithholding)).setBold());
 		table.addCell(new Cell().add(CurrencyHelper.formatAsCurrencyString(totalStateWithholding)).setBold());
@@ -3176,6 +3243,10 @@ public class PortfolioService {
 		table.addCell(new Cell().add(CurrencyHelper.formatAsCurrencyString(ytdWithdrawals)).setBold());
 		table.addCell(new Cell().add(CurrencyHelper.formatAsCurrencyString(ytdFederalWithholding)).setBold());
 		table.addCell(new Cell().add(CurrencyHelper.formatAsCurrencyString(ytdStateWithholding)).setBold());
+		table.addCell(new Cell()
+				.add(CurrencyHelper
+						.formatAsCurrencyString(ytdWithdrawals.add(ytdStateWithholding).add(ytdFederalWithholding)))
+				.setBold());
 
 		table.startNewRow();
 
@@ -3190,6 +3261,10 @@ public class PortfolioService {
 				.setBold());
 		table.addCell(new Cell()
 				.add(CurrencyHelper.formatAsCurrencyString(totalStateWithholding.add(ytdStateWithholding))).setBold());
+		table.addCell(new Cell()
+				.add(CurrencyHelper.formatAsCurrencyString(
+						ytdWithdrawals.add(totalNetWithdrawal).add(totalFederalWithholding).add(ytdStateWithholding)))
+				.setBold());
 
 		document.add(table);
 		document.add(new AreaBreak());
@@ -3290,7 +3365,12 @@ public class PortfolioService {
 		if (fund.isClosed()) {
 			return;
 		}
-		BigDecimal postWithdrawalPortfolioValue = portfolio.getTotalValue().subtract(netWithdrawalAmount);
+		BigDecimal totalWithdrawals = BigDecimal.ZERO;
+		for (BigDecimal withdrawal : withdrawals.values()) {
+			totalWithdrawals = totalWithdrawals.add(withdrawal);
+		}
+
+		BigDecimal postWithdrawalPortfolioValue = portfolio.getTotalValue().subtract(totalWithdrawals);
 		BigDecimal currentPortfolioValue = portfolio.getTotalValue();
 
 		BigDecimal currentFundValue = fund.getCurrentValue();
@@ -4094,7 +4174,8 @@ public class PortfolioService {
 							calculateMovingAveragePriceOpacity(currentPrice, movingAveragePrice, 50)))
 					.add(new Cell().add(CurrencyHelper.formatPercentageString(tenDayMovingAverageRate))
 							.setBackgroundColor(tenDayMaDiffBackgroundColor,
-									calculateMovingAveragePriceOpacity(currentPrice, tenDayMovingAveragePrice, 10) * 5)));
+									calculateMovingAveragePriceOpacity(currentPrice, tenDayMovingAveragePrice, 10)
+											* 5)));
 		}
 
 		// YTD Change in number of Shares

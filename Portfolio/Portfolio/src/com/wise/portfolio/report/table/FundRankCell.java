@@ -1,4 +1,4 @@
-package com.wise.portfolio.graph;
+package com.wise.portfolio.report.table;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;

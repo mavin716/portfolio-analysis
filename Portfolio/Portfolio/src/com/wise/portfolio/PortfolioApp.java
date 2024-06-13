@@ -18,7 +18,6 @@ import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 
 import org.apache.commons.lang3.tuple.Pair;
 
@@ -30,7 +29,6 @@ import com.itextpdf.layout.Document;
 import com.itextpdf.layout.element.Paragraph;
 import com.itextpdf.layout.property.HorizontalAlignment;
 import com.wise.portfolio.alphaVantage.AlphaVantageFundPriceService;
-import com.wise.portfolio.fund.FundTransaction;
 import com.wise.portfolio.fund.PortfolioFund;
 import com.wise.portfolio.pdf.FooterHandler;
 import com.wise.portfolio.pdf.HeaderHandler;
@@ -68,7 +66,7 @@ public class PortfolioApp {
 
 	private static final int RECENT_TRANSACTIONS_DAYS = 30;
 
-	private static final long PORTFOLIO_TRANSACTION_REPORT_WINDOW = 8;
+	private static final long PORTFOLIO_TRANSACTION_REPORT_WINDOW = 10;
 
 	public static void main(String[] args) {
 
@@ -225,7 +223,7 @@ public class PortfolioApp {
 			portfolioService.printBalanceLineGraphs(document, pdfDoc, LocalDate.now().minusYears(1), LocalDate.now());
 
 			pdfDoc.addNewPage();
-			portfolioService.printBalanceLineGraphs(document, pdfDoc, LocalDate.now().minusMonths(1), LocalDate.now());
+			portfolioService.printBalanceLineGraphs(document, pdfDoc, LocalDate.now().minusMonths(6), LocalDate.now());
 
 			pdfDoc.addNewPage();
 			for (PortfolioFund fund : portfolio.getFunds()) {
@@ -247,7 +245,7 @@ public class PortfolioApp {
 				}
 			}
 			portfolioService.printPerformanceLineGraphs("fund price > $200", fundSynbols, document, pdfDoc, startDate,
-					endDate);
+					endDate, false);
 
 			pdfDoc.addNewPage();
 			fundSynbols = new ArrayList<String>();
@@ -258,7 +256,7 @@ public class PortfolioApp {
 				}
 			}
 			portfolioService.printPerformanceLineGraphs("fund price > $150 and < $200", fundSynbols, document, pdfDoc,
-					startDate, endDate);
+					startDate, endDate, false);
 
 			pdfDoc.addNewPage();
 			fundSynbols = new ArrayList<String>();
@@ -269,7 +267,7 @@ public class PortfolioApp {
 				}
 			}
 			portfolioService.printPerformanceLineGraphs("fund price > $100 and < $150", fundSynbols, document, pdfDoc,
-					startDate, endDate);
+					startDate, endDate, false);
 
 			pdfDoc.addNewPage();
 			fundSynbols = new ArrayList<String>();
@@ -280,7 +278,7 @@ public class PortfolioApp {
 				}
 			}
 			portfolioService.printPerformanceLineGraphs("fund price > $50 and < $100", fundSynbols, document, pdfDoc,
-					startDate, endDate);
+					startDate, endDate, false);
 
 			pdfDoc.addNewPage();
 			fundSynbols = new ArrayList<String>();
@@ -291,7 +289,7 @@ public class PortfolioApp {
 				}
 			}
 			portfolioService.printPerformanceLineGraphs("fund price > $30 and < $50", fundSynbols, document, pdfDoc,
-					startDate, endDate);
+					startDate, endDate, false);
 			pdfDoc.addNewPage();
 			fundSynbols = new ArrayList<String>();
 			for (PortfolioFund fund : portfolio.getFunds()) {
@@ -301,7 +299,7 @@ public class PortfolioApp {
 				}
 			}
 			portfolioService.printPerformanceLineGraphs("fund price > $15 and < $30", fundSynbols, document, pdfDoc,
-					startDate, endDate);
+					startDate, endDate, false);
 
 			pdfDoc.addNewPage();
 			fundSynbols = new ArrayList<String>();
@@ -312,7 +310,7 @@ public class PortfolioApp {
 				}
 			}
 			portfolioService.printPerformanceLineGraphs("fund price > $1 and < $15", fundSynbols, document, pdfDoc,
-					startDate, endDate);
+					startDate, endDate, false);
 
 			// portfolioService.printTrends(portfolio);
 

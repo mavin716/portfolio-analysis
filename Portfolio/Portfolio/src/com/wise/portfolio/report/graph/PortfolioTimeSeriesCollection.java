@@ -1,4 +1,4 @@
-package com.wise.portfolio.graph;
+package com.wise.portfolio.report.graph;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;

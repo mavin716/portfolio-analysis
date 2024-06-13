@@ -12,13 +12,12 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 import java.util.Map.Entry;
 import java.util.stream.Collectors;
 
+import com.wise.portfolio.fund.FundTransaction;
 import com.wise.portfolio.fund.MutualFund.FundCategory;
 import com.wise.portfolio.fund.PortfolioFund;
-import com.wise.portfolio.fund.FundTransaction;
 import com.wise.portfolio.service.MutualFundPerformance;
 import com.wise.portfolio.service.PortfolioPriceHistory;
 
@@ -221,7 +220,7 @@ public class ManagedPortfolio extends Portfolio {
 	}
 
 	public BigDecimal getTotalValueByDate(LocalDate date) {
-		
+
 		BigDecimal totalValueByDate = getFundMap().values().stream().map(f -> getValueByDate(f, date))
 				.filter(x -> x != null)
 				.reduce(new BigDecimal(0, MathContext.DECIMAL32), (total, fundValue) -> total = total.add(fundValue))
@@ -234,33 +233,26 @@ public class ManagedPortfolio extends Portfolio {
 		if (fund.isClosed()) {
 			return BigDecimal.ZERO;
 		}
-		BigDecimal value = BigDecimal.ZERO;
 
 		PortfolioPriceHistory priceHistory = getPriceHistory();
-		
 		double shares = priceHistory.getSharesByDate(fund, date, false);
 		if (shares <= 0) {
-			return value;
-		}
-		
-		BigDecimal price = priceHistory.getPriceByDate(fund, date, false);
-		int tries = 30;
-		while (tries-- > 0) {
-			if (price != null && price.compareTo(BigDecimal.ZERO) > 0) {
-				value = price.multiply(new BigDecimal(shares));
-				if (value != null) {
-					return value;
-				}
-			}
-			date = date.minusDays(1);
-			price = priceHistory.getPriceByDate(fund, date, true);
+			return BigDecimal.ZERO;
 		}
 
-		return value;
+		BigDecimal price = priceHistory.getPriceByDate(fund, date, false);
+		if (price != null) {
+			return price.multiply(new BigDecimal(shares));
+		} else {
+			System.out.println("Price is null for fund:  " + fund.getName());
+			return BigDecimal.ZERO;
+		}
 	}
 
 	public BigDecimal getTargetValue(String fundSymbol) {
+
 		BigDecimal targetPercentage = getTargetPercentage(fundSymbol);
+
 		return this.getTotalValue().multiply(targetPercentage);
 	}
 
@@ -270,17 +262,18 @@ public class ManagedPortfolio extends Portfolio {
 
 	public List<Entry<LocalDate, FundTransaction>> getRecentTransactions(List<String> transactionTypes, long days) {
 
-		LocalDate startDate = LocalDate.now().minusDays(days);
 		List<Entry<LocalDate, FundTransaction>> transactions = new ArrayList<>();
+
+		LocalDate startDate = LocalDate.now().minusDays(days);
+		LocalDate endDate = LocalDate.now();
 		for (PortfolioFund fund : getFundMap().values()) {
 			for (Entry<LocalDate, FundTransaction> transactionEntry : fund.getTransactionsBetweenDates(startDate,
-					LocalDate.now())) {
+					endDate)) {
+
 				if (transactionTypes != null) {
-					for (String filterdType : transactionTypes) {
-						if (transactionEntry.getValue().getTransactionType().equals(filterdType)) {
-							transactions.add(transactionEntry);
-							break;
-						}
+					String transactionType = transactionEntry.getValue().getTransactionType();
+					if (transactionTypes.contains(transactionType)) {
+						transactions.add(transactionEntry);
 					}
 				} else {
 					transactions.add(transactionEntry);
@@ -293,10 +286,13 @@ public class ManagedPortfolio extends Portfolio {
 	}
 
 	public BigDecimal getRecentWithdrawalAmount(int days) {
+		
 		BigDecimal recentWithdrawalTotal = BigDecimal.ZERO;
-		List<String> transactionTypes = new ArrayList<>();
+		
+		List<String> transactionTypes = new ArrayList<String>();
 		transactionTypes.add("Sell");
 		List<Entry<LocalDate, FundTransaction>> transactions = getRecentTransactions(transactionTypes, days);
+
 		for (Entry<LocalDate, FundTransaction> entry : transactions) {
 			FundTransaction transaction = entry.getValue();
 			recentWithdrawalTotal = recentWithdrawalTotal.add(transaction.getTransastionPrincipal());
