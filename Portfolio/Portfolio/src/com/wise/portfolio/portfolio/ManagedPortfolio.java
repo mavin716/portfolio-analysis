@@ -244,7 +244,7 @@ public class ManagedPortfolio extends Portfolio {
 		if (price != null) {
 			return price.multiply(new BigDecimal(shares));
 		} else {
-			System.out.println("Price is null for fund:  " + fund.getName());
+			System.out.println("Price is null for fund:  " + fund.getName() + " for date:  " + date);
 			return BigDecimal.ZERO;
 		}
 	}
@@ -286,9 +286,9 @@ public class ManagedPortfolio extends Portfolio {
 	}
 
 	public BigDecimal getRecentWithdrawalAmount(int days) {
-		
+
 		BigDecimal recentWithdrawalTotal = BigDecimal.ZERO;
-		
+
 		List<String> transactionTypes = new ArrayList<String>();
 		transactionTypes.add("Sell");
 		List<Entry<LocalDate, FundTransaction>> transactions = getRecentTransactions(transactionTypes, days);
@@ -303,6 +303,15 @@ public class ManagedPortfolio extends Portfolio {
 	public void addPortfolioScheduledTransaction(PortfolioTransaction portfolioTransaction) {
 		portfolioScheduledTransactions.add(portfolioTransaction);
 
+	}
+
+	public BigDecimal getWithdrawalsUpToDate(LocalDate historicalDate) {
+		BigDecimal withdrawals = BigDecimal.ZERO;
+
+//		getFunds().stream()
+//				.filter(fund -> fund.getWithdrawalsUpToDate(historicalDate).reduce(BigDecimal.ZERO, BigDecimal::add));
+
+		return withdrawals;
 	}
 
 }

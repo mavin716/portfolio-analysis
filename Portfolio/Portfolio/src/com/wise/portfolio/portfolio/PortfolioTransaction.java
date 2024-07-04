@@ -14,6 +14,13 @@ public class PortfolioTransaction {
 		this.subType = subType;
 	}
 	LocalDate date;
+	LocalDate endRecurringDate;
+	public LocalDate getEndRecurringDate() {
+		return endRecurringDate;
+	}
+	public void setEndRecurringDate(LocalDate endRecurringDate) {
+		this.endRecurringDate = endRecurringDate;
+	}
 	String fundSymbol;
 	public String getType() {
 		return type;
@@ -50,6 +57,14 @@ public class PortfolioTransaction {
 	}
 	public void setDescription(String description) {
 		this.description = description;
+	}
+	boolean adjustForInflation;
+	
+	public boolean isAdjustForInflation() {
+		return adjustForInflation;
+	}
+	public void setAdjustForInflation(boolean adjustForInflation) {
+		this.adjustForInflation = adjustForInflation;
 	}
 	boolean isRecurring;
 	String recurringPeriod;

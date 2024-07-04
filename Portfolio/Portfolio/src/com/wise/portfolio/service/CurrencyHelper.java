@@ -38,6 +38,10 @@ public class CurrencyHelper {
 				: String.format("%(6.4f", (percentage.multiply(new BigDecimal(100)))) + "%";
 	}
 
+	public static String formatPercentageString(float percentage) {
+		return String.format("%(6.2f", (percentage * 100)) + "%";
+	}
+
 
 
 }

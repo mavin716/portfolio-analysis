@@ -204,7 +204,7 @@ public class PortfolioFund extends MutualFund {
 		BigDecimal transactionsAmount = new BigDecimal(0);
 
 		for (Entry<LocalDate, Collection<FundTransaction>> entry : distributions.entrySet()) {
-			if (entry.getKey().isAfter(startDate) && entry.getKey().isBefore(endDate)) {
+			if (!entry.getKey().isBefore(startDate) && !entry.getKey().isAfter(endDate)) {
 				Collection<FundTransaction> transactionList = entry.getValue();
 				for (FundTransaction transaction : transactionList) {
 					transactionsAmount = transactionsAmount.add(transaction.getTransastionPrincipal());
@@ -232,7 +232,7 @@ public class PortfolioFund extends MutualFund {
 		BigDecimal transactionsAmount = new BigDecimal(0);
 
 		for (Entry<LocalDate, Collection<FundTransaction>> entry : withdrawals.entrySet()) {
-			if (entry.getKey().isAfter(startDate) && entry.getKey().isBefore(endDate)) {
+			if (!entry.getKey().isBefore(startDate) && !entry.getKey().isAfter(endDate)) {
 				Collection<FundTransaction> transactionList = entry.getValue();
 				for (FundTransaction transaction : transactionList) {
 					transactionsAmount = transactionsAmount.add(transaction.getTransastionPrincipal());
@@ -419,7 +419,7 @@ public class PortfolioFund extends MutualFund {
 
 		for (Entry<LocalDate, Collection<FundTransaction>> entry : income.entrySet()) {
 			LocalDate transactionDate = entry.getKey();
-			if (transactionDate.isBefore(endDate) && transactionDate.isAfter(startDate)) {
+			if (transactionDate.isBefore(endDate) && !transactionDate.isBefore(startDate)) {
 				Collection<FundTransaction> transactionList = entry.getValue();
 				for (FundTransaction transaction : transactionList) {
 					Entry<LocalDate, FundTransaction> transactionEntry = new AbstractMap.SimpleEntry<>(

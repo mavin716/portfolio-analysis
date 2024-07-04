@@ -638,13 +638,13 @@ public class PortfolioPriceHistory {
 		return minPrice;
 	}
 
-	public BigDecimal getPriceByDate(Fund fund, LocalDate date, boolean isExactDate) {
+	public BigDecimal getPriceByDate(PortfolioFund fund, LocalDate date, boolean isExactDate) {
 
 		FundPriceHistory priceHistory = vanguardPriceHistory.get(fund.getSymbol());
 		if (priceHistory == null) {
 			priceHistory = alphaVantagePriceHistory.get(fund.getSymbol());
 			if (priceHistory == null) {
-				System.out.println("No price history for :  " + fund.getName());
+//				System.out.println("No price history for :  " + fund.getName());
 				return BigDecimal.ZERO;
 			}
 		}
@@ -652,7 +652,7 @@ public class PortfolioPriceHistory {
 
 		BigDecimal value = fundPriceMap.get(date);
 		if (value == null && !isExactDate) {
-			int tries = 5;
+			int tries = 60;
 			while (tries-- > 0) {
 				date = date.minus(1, ChronoUnit.DAYS);
 				value = fundPriceMap.get(date);
@@ -682,7 +682,7 @@ public class PortfolioPriceHistory {
 		}
 		value = fundPriceMap.get(date);
 		if (value == null && !isExactDate) {
-			int tries = 5;
+			int tries = 60;
 			while (tries-- > 0) {
 				date = date.minus(1, ChronoUnit.DAYS);
 				value = fundPriceMap.get(date);
@@ -690,13 +690,14 @@ public class PortfolioPriceHistory {
 					return value;
 				}
 			}
+//			System.out.println("Shares is zero for fund: " + fund.getName() + " for date: " + date);
 			return (double) 0;
 		}
 
 		return value;
 	}
 
-	public BigDecimal getFundValueByDate(Fund fund, LocalDate date, boolean isExactDate) {
+	public BigDecimal getFundValueByDate(PortfolioFund fund, LocalDate date, boolean isExactDate) {
 
 		BigDecimal value = null;
 

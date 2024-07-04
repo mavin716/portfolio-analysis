@@ -11,7 +11,9 @@ import java.text.SimpleDateFormat;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.Period;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.TemporalUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Date;
@@ -66,7 +68,7 @@ public class PortfolioApp {
 
 	private static final int RECENT_TRANSACTIONS_DAYS = 30;
 
-	private static final long PORTFOLIO_TRANSACTION_REPORT_WINDOW = 10;
+	private static final long PORTFOLIO_TRANSACTION_REPORT_WINDOW = 5;
 
 	public static void main(String[] args) {
 
@@ -103,31 +105,14 @@ public class PortfolioApp {
 
 			// Load price history via alphaVantage
 			// randomize order of funds because the number exceeds daily quota
-			portfolio.getFunds().parallelStream().filter(f -> !f.isClosed() && !f.isMMFund())
-			.forEach(f -> {
+			portfolio.getFunds().parallelStream().filter(f -> !f.isClosed() && !f.isMMFund()).forEach(f -> {
 				try {
-					AlphaVantageFundPriceService.retrieveFundHistoryFromAlphaVantage(portfolio, f.getSymbol(),
-								false);
+					AlphaVantageFundPriceService.retrieveFundHistoryFromAlphaVantage(portfolio, f.getSymbol(), false);
 				} catch (IOException e) {
 					System.out.println("Exception:  " + e.getMessage());
 					e.printStackTrace();
 				}
 			});
-//			for (PortfolioFund fund : portfolio.getFunds()) {
-//				if (fund.isClosed()) {
-//					// don't retrieve price history for closed funds since that will
-//					// increase the number of calls above the daily limit
-//					continue;
-//				}
-//				System.out.println("Retrieve Alpha Vantage prices for " + fund.getName() + " " + fund.getSymbol());
-//				boolean success = AlphaVantageFundPriceService.retrieveFundHistoryFromAlphaVantage(portfolio, fund.getSymbol(),
-//						false);
-//				// Do not stop retrieving because closed funds will return failure:  Invalid API call
-//				if (!success) {
-//					System.out.println("Failed to retrieve prices from Alpha Vantage service for fund: " + fund.getName());
-//					//break;
-//				}
-//			}
 
 			System.out.println("Loading Alpha Vantage Price History File");
 			portfolio.getPriceHistory().loadAlphaPriceHistoryFile(portfolio, DOWNLOAD_PATH,
@@ -151,35 +136,9 @@ public class PortfolioApp {
 			Document document = new Document(pdfDoc, PageSize.LEDGER);
 			document.setMargins(30f, 10f, 30f, 10f);
 
-			// Document Title
-			LocalDate lastBusinessDay = LocalDate.now();
-			if (LocalTime.now().getHour() < 18) {
-				lastBusinessDay = lastBusinessDay.minusDays(1);
-			}
-			if (lastBusinessDay.getDayOfWeek() == DayOfWeek.SUNDAY) {
-				lastBusinessDay = lastBusinessDay.minusDays(1);
-			}
-			if (lastBusinessDay.getDayOfWeek() == DayOfWeek.SATURDAY) {
-				lastBusinessDay = lastBusinessDay.minusDays(1);
-			}
-			LocalDate previousBusinessDay = lastBusinessDay.minusDays(1);
-			if (previousBusinessDay.getDayOfWeek() == DayOfWeek.SUNDAY) {
-				previousBusinessDay = previousBusinessDay.minusDays(1);
-			}
-			if (previousBusinessDay.getDayOfWeek() == DayOfWeek.SATURDAY) {
-				previousBusinessDay = previousBusinessDay.minusDays(1);
-			}
-
-			BigDecimal currentTotalValue = portfolio.getTotalValueByDate(lastBusinessDay);
-			BigDecimal previousTotalValue = portfolio.getTotalValueByDate(previousBusinessDay);
-			BigDecimal difference = currentTotalValue.subtract(previousTotalValue);
-			String changeText = "Change:  " + NumberFormat.getCurrencyInstance().format(difference) + " Total:  "
-					+ NumberFormat.getCurrencyInstance().format(portfolio.getTotalValue());
-
-			document.add(
-					new Paragraph("Report run at " + LocalDate.now().format(DateTimeFormatter.ofPattern("MM/dd/yy"))
-							+ " " + LocalTime.now().format(DateTimeFormatter.ofPattern("hh:mm a")) + " " + changeText)
-							.setFontSize(14).setHorizontalAlignment(HorizontalAlignment.CENTER));
+			document.add(new Paragraph(generateReportTitle()).setFontSize(14)
+					.setHorizontalAlignment(HorizontalAlignment.CENTER));
+			
 			HeaderHandler headerHandler = new HeaderHandler();
 			pdfDoc.addEventHandler(PdfDocumentEvent.START_PAGE, headerHandler);
 			FooterHandler footerHandler = new FooterHandler();
@@ -217,13 +176,19 @@ public class PortfolioApp {
 			System.out.println("Print graphs");
 			headerHandler.setHeader("balance line graph");
 			pdfDoc.addNewPage();
-			portfolioService.printBalanceLineGraphs(document, pdfDoc, LocalDate.now().minusYears(4), LocalDate.now());
+			portfolioService.printBalanceLineGraphs(document, pdfDoc, null, null, Period.ofMonths(1));
 
 			pdfDoc.addNewPage();
-			portfolioService.printBalanceLineGraphs(document, pdfDoc, LocalDate.now().minusYears(1), LocalDate.now());
+			LocalDate rawStartDate = LocalDate.now().minusYears(1);
+			LocalDate startDate = LocalDate.of(rawStartDate.getYear(), rawStartDate.getMonth(), 1);
+			portfolioService.printBalanceLineGraphs(document, pdfDoc, LocalDate.now().minusYears(1), LocalDate.now(), Period.ofWeeks(1));
 
 			pdfDoc.addNewPage();
-			portfolioService.printBalanceLineGraphs(document, pdfDoc, LocalDate.now().minusMonths(6), LocalDate.now());
+			rawStartDate = LocalDate.now().minusDays(14);
+			portfolioService.printBalanceLineGraphs(document, pdfDoc, rawStartDate, LocalDate.now(), Period.ofDays(1));
+
+			pdfDoc.addNewPage();
+			portfolioService.printProjectedBalanceLineGraphs(document, pdfDoc, Period.ofMonths(1));
 
 			pdfDoc.addNewPage();
 			for (PortfolioFund fund : portfolio.getFunds()) {
@@ -235,7 +200,7 @@ public class PortfolioApp {
 			// Separate by current price (e.g., > 200, 100 - 200, 50 = 100, under 50
 			pdfDoc.addNewPage();
 
-			LocalDate startDate = LocalDate.now().minusYears(10);
+			startDate = LocalDate.now().minusYears(10);
 			LocalDate endDate = LocalDate.now();
 			List<String> fundSynbols = new ArrayList<String>();
 			for (PortfolioFund fund : portfolio.getFunds()) {
@@ -339,6 +304,7 @@ public class PortfolioApp {
 			System.out.println("PDF Created");
 
 			String subject = "YEAH";
+			BigDecimal difference = getBalanceDifference();
 			if (difference.compareTo(BigDecimal.ZERO) < 0) {
 				subject = "NOOO";
 			} else if (difference.compareTo(BigDecimal.ZERO) == 0) {
@@ -354,6 +320,42 @@ public class PortfolioApp {
 		}
 		return portfolioPdfFile;
 
+	}
+
+	private String generateReportTitle() {
+
+		BigDecimal difference = getBalanceDifference();
+		String changeText = "Change:  " + NumberFormat.getCurrencyInstance().format(difference) + " Total:  "
+				+ NumberFormat.getCurrencyInstance().format(portfolio.getTotalValue());
+
+		String title = "Report run at " + LocalDate.now().format(DateTimeFormatter.ofPattern("MM/dd/yy")) + " "
+				+ LocalTime.now().format(DateTimeFormatter.ofPattern("hh:mm a")) + " " + changeText;
+		return title;
+	}
+
+	private BigDecimal getBalanceDifference() {
+		LocalDate lastBusinessDay = LocalDate.now();
+		if (LocalTime.now().getHour() < 18) {
+			lastBusinessDay = lastBusinessDay.minusDays(1);
+		}
+		if (lastBusinessDay.getDayOfWeek() == DayOfWeek.SUNDAY) {
+			lastBusinessDay = lastBusinessDay.minusDays(1);
+		}
+		if (lastBusinessDay.getDayOfWeek() == DayOfWeek.SATURDAY) {
+			lastBusinessDay = lastBusinessDay.minusDays(1);
+		}
+		LocalDate previousBusinessDay = lastBusinessDay.minusDays(1);
+		if (previousBusinessDay.getDayOfWeek() == DayOfWeek.SUNDAY) {
+			previousBusinessDay = previousBusinessDay.minusDays(1);
+		}
+		if (previousBusinessDay.getDayOfWeek() == DayOfWeek.SATURDAY) {
+			previousBusinessDay = previousBusinessDay.minusDays(1);
+		}
+
+		BigDecimal currentTotalValue = portfolio.getTotalValueByDate(lastBusinessDay);
+		BigDecimal previousTotalValue = portfolio.getTotalValueByDate(previousBusinessDay);
+		BigDecimal difference = currentTotalValue.subtract(previousTotalValue);
+		return difference;
 	}
 
 	private void processScheduledPortfolioTransactions(Document document) {

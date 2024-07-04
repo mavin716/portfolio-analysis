@@ -49,7 +49,7 @@ public class AlphaVantageFundPriceService {
 			while (sc.hasNext()) {
 				response.append(sc.nextLine());
 			}
-			System.out.println("response " + response.substring(0, 25));
+			System.out.println("response " + response.substring(0, response.length() > 80 ? 80 : response.length()));
 			sc.close();
 			httpclient.close();
 
@@ -85,7 +85,7 @@ public class AlphaVantageFundPriceService {
 					fund.setCurrentPrice(closingPrice, mostRecentDate);
 					System.out.println(fund.getShortName() + "most recent date:  " + mostRecentDate);
 				}
-				
+
 				if (date.isBefore(earliestAlphaVantageDate)) {
 					earliestAlphaVantageDate = date;
 				}
