@@ -22,12 +22,10 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAmount;
-import java.time.temporal.TemporalUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -55,10 +53,9 @@ import org.apache.poi.ss.formula.functions.Irr;
 import org.jfree.chart.JFreeChart;
 import org.jfree.chart.axis.DateAxis;
 import org.jfree.chart.axis.NumberAxis;
-import org.jfree.chart.axis.ValueAxis;
 import org.jfree.chart.plot.XYPlot;
 import org.jfree.chart.renderer.xy.ClusteredXYBarRenderer;
-import org.jfree.chart.renderer.xy.StandardXYBarPainter;
+import org.jfree.chart.renderer.xy.StackedXYBarRenderer;
 import org.jfree.chart.renderer.xy.XYBarRenderer;
 import org.jfree.chart.renderer.xy.XYItemRenderer;
 import org.jfree.chart.renderer.xy.XYLineAndShapeRenderer;
@@ -74,7 +71,6 @@ import org.jfree.data.xy.IntervalXYDataset;
 import org.jfree.data.xy.XYIntervalDataItem;
 import org.jfree.data.xy.XYIntervalSeries;
 import org.jfree.data.xy.XYIntervalSeriesCollection;
-import org.springframework.format.number.CurrencyFormatter;
 
 import com.itextpdf.kernel.color.Color;
 import com.itextpdf.kernel.color.DeviceRgb;
@@ -2113,14 +2109,9 @@ public class PortfolioService {
 		XYIntervalSeries increaseIntervalSeries = new XYIntervalSeries("Change");
 		XYIntervalSeries distributionsIntervalSeries = new XYIntervalSeries("Distributions");
 
+		// Start with 2nd date
 		LocalDate graphDate = startDate;
 		while (!graphDate.isAfter(endDate)) {
-
-//			// Only graph date if balance is available
-//			if (portfolio.getTotalValueByDate(graphDate).compareTo(BigDecimal.ZERO) <= 0) {
-//				graphDate = graphDate.plusDays(1);
-//				continue;
-//			}
 
 			final LocalDate finalStartDate = graphDate;
 			BigDecimal withdrawalsByDate = portfolio.getFunds().stream().map(
@@ -2131,113 +2122,53 @@ public class PortfolioService {
 					f -> f.getDistributionsBetweenDates(finalStartDate.minus(intervalUnit).plusDays(1), finalStartDate))
 					.reduce(BigDecimal.ZERO, BigDecimal::add);
 
-			BigDecimal preWithdrawalBalance = portfolio.getTotalValueByDate(graphDate.minus(intervalUnit));
-			if (preWithdrawalBalance.compareTo(BigDecimal.ZERO) == 0) {
-				System.out.println("pre withdrawal Balance is ZERO???? for date:  " + graphDate);
+			BigDecimal startBalance = portfolio.getTotalValueByDate(graphDate);
+			BigDecimal endBalance = portfolio.getTotalValueByDate(graphDate.plus(intervalUnit));
+			if (endBalance.compareTo(BigDecimal.ZERO) == 0) {
+				System.out.println("endXBalance is ZERO???? for date:  " + graphDate.plus(intervalUnit));
 				graphDate = graphDate.plus(intervalUnit);
 				continue;
 			}
 
-			// Subtract withdrawals from previous balance
-			BigDecimal postWithdrawalChange = preWithdrawalBalance.subtract(withdrawalsByDate);
-			BigDecimal graphDateBalance = portfolio.getTotalValueByDate(graphDate);
-			if (graphDateBalance.compareTo(BigDecimal.ZERO) == 0) {
+			BigDecimal earningsEndBalance = endBalance.subtract(dividendsByDate).add(withdrawalsByDate);
+			BigDecimal divEndBalance = earningsEndBalance.add(dividendsByDate);
+
+			if (startBalance.compareTo(BigDecimal.ZERO) == 0) {
 				System.out.println("graph Balance is ZERO???? for date:  " + graphDate);
 				graphDate = graphDate.plus(intervalUnit);
 				continue;
 			}
-			// Add dividends to post withdrawal balance
-			BigDecimal postWithdrawalBalanceAfterDividends = postWithdrawalChange.add(dividendsByDate);
-
-			LocalDate graphIntervalDate = graphDate.minus(intervalUnit);
-			Day graphDay = new Day(graphIntervalDate.getDayOfMonth(), graphIntervalDate.getMonthValue(),
-					graphIntervalDate.getYear());
-
-			if (withdrawalsByDate.compareTo(BigDecimal.ZERO) > 0) {
-				// withdrawals are alway negative
-				XYIntervalDataItem withdrawalDataItem = new XYIntervalDataItem(graphDay.getLastMillisecond(),
-						graphDay.getFirstMillisecond(), graphDay.getLastMillisecond(), preWithdrawalBalance.longValue(),
-						postWithdrawalChange.longValue(), preWithdrawalBalance.longValue());
-				withdrawalIntervalSeries.add(withdrawalDataItem, false);
-			}
-
-			if (dividendsByDate.compareTo(BigDecimal.ZERO) > 0) {
-				// earnings are positive
-				XYIntervalDataItem dividendsDataItem = new XYIntervalDataItem(graphDay.getLastMillisecond(),
-						graphDay.getFirstMillisecond(), graphDay.getLastMillisecond(), preWithdrawalBalance.longValue(),
-						postWithdrawalChange.longValue(), postWithdrawalBalanceAfterDividends.longValue());
-				distributionsIntervalSeries.add(dividendsDataItem, false);
-			}
+			LocalDate graphEndDate = graphDate.plus(intervalUnit);
+			Day graphFirstDay = new Day(graphDate.getDayOfMonth(), graphDate.getMonthValue(), graphDate.getYear());
+			Day graphLastDay = new Day(graphEndDate.getDayOfMonth(), graphEndDate.getMonthValue(),
+					graphEndDate.getYear());
 
 			XYIntervalDataItem changeDataItem;
-			if (graphDateBalance.compareTo(postWithdrawalBalanceAfterDividends) > 0) {
-				// change is positive
-				changeDataItem = new XYIntervalDataItem(graphDay.getLastMillisecond(), graphDay.getFirstMillisecond(),
-						graphDay.getLastMillisecond(), postWithdrawalBalanceAfterDividends.longValue(),
-						postWithdrawalBalanceAfterDividends.longValue(), graphDateBalance.longValue());
+				changeDataItem = new XYIntervalDataItem(graphFirstDay.getFirstMillisecond(),
+						graphFirstDay.getFirstMillisecond(), graphLastDay.getLastMillisecond(),
+						startBalance.longValue(), startBalance.longValue(), earningsEndBalance.longValue());
 				increaseIntervalSeries.add(changeDataItem, false);
-			} else if (graphDateBalance.compareTo(postWithdrawalChange) < 0) {
-				// change is negative
-				changeDataItem = new XYIntervalDataItem(graphDay.getLastMillisecond(), graphDay.getFirstMillisecond(),
-						graphDay.getLastMillisecond(), postWithdrawalBalanceAfterDividends.longValue(),
-						graphDateBalance.longValue(), postWithdrawalBalanceAfterDividends.longValue());
-				increaseIntervalSeries.add(changeDataItem, false);
-			}
+
+			// earnings are always positive
+			XYIntervalDataItem dividendsDataItem = new XYIntervalDataItem(graphFirstDay.getFirstMillisecond(),
+					graphFirstDay.getFirstMillisecond(), graphLastDay.getLastMillisecond(),
+					earningsEndBalance.longValue(), earningsEndBalance.longValue(), divEndBalance.longValue());
+			distributionsIntervalSeries.add(dividendsDataItem, false);
+
+			// withdrawals are always negative
+			XYIntervalDataItem withdrawalDataItem = new XYIntervalDataItem(graphFirstDay.getFirstMillisecond(),
+					graphFirstDay.getFirstMillisecond(), graphLastDay.getLastMillisecond(), divEndBalance.longValue(),
+					divEndBalance.longValue(), endBalance.longValue());
+			withdrawalIntervalSeries.add(withdrawalDataItem, false);
 
 //			}
 			graphDate = graphDate.plus(intervalUnit);
 		}
-		dataset.addSeries(withdrawalIntervalSeries);
-		dataset.addSeries(distributionsIntervalSeries);
 		dataset.addSeries(increaseIntervalSeries);
+		dataset.addSeries(distributionsIntervalSeries);
+		dataset.addSeries(withdrawalIntervalSeries);
 		return dataset;
 	}
-
-//	private DefaultIntervalCategoryDataset createWithdrawalCategoryDataset(LocalDate startDate, LocalDate endDate) {
-//		DefaultIntervalCategoryDataset dataset = new DefaultIntervalCategoryDataset();
-//
-//		XYIntervalSeries withdrawalIntervalSeries = new XYIntervalSeries("Interval Withdrawals");
-//		XYIntervalSeries increaseIntervalSeries = new XYIntervalSeries("Interval Increase");
-//		if (startDate == null) {
-//			startDate = portfolio.getPriceHistory().getOldestDate();
-//		}
-//		if (endDate == null) {
-//			endDate = LocalDate.now();
-//		}
-//		LocalDate graphDate = startDate;
-//		while (!graphDate.isBefore(startDate) && !graphDate.isAfter(endDate)) {
-//			final LocalDate date = graphDate;
-//			BigDecimal withdrawalsByDate = portfolio.getFunds().stream().map(f -> f.getWithdrawalTotalForDate(date))
-//					.reduce(BigDecimal.ZERO, BigDecimal::subtract);
-//			if (withdrawalsByDate != null && withdrawalsByDate.compareTo(BigDecimal.ZERO) < 0) {
-//				BigDecimal beforeBalance = portfolio.getTotalValueByDate(graphDate);
-//				// withdrawal are negative
-//				BigDecimal balanceDifference = beforeBalance.add(withdrawalsByDate);
-//				BigDecimal actualBalance = portfolio.getTotalValueByDate(graphDate.plusDays(1));
-////				if (balanceDifference.compareTo(actualBalance) != 0) {
-////					System.out.println("Actual balance after withdraw doesn't equal afterBalance");
-////				}
-//
-//				// LocalDate dayDate = graphDate.minusDays(1);
-//				Day day = new Day(graphDate.getDayOfMonth(), graphDate.getMonthValue(), graphDate.getYear());
-//
-//				XYIntervalDataItem item = new XYIntervalDataItem(day.getLastMillisecond(), day.getFirstMillisecond(),
-//						day.getLastMillisecond(), balanceDifference.longValue(), balanceDifference.longValue(),
-//						beforeBalance.longValue());
-//				withdrawalIntervalSeries.add(item, false);
-//				XYIntervalDataItem item2 = new XYIntervalDataItem(day.getLastMillisecond(), day.getFirstMillisecond(),
-//						day.getLastMillisecond(), balanceDifference.longValue(), balanceDifference.longValue(),
-//						actualBalance.longValue());
-//				increaseIntervalSeries.add(item2, false);
-//
-//			}
-//			graphDate = graphDate.plusDays(1);
-//		}
-//		
-//		dataset.addSeries(withdrawalIntervalSeries);
-//		dataset.addSeries(increaseIntervalSeries);
-//		return dataset;
-//	}
 
 	public JFreeChart createTimeSeriesChart(String title, String timeAxisLabel, String valueAxisLabel,
 			List<TimeSeriesCollection> datasets, List<XYItemRenderer> renderers,
@@ -2246,19 +2177,16 @@ public class PortfolioService {
 
 		XYPlot plot = new XYPlot();
 
-		// reduce the default margins
-		ValueAxis dateAxis = new DateAxis(timeAxisLabel);
-//		dateAxis.setLowerMargin(0.02);
-//		dateAxis.setUpperMargin(0.02);
+		//
+		DateAxis dateAxis = new DateAxis(timeAxisLabel);
 		plot.setDomainAxis(dateAxis);
 
 		NumberAxis valueAxis = new NumberAxis(valueAxisLabel);
-//		plot.setRangeAxis(0, valueAxis);
 
 		for (int datasetIndex = 0; datasetIndex < datasets.size(); datasetIndex++) {
 			TimeSeriesCollection timeSeriesCollection = datasets.get(datasetIndex);
 
-			valueAxis = new NumberAxis(valueAxisLabel);
+			// valueAxis = new NumberAxis(valueAxisLabel);
 
 			XYItemRenderer renderer;
 			if (renderers != null & renderers.size() > datasetIndex) {
@@ -2351,42 +2279,38 @@ public class PortfolioService {
 				valueAxis.setNumberFormatOverride(currencyInstance);
 			}
 
-			plot.setRangeAxis(datasetIndex, valueAxis);
+			plot.setRangeAxis(valueAxis);
 
 			// Map the data to the appropriate axis
-			plot.mapDatasetToRangeAxis(datasetIndex, datasetIndex);
+//			plot.mapDatasetToRangeAxis(datasetIndex, 0);
 
 		}
 
 		if (withdrawalIntervalDataset != null) {
 			ClusteredXYBarRenderer barRenderer = new ClusteredXYBarRenderer() {
+//			StackedXYBarRenderer barRenderer = new StackedXYBarRenderer() {
 				/**
 				* 
 				*/
 				private static final long serialVersionUID = 1L;
 
-				
 				public Paint getItemPaint(int series, int itemCount) {
 					switch (series) {
 					case 0:
-						return java.awt.Color.MAGENTA;
-					case 1:
-						return java.awt.Color.BLUE;
-					case 2:
-
-						double x = withdrawalIntervalDataset.getXValue(series, itemCount);
-						LocalDate xDate = LocalDateTime
-								.ofEpochSecond(new Double(x).longValue()/1000, 0, ZoneOffset.UTC).toLocalDate();
-
-						BigDecimal priorBalance = portfolio.getTotalValueByDate(xDate.minus(intervalAmount));
-
-						double endY = withdrawalIntervalDataset.getEndYValue(series, itemCount++);
-						BigDecimal endBalance = new BigDecimal(endY);
-						if (endBalance.compareTo(priorBalance) < 0) {
+						// Earnings
+						BigDecimal startYBalance = new BigDecimal(withdrawalIntervalDataset.getStartYValue(0, itemCount));
+						BigDecimal endYBalance = new BigDecimal(withdrawalIntervalDataset.getEndYValue(0, itemCount));
+						if (startYBalance.compareTo(endYBalance) > 0) {
 							return java.awt.Color.RED;
 						} else {
 							return java.awt.Color.GREEN;
 						}
+					case 1:
+						// Dividends
+						return java.awt.Color.BLUE;
+					case 2:
+						// Withdrawals
+						return java.awt.Color.BLACK;
 					default:
 						return java.awt.Color.BLACK;
 					}
@@ -2394,23 +2318,10 @@ public class PortfolioService {
 			};
 			barRenderer.setUseYInterval(true);
 			barRenderer.setShadowVisible(false);
-//			barRenderer.setDrawBarOutline(true);
 
-//			barRenderer.setDefaultFillPaint(java.awt.Color.BLACK);
-//			barRenderer.setSeriesFillPaint(datasets.size(), java.awt.Color.RED);
-//			barRenderer.setSeriesFillPaint(datasets.size() + 1, java.awt.Color.MAGENTA);
-//			barRenderer.setSeriesFillPaint(datasets.size() + 2, java.awt.Color.GREEN);
-			barRenderer.setDefaultItemLabelsVisible(true);
-
+			
 			plot.setDataset(datasets.size(), withdrawalIntervalDataset);
 			plot.setRenderer(datasets.size(), barRenderer);
-
-//			NumberAxis valueAxis = new NumberAxis(valueAxisLabel);
-//			valueAxis.setAutoRangeIncludesZero(false); // override default
-//			valueAxis.setNumberFormatOverride(NumberFormat.getCurrencyInstance());
-//			plot.setRangeAxis(datasets.size(), valueAxis);
-			// Map the data to the appropriate axis
-			plot.mapDatasetToRangeAxis(datasets.size(), 0);
 
 		}
 
@@ -2719,39 +2630,6 @@ public class PortfolioService {
 		return dataset;
 	}
 
-	private List<TimeSeriesCollection> createFundPriceHistoryDatasets(List<String> fundSynbols, LocalDate startDate,
-			LocalDate endDate) {
-
-		List<TimeSeriesCollection> datasets = new ArrayList<TimeSeriesCollection>();
-
-		for (String symbol : fundSynbols) {
-
-			TimeSeriesCollection dataset = new TimeSeriesCollection();
-			PortfolioFund fund = portfolio.getFund(symbol);
-			TimeSeries timeSeries = new TimeSeries(fund.getShortName());
-			for (Entry<LocalDate, BigDecimal> fundPriceEntry : portfolio.getPriceHistory().getVanguardPriceHistory()
-					.get(symbol).getFundPricesMap().entrySet()) {
-
-				LocalDate priceHistoryDate = fundPriceEntry.getKey();
-				if (startDate != null) {
-					if (priceHistoryDate.isBefore(startDate)) {
-						continue;
-					}
-				}
-				if (endDate != null) {
-					if (priceHistoryDate.isAfter(endDate)) {
-						continue;
-					}
-				}
-				timeSeries.add(new Day(priceHistoryDate.getDayOfMonth(), priceHistoryDate.getMonthValue(),
-						priceHistoryDate.getYear()), fundPriceEntry.getValue());
-			}
-			dataset.addSeries(timeSeries);
-			datasets.add(dataset);
-		}
-		return datasets;
-	}
-
 	private TimeSeriesCollection createBalanceDataset(LocalDate startDate, LocalDate endDate,
 			TemporalAmount intervalUnit) {
 		TimeSeriesCollection dataset = new TimeSeriesCollection();
@@ -2764,26 +2642,12 @@ public class PortfolioService {
 			endDate = LocalDate.now();
 		}
 		LocalDate graphDate = startDate;
-		BigDecimal lastTotalByDate = BigDecimal.ZERO;
 		while (!graphDate.isAfter(endDate)) {
-//			if (graphDate.getDayOfWeek().compareTo(DayOfWeek.SUNDAY) == 0) {
-//				graphDate = graphDate.plusDays(1);
-//				continue;
-//			}
-//			if (graphDate.getDayOfWeek().compareTo(DayOfWeek.SATURDAY) == 0) {
-//				graphDate = graphDate.plusDays(1);
-//				continue;
-//			}
 
 			BigDecimal totalByDate = portfolio.getTotalValueByDate(graphDate);
 			if (totalByDate != null && totalByDate.compareTo(BigDecimal.ONE) > 0) {
-//					&& graphDate.getDayOfWeek() != DayOfWeek.SATURDAY
-//					&& graphDate.getDayOfWeek() != DayOfWeek.SUNDAY) {
-				// if (totalByDate.compareTo(lastTotalByDate) != 0) {
 				timeSeries.add(new Day(graphDate.getDayOfMonth(), graphDate.getMonthValue(), graphDate.getYear()),
 						totalByDate);
-				lastTotalByDate = totalByDate;
-				// }
 
 			}
 			graphDate = graphDate.plus(intervalUnit);

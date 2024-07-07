@@ -176,16 +176,18 @@ public class PortfolioApp {
 			System.out.println("Print graphs");
 			headerHandler.setHeader("balance line graph");
 			pdfDoc.addNewPage();
-			portfolioService.printBalanceLineGraphs(document, pdfDoc, null, null, Period.ofMonths(1));
+			LocalDate startDate = LocalDate.now().minusYears(5);
+			startDate = startDate.withDayOfMonth(1);
+			portfolioService.printBalanceLineGraphs(document, pdfDoc, startDate, LocalDate.now(), Period.ofMonths(3));
 
 			pdfDoc.addNewPage();
-			LocalDate rawStartDate = LocalDate.now().minusYears(1);
-			LocalDate startDate = LocalDate.of(rawStartDate.getYear(), rawStartDate.getMonth(), 1);
-			portfolioService.printBalanceLineGraphs(document, pdfDoc, LocalDate.now().minusYears(1), LocalDate.now(), Period.ofWeeks(1));
+			startDate = LocalDate.now().minusYears(1);
+			startDate = startDate.withDayOfMonth(1);
+			portfolioService.printBalanceLineGraphs(document, pdfDoc, startDate, LocalDate.now(), Period.ofMonths(1));
 
 			pdfDoc.addNewPage();
-			rawStartDate = LocalDate.now().minusDays(14);
-			portfolioService.printBalanceLineGraphs(document, pdfDoc, rawStartDate, LocalDate.now(), Period.ofDays(1));
+			startDate = LocalDate.now().minusWeeks(2);
+			portfolioService.printBalanceLineGraphs(document, pdfDoc, startDate, LocalDate.now(), Period.ofDays(1));
 
 			pdfDoc.addNewPage();
 			portfolioService.printProjectedBalanceLineGraphs(document, pdfDoc, Period.ofMonths(1));
