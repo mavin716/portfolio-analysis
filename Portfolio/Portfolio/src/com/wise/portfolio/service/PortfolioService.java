@@ -31,6 +31,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
@@ -55,7 +56,6 @@ import org.jfree.chart.axis.DateAxis;
 import org.jfree.chart.axis.NumberAxis;
 import org.jfree.chart.plot.XYPlot;
 import org.jfree.chart.renderer.xy.ClusteredXYBarRenderer;
-import org.jfree.chart.renderer.xy.StackedXYBarRenderer;
 import org.jfree.chart.renderer.xy.XYBarRenderer;
 import org.jfree.chart.renderer.xy.XYItemRenderer;
 import org.jfree.chart.renderer.xy.XYLineAndShapeRenderer;
@@ -144,14 +144,25 @@ public class PortfolioService {
 			new java.awt.Color(188, 143, 143), // Rosy Brown
 			new java.awt.Color(250, 128, 114), // Salmon
 			new java.awt.Color(0, 158, 71), // Med Green
+			new java.awt.Color(0x4B, 0x00, 0x82), // Indigo
+			new java.awt.Color(0xDD, 0xA0, 0xDD), // Plum
+			new java.awt.Color(0x1F, 0xCE, 0xCB), // Robin Egg Blue
+			new java.awt.Color(0x19, 0x9E, 0xBD), // Blue Green
+			new java.awt.Color(0xFC, 0x74, 0xFD), // Pink Flamingo
+			new java.awt.Color(0xDD, 0x44, 0x92), // Cerise
 
 			java.awt.Color.RED, java.awt.Color.BLUE, java.awt.Color.GREEN, java.awt.Color.CYAN, java.awt.Color.ORANGE,
 			java.awt.Color.PINK, java.awt.Color.DARK_GRAY, java.awt.Color.GRAY, java.awt.Color.MAGENTA,
 			java.awt.Color.YELLOW, java.awt.Color.BLACK, new java.awt.Color(162, 42, 42), // Brown
+			new java.awt.Color(251, 72, 196), // Hot Pink
+			new java.awt.Color(0, 0, 139), // Lt Blue
+			new java.awt.Color(95, 158, 160), // Cadet Blue
 			new java.awt.Color(104, 30, 126), // Purple
 			new java.awt.Color(0, 0, 139), // Lt Blue
 			new java.awt.Color(251, 72, 196), // Hot Pink
 			new java.awt.Color(0, 158, 71), // Med Green
+			new java.awt.Color(0x4B, 0x00, 0x82), // Indigo
+			new java.awt.Color(0xDD, 0xA0, 0xDD), // Plum
 
 			java.awt.Color.RED, java.awt.Color.BLUE, java.awt.Color.GREEN, java.awt.Color.CYAN, java.awt.Color.ORANGE,
 			java.awt.Color.PINK, java.awt.Color.DARK_GRAY, java.awt.Color.GRAY, java.awt.Color.MAGENTA,
@@ -162,7 +173,8 @@ public class PortfolioService {
 			java.awt.Color.RED, java.awt.Color.BLUE, java.awt.Color.GREEN, new java.awt.Color(104, 30, 126), // Purple
 			new java.awt.Color(0, 121, 231), // Lt Blue
 			new java.awt.Color(251, 72, 196), // Hot Pink
-			new java.awt.Color(0, 158, 71) // Med Green
+			new java.awt.Color(0, 158, 71), // Med Green
+			new java.awt.Color(0x4B, 0x00, 0x82), // Indigo
 	};
 
 	private static Map<String, java.awt.Color> fundPaints = new HashMap<>();
@@ -1408,8 +1420,10 @@ public class PortfolioService {
 	}
 
 	private void loadFundSymbolMap(String filename) {
+
 		Map<String, String> fundSymbolNameMap = new HashMap<>();
 		portfolio.setFundSymbolNameMap(fundSymbolNameMap);
+
 		List<List<String>> fundAllocationValues = readCsvFile(basePath + filename);
 		for (List<String> values : fundAllocationValues) {
 			if (values.size() >= 2) {
@@ -1424,7 +1438,7 @@ public class PortfolioService {
 				fund.setSymbol(symbol);
 				portfolio.addFund(fund);
 			} else {
-				System.out.println("invalid allocation record.  size:  " + values.size());
+				System.out.println("invalid fund allocation record.  field size:  " + values.size());
 				break;
 			}
 		}
@@ -1928,7 +1942,7 @@ public class PortfolioService {
 
 		if (fund.getCategoriesMap().get(FundCategory.CASH).compareTo(BigDecimal.ONE) != 0) {
 			dataset = createFundPriceHistoryDataset(fundSynbols, startDate, endDate, 5);
-			dataset.getSeries(0).setKey("Price History");
+			dataset.getSeries(0).setKey("Share Price");
 			datasets.add(dataset);
 			renderer = new XYLineAndShapeRenderer();
 			renderer.setDefaultShapesVisible(false);
@@ -1945,7 +1959,7 @@ public class PortfolioService {
 //		renderers.add(renderer);
 
 		JFreeChart lineChart = createTimeSeriesChart(fund.getName() + " Price History", null, null, datasets, renderers,
-				null, null, true, true, false);
+				null, null, true, true, false, startDate, endDate);
 
 		addChartToDocument(lineChart, pdfDocument, document);
 
@@ -2004,7 +2018,7 @@ public class PortfolioService {
 		}
 	}
 
-	public void printBalanceLineGraphs(Document document, PdfDocument pdfDocument, LocalDate startDate,
+	public void printBalanceLineAndBarGraphs(Document document, PdfDocument pdfDocument, LocalDate startDate,
 			LocalDate endDate, TemporalAmount intervalUnit) {
 
 		List<XYItemRenderer> renderers = new ArrayList<>();
@@ -2049,7 +2063,7 @@ public class PortfolioService {
 //		barRenderer.setShadowVisible(false);
 //		renderers.add(barRenderer);
 		JFreeChart lineChart = createTimeSeriesChart("Balance", null, null, datasets, renderers,
-				withdrawalIntervalDataset, intervalUnit, true, true, false);
+				withdrawalIntervalDataset, intervalUnit, true, true, false, startDate, endDate);
 
 		// TODO Attempt to configure stroke to be darker, doesn't seem to work....
 //		XYPlot plot = (XYPlot) lineChart.getPlot();
@@ -2078,7 +2092,7 @@ public class PortfolioService {
 //		barRenderer.setShadowVisible(false);
 //		renderers.add(barRenderer);
 		JFreeChart lineChart = createTimeSeriesChart("Balance", null, null, datasets, renderers, null, intervalUnit,
-				true, true, false);
+				true, true, false, null, null);
 
 		// TODO Attempt to configure stroke to be darker, doesn't seem to work....
 //		XYPlot plot = (XYPlot) lineChart.getPlot();
@@ -2105,15 +2119,14 @@ public class PortfolioService {
 			endDate = LocalDate.now();
 		}
 
-		XYIntervalSeries withdrawalIntervalSeries = new XYIntervalSeries("Withdrawals");
+		XYIntervalSeries withdrawalIntervalSeries = new XYIntervalSeries("Withd");
 		XYIntervalSeries increaseIntervalSeries = new XYIntervalSeries("Change");
 		XYIntervalSeries distributionsIntervalSeries = new XYIntervalSeries("Distributions");
 
-		// Start with 2nd date
-		LocalDate graphDate = startDate;
-		while (!graphDate.isAfter(endDate)) {
+		LocalDate graphStartDate = startDate;
+		while (!graphStartDate.isAfter(endDate)) {
 
-			final LocalDate finalStartDate = graphDate;
+			final LocalDate finalStartDate = graphStartDate;
 			BigDecimal withdrawalsByDate = portfolio.getFunds().stream().map(
 					f -> f.geWithdrawalsBetweenDates(finalStartDate.minus(intervalUnit).plusDays(1), finalStartDate))
 					.reduce(BigDecimal.ZERO, BigDecimal::subtract);
@@ -2122,11 +2135,15 @@ public class PortfolioService {
 					f -> f.getDistributionsBetweenDates(finalStartDate.minus(intervalUnit).plusDays(1), finalStartDate))
 					.reduce(BigDecimal.ZERO, BigDecimal::add);
 
-			BigDecimal startBalance = portfolio.getTotalValueByDate(graphDate);
-			BigDecimal endBalance = portfolio.getTotalValueByDate(graphDate.plus(intervalUnit));
+			BigDecimal startBalance = portfolio.getTotalValueByDate(graphStartDate);
+			LocalDate endBalanceDate = graphStartDate.plus(intervalUnit);
+			if (endBalanceDate.isAfter(LocalDate.now())) {
+				endBalanceDate = LocalDate.now();
+			}
+			BigDecimal endBalance = portfolio.getTotalValueByDate(endBalanceDate);
 			if (endBalance.compareTo(BigDecimal.ZERO) == 0) {
-				System.out.println("endXBalance is ZERO???? for date:  " + graphDate.plus(intervalUnit));
-				graphDate = graphDate.plus(intervalUnit);
+				System.out.println("endXBalance is ZERO???? for date:  " + endBalanceDate);
+				graphStartDate = graphStartDate.plus(intervalUnit);
 				continue;
 			}
 
@@ -2134,20 +2151,22 @@ public class PortfolioService {
 			BigDecimal divEndBalance = earningsEndBalance.add(dividendsByDate);
 
 			if (startBalance.compareTo(BigDecimal.ZERO) == 0) {
-				System.out.println("graph Balance is ZERO???? for date:  " + graphDate);
-				graphDate = graphDate.plus(intervalUnit);
+				System.out.println("graph Balance is ZERO???? for date:  " + graphStartDate);
+				graphStartDate = graphStartDate.plus(intervalUnit);
 				continue;
 			}
-			LocalDate graphEndDate = graphDate.plus(intervalUnit);
-			Day graphFirstDay = new Day(graphDate.getDayOfMonth(), graphDate.getMonthValue(), graphDate.getYear());
+			LocalDateTime graphEndDate = LocalDateTime.of(graphStartDate.plus(intervalUnit), LocalTime.MIN)
+					.minusSeconds(1);
+			Day graphFirstDay = new Day(graphStartDate.getDayOfMonth(), graphStartDate.getMonthValue(),
+					graphStartDate.getYear());
 			Day graphLastDay = new Day(graphEndDate.getDayOfMonth(), graphEndDate.getMonthValue(),
 					graphEndDate.getYear());
 
 			XYIntervalDataItem changeDataItem;
-				changeDataItem = new XYIntervalDataItem(graphFirstDay.getFirstMillisecond(),
-						graphFirstDay.getFirstMillisecond(), graphLastDay.getLastMillisecond(),
-						startBalance.longValue(), startBalance.longValue(), earningsEndBalance.longValue());
-				increaseIntervalSeries.add(changeDataItem, false);
+			changeDataItem = new XYIntervalDataItem(graphFirstDay.getFirstMillisecond(),
+					graphFirstDay.getFirstMillisecond(), graphLastDay.getLastMillisecond(), startBalance.longValue(),
+					startBalance.longValue(), earningsEndBalance.longValue());
+			increaseIntervalSeries.add(changeDataItem, false);
 
 			// earnings are always positive
 			XYIntervalDataItem dividendsDataItem = new XYIntervalDataItem(graphFirstDay.getFirstMillisecond(),
@@ -2162,7 +2181,7 @@ public class PortfolioService {
 			withdrawalIntervalSeries.add(withdrawalDataItem, false);
 
 //			}
-			graphDate = graphDate.plus(intervalUnit);
+			graphStartDate = graphStartDate.plus(intervalUnit);
 		}
 		dataset.addSeries(increaseIntervalSeries);
 		dataset.addSeries(distributionsIntervalSeries);
@@ -2173,20 +2192,29 @@ public class PortfolioService {
 	public JFreeChart createTimeSeriesChart(String title, String timeAxisLabel, String valueAxisLabel,
 			List<TimeSeriesCollection> datasets, List<XYItemRenderer> renderers,
 			IntervalXYDataset withdrawalIntervalDataset, TemporalAmount intervalAmount, boolean legend,
-			boolean tooltips, boolean urls) {
+			boolean tooltips, boolean urls, LocalDate startDate, LocalDate endDate) {
 
 		XYPlot plot = new XYPlot();
 
 		//
 		DateAxis dateAxis = new DateAxis(timeAxisLabel);
 		plot.setDomainAxis(dateAxis);
+		if (startDate != null) {
+			Date startDateDate = new Date(startDate.getYear(), startDate.getMonthValue(), startDate.getDayOfMonth());
+//			dateAxis.setMinimumDate(startDateDate);
+		}
+		if (endDate != null) {
+			Date endDateDate = new Date(endDate.getYear(), endDate.getMonthValue(), endDate.getDayOfMonth());
+//			dateAxis.setMaximumDate(endDateDate);
+		}
 
-		NumberAxis valueAxis = new NumberAxis(valueAxisLabel);
+		NumberAxis balanceValueAxis = new NumberAxis(valueAxisLabel);
+		balanceValueAxis.setAutoRangeIncludesZero(false);
+		NumberFormat currencyInstance = NumberFormat.getCurrencyInstance();
+		balanceValueAxis.setNumberFormatOverride(currencyInstance);
 
 		for (int datasetIndex = 0; datasetIndex < datasets.size(); datasetIndex++) {
 			TimeSeriesCollection timeSeriesCollection = datasets.get(datasetIndex);
-
-			// valueAxis = new NumberAxis(valueAxisLabel);
 
 			XYItemRenderer renderer;
 			if (renderers != null & renderers.size() > datasetIndex) {
@@ -2196,16 +2224,17 @@ public class PortfolioService {
 			}
 			plot.setRenderer(datasetIndex, renderer);
 
-			// note: use first series because moving average uses Float
-			boolean isStdDeviationDataset = false;
-			boolean isCurrencyFormat = timeSeriesCollection.getSeries(0).getDataItem(0)
-					.getValue() instanceof BigDecimal;
-			NumberFormat currencyInstance = NumberFormat.getCurrencyInstance();
-
+			NumberAxis valueAxis;
 			for (int seriesIndex = 0; seriesIndex < timeSeriesCollection.getSeries().size(); seriesIndex++) {
-				java.awt.Color seriesColor = null;
+
+				valueAxis = new NumberAxis(valueAxisLabel);
+				valueAxis.setAutoRangeIncludesZero(false); // override default
+				plot.setRangeAxis(datasetIndex, valueAxis);
+				plot.mapDatasetToRangeAxis(datasetIndex, datasetIndex);
 
 				TimeSeries series = timeSeriesCollection.getSeries(seriesIndex);
+
+				// Extract info from series key
 				String key = (String) series.getKey();
 				int indexOfSpace = key.indexOf(' ');
 				String symbol = key;
@@ -2214,6 +2243,9 @@ public class PortfolioService {
 					symbol = key.substring(0, key.indexOf(' '));
 					extra = key.substring(indexOfSpace + 1);
 				}
+
+				// Assign series color if fund
+				java.awt.Color seriesColor = null;
 				if (symbol != null) {
 					PortfolioFund fund = portfolio.getFund(symbol);
 					if (fund != null) {
@@ -2224,44 +2256,59 @@ public class PortfolioService {
 						}
 					}
 				}
-				if (key.contains("Distributions")) {
+				if (key.contains("Balance")) {
 					seriesColor = java.awt.Color.GREEN;
+
+					currencyInstance = NumberFormat.getCurrencyInstance();
 					currencyInstance.setMaximumFractionDigits(0);
+					balanceValueAxis.setNumberFormatOverride(currencyInstance);
+					// Override value axis
+					plot.setRangeAxis(datasetIndex, balanceValueAxis);
+				}
+				if (key.contains("Distributions")) {
+					seriesColor = new java.awt.Color(0, 158, 71); // Medium green
+					currencyInstance = NumberFormat.getCurrencyInstance();
+					currencyInstance.setMaximumFractionDigits(0);
+					valueAxis.setNumberFormatOverride(currencyInstance);
 					renderer.setSeriesShape(seriesIndex, ShapeUtils.createDiamond(2f));
 				}
 				if (key.contains("Withdrawals")) {
 					seriesColor = java.awt.Color.RED;
+					currencyInstance = NumberFormat.getCurrencyInstance();
 					currencyInstance.setMaximumFractionDigits(0);
+					valueAxis.setNumberFormatOverride(currencyInstance);
 					renderer.setSeriesShape(seriesIndex, ShapeUtils.createDownTriangle(2f));
 				}
 				if (key.contains("Shares")) {
 					seriesColor = java.awt.Color.DARK_GRAY;
 				}
-				if (key.contains("History")) {
+				if (key.contains("Price")) {
 					seriesColor = java.awt.Color.MAGENTA;
-					// currencyInstance.setMaximumFractionDigits(0);
-				}
-				if (key.contains("Balance")) {
-					currencyInstance.setMaximumFractionDigits(0);
-					seriesColor = java.awt.Color.GREEN;
+					currencyInstance = NumberFormat.getCurrencyInstance();
+					currencyInstance.setMinimumFractionDigits(4);
+					valueAxis.setNumberFormatOverride(currencyInstance);
 				}
 				if (extra.contains("Target")) {
 					seriesColor = java.awt.Color.BLUE;
 				}
 				if (key.contains("Change")) {
+					currencyInstance = NumberFormat.getCurrencyInstance();
 					currencyInstance.setMaximumFractionDigits(0);
-					seriesColor = java.awt.Color.MAGENTA;
+					valueAxis.setNumberFormatOverride(currencyInstance);
+					seriesColor = new java.awt.Color(251, 72, 196); // Hot Pink
 				}
 				if (extra.contains("MA")) {
 					seriesColor = seriesColor.darker().darker();
 				}
 				if (extra.contains("Std")) {
 					seriesColor = seriesColor.darker().darker();
-					isStdDeviationDataset = true;
+					valueAxis.setAutoRangeIncludesZero(true); // override default
 				}
+
 				if (seriesColor == null) {
 					seriesColor = axisPaints[seriesIndex];
 				}
+
 				renderer.setDefaultItemLabelPaint(seriesColor);
 				renderer.setSeriesFillPaint(seriesIndex, seriesColor);
 				renderer.setSeriesPaint(seriesIndex, seriesColor);
@@ -2269,17 +2316,6 @@ public class PortfolioService {
 			}
 
 			plot.setDataset(datasetIndex, timeSeriesCollection);
-
-			if (isStdDeviationDataset) {
-				valueAxis.setAutoRangeIncludesZero(true); // override default
-			} else {
-				valueAxis.setAutoRangeIncludesZero(false); // override default
-			}
-			if (isCurrencyFormat) {
-				valueAxis.setNumberFormatOverride(currencyInstance);
-			}
-
-			plot.setRangeAxis(valueAxis);
 
 			// Map the data to the appropriate axis
 //			plot.mapDatasetToRangeAxis(datasetIndex, 0);
@@ -2298,7 +2334,8 @@ public class PortfolioService {
 					switch (series) {
 					case 0:
 						// Earnings
-						BigDecimal startYBalance = new BigDecimal(withdrawalIntervalDataset.getStartYValue(0, itemCount));
+						BigDecimal startYBalance = new BigDecimal(
+								withdrawalIntervalDataset.getStartYValue(0, itemCount));
 						BigDecimal endYBalance = new BigDecimal(withdrawalIntervalDataset.getEndYValue(0, itemCount));
 						if (startYBalance.compareTo(endYBalance) > 0) {
 							return java.awt.Color.RED;
@@ -2315,11 +2352,31 @@ public class PortfolioService {
 						return java.awt.Color.BLACK;
 					}
 				}
+
+				public Paint lookupSeriesPaint(int series) {
+
+					switch (series) {
+					case 0:
+						return java.awt.Color.GREEN;
+					case 1:
+						// Dividends
+						return java.awt.Color.BLUE;
+					case 2:
+						// Withdrawals
+						return java.awt.Color.BLACK;
+					default:
+						return java.awt.Color.BLACK;
+					}
+
+				}
+
 			};
 			barRenderer.setUseYInterval(true);
 			barRenderer.setShadowVisible(false);
 
-			
+//			plot.setRangeAxis(datasets.size(), balanceValueAxis);
+			plot.mapDatasetToRangeAxis(datasets.size(), 0);
+
 			plot.setDataset(datasets.size(), withdrawalIntervalDataset);
 			plot.setRenderer(datasets.size(), barRenderer);
 
@@ -2351,7 +2408,7 @@ public class PortfolioService {
 		barRenderer.setShadowVisible(false);
 		renderers.add(renderer);
 		JFreeChart lineChart = createTimeSeriesChart(title, null, null, datasets, renderers, null, null, true, true,
-				false);
+				false, startDate, endDate);
 
 		addChartToDocument(lineChart, pdfDocument, document);
 
@@ -2643,6 +2700,11 @@ public class PortfolioService {
 		}
 		LocalDate graphDate = startDate;
 		while (!graphDate.isAfter(endDate)) {
+//			if (graphDate.getDayOfWeek().equals(DayOfWeek.SATURDAY)
+//					|| graphDate.getDayOfWeek().equals(DayOfWeek.SUNDAY)) {
+//				graphDate = graphDate.plusDays(1);
+//				continue;
+//			}
 
 			BigDecimal totalByDate = portfolio.getTotalValueByDate(graphDate);
 			if (totalByDate != null && totalByDate.compareTo(BigDecimal.ONE) > 0) {
@@ -2874,8 +2936,8 @@ public class PortfolioService {
 				new Cell().add("Deviation\nCategory\nTotal\nMinimum").setTextAlignment(TextAlignment.CENTER));
 		table.addHeaderCell(
 				new Cell().add("Surplus/Deficit\nCategory\nTotal\nMinimum").setTextAlignment(TextAlignment.CENTER));
-		table.addHeaderCell(
-				new Cell().add("High Price: Value\nDiff\n%\nDeviation").setTextAlignment(TextAlignment.CENTER));
+		table.addHeaderCell(new Cell().add("High Price: Value\nDiff\ntarget val@hi bal\n%\nDeviation")
+				.setTextAlignment(TextAlignment.CENTER));
 
 		// Cash Funds
 		FundCategory category = FundCategory.CASH;
@@ -3079,36 +3141,6 @@ public class PortfolioService {
 			PortfolioFund fund = portfolio.getFund(symbol);
 			addFundToWithdrawalTable(fund, table, FundCategory.TOTAL, totalWithdrawalAmount, withdrawals);
 		}
-
-//		table.addCell(new Cell().add("Cash Funds"));
-//		table.startNewRow();
-//		for (PortfolioFund fund : portfolio.getFundsByCategory(FundCategory.CASH)) {
-//			addFundToWithdrawalTable(fund, table, FundCategory.CASH, totalWithdrawalAmount, withdrawals);
-//		}
-//		addCategoryTotalsToWithdrawalTable(table, FundCategory.CASH, withdrawals);
-//
-//		table.addCell(new Cell().add("Bond Funds").setBold());
-//		table.startNewRow();
-//		for (PortfolioFund fund : portfolio.getFundsByCategory(FundCategory.BOND)) {
-//			addFundToWithdrawalTable(fund, table, FundCategory.BOND, totalWithdrawalAmount, withdrawals);
-//		}
-//		addCategoryTotalsToWithdrawalTable(table, FundCategory.BOND, withdrawals);
-//
-//		table.startNewRow();
-//		table.addCell(new Cell().add("Stock Funds").setKeepWithNext(true).setBold());
-//		table.startNewRow();
-//		for (PortfolioFund fund : portfolio.getFundsByCategory(FundCategory.STOCK)) {
-//			addFundToWithdrawalTable(fund, table, FundCategory.STOCK, totalWithdrawalAmount, withdrawals);
-//		}
-//		addCategoryTotalsToWithdrawalTable(table, FundCategory.STOCK, withdrawals);
-//
-//		table.startNewRow();
-//		table.addCell(new Cell().add("Intl Funds").setBold());
-//		table.startNewRow();
-//		for (PortfolioFund fund : portfolio.getFundsByCategory(FundCategory.INTL)) {
-//			addFundToWithdrawalTable(fund, table, FundCategory.INTL, totalWithdrawalAmount, withdrawals);
-//		}
-//		addCategoryTotalsToWithdrawalTable(table, FundCategory.INTL, withdrawals);
 
 		addTotalsToWithdrawalTable(table, netWithdrawalAmount, withdrawals);
 

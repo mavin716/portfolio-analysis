@@ -15,11 +15,13 @@ import java.time.Period;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalUnit;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import org.apache.commons.lang3.tuple.Pair;
 
@@ -30,7 +32,9 @@ import com.itextpdf.kernel.pdf.PdfWriter;
 import com.itextpdf.layout.Document;
 import com.itextpdf.layout.element.Paragraph;
 import com.itextpdf.layout.property.HorizontalAlignment;
+import com.itextpdf.layout.property.TextAlignment;
 import com.wise.portfolio.alphaVantage.AlphaVantageFundPriceService;
+import com.wise.portfolio.fund.FundTransaction;
 import com.wise.portfolio.fund.PortfolioFund;
 import com.wise.portfolio.pdf.FooterHandler;
 import com.wise.portfolio.pdf.HeaderHandler;
@@ -68,7 +72,7 @@ public class PortfolioApp {
 
 	private static final int RECENT_TRANSACTIONS_DAYS = 30;
 
-	private static final long PORTFOLIO_TRANSACTION_REPORT_WINDOW = 5;
+	private static final long PORTFOLIO_TRANSACTION_REPORT_WINDOW = 30;
 
 	public static void main(String[] args) {
 
@@ -124,8 +128,6 @@ public class PortfolioApp {
 			System.out.println("Save Portfolio Data");
 			portfolioService.savePortfolioData();
 
-			portfolioService.setFundColors();
-
 			// Overwrite PDF output file
 			portfolioPdfFile = new File(PORTFOLIO_PDF_FILE);
 			portfolioPdfFile.delete();
@@ -138,7 +140,7 @@ public class PortfolioApp {
 
 			document.add(new Paragraph(generateReportTitle()).setFontSize(14)
 					.setHorizontalAlignment(HorizontalAlignment.CENTER));
-			
+
 			HeaderHandler headerHandler = new HeaderHandler();
 			pdfDoc.addEventHandler(PdfDocumentEvent.START_PAGE, headerHandler);
 			FooterHandler footerHandler = new FooterHandler();
@@ -176,18 +178,24 @@ public class PortfolioApp {
 			System.out.println("Print graphs");
 			headerHandler.setHeader("balance line graph");
 			pdfDoc.addNewPage();
-			LocalDate startDate = LocalDate.now().minusYears(5);
-			startDate = startDate.withDayOfMonth(1);
-			portfolioService.printBalanceLineGraphs(document, pdfDoc, startDate, LocalDate.now(), Period.ofMonths(3));
+			LocalDate endDate = LocalDate.now();
+			if (LocalTime.now().isBefore(LocalTime.of(18, 0))) {
+				endDate = endDate.minusDays(1);
+			}
+			LocalDate startDate = LocalDate.of(2020, 1, 1);
+			Period period = Period.ofMonths(1);
+			portfolioService.printBalanceLineAndBarGraphs(document, pdfDoc, startDate, endDate, period);
 
 			pdfDoc.addNewPage();
 			startDate = LocalDate.now().minusYears(1);
 			startDate = startDate.withDayOfMonth(1);
-			portfolioService.printBalanceLineGraphs(document, pdfDoc, startDate, LocalDate.now(), Period.ofMonths(1));
+			period = Period.ofMonths(1);
+			portfolioService.printBalanceLineAndBarGraphs(document, pdfDoc, startDate, endDate, period);
 
 			pdfDoc.addNewPage();
-			startDate = LocalDate.now().minusWeeks(2);
-			portfolioService.printBalanceLineGraphs(document, pdfDoc, startDate, LocalDate.now(), Period.ofDays(1));
+			startDate = LocalDate.now().minusMonths(1);
+			period = Period.ofDays(1);
+			portfolioService.printBalanceLineAndBarGraphs(document, pdfDoc, startDate, endDate, period);
 
 			pdfDoc.addNewPage();
 			portfolioService.printProjectedBalanceLineGraphs(document, pdfDoc, Period.ofMonths(1));
@@ -203,7 +211,6 @@ public class PortfolioApp {
 			pdfDoc.addNewPage();
 
 			startDate = LocalDate.now().minusYears(10);
-			LocalDate endDate = LocalDate.now();
 			List<String> fundSynbols = new ArrayList<String>();
 			for (PortfolioFund fund : portfolio.getFunds()) {
 				BigDecimal maxPrice = portfolio.getPriceHistory().getMaxPrice(fund).getValue();
@@ -327,8 +334,7 @@ public class PortfolioApp {
 	private String generateReportTitle() {
 
 		BigDecimal difference = getBalanceDifference();
-		String changeText = "Change:  " + NumberFormat.getCurrencyInstance().format(difference) + " Total:  "
-				+ NumberFormat.getCurrencyInstance().format(portfolio.getTotalValue());
+		String changeText = "Change:  " + NumberFormat.getCurrencyInstance().format(difference);
 
 		String title = "Report run at " + LocalDate.now().format(DateTimeFormatter.ofPattern("MM/dd/yy")) + " "
 				+ LocalTime.now().format(DateTimeFormatter.ofPattern("hh:mm a")) + " " + changeText;
@@ -406,24 +412,26 @@ public class PortfolioApp {
 			}
 		}
 		if (withdrawTransactions.size() > 0) {
-			processPortfolioTransactionWithdraw(withdrawDate, withdrawTransactions, portfolioService, document,
+			// sorts by amount descending
+//			withdrawTransactions.sort(Comparator.comparing(PortfolioTransaction::getDate));
+			printPortfolioTransactionWithdraw(withdrawDate, withdrawTransactions, portfolioService, document,
 					portfolio);
 		}
 		if (transferTransactions.size() > 0) {
-			processPortfolioTransactionTransfer(transferTransactions, portfolioService, document, portfolio);
+			printPortfolioTransactionTransfer(transferTransactions, portfolioService, document, portfolio);
 		}
 		// update next run date
 		portfolioService.updatePortfolioSchedule(SCHEDULE_FILE, updatedTransactions);
 
 	}
 
-	private void processPortfolioTransactionWithdraw(LocalDate withdrawDate,
+	private void printPortfolioTransactionWithdraw(LocalDate withdrawDate,
 			List<PortfolioTransaction> withdrawTransactions, PortfolioService portfolioService, Document document,
 			Portfolio portfolio2) {
 
 		Portfolio portfolio = portfolioService.getPortfolio();
 
-		String title = "Withdrawal scheduled for " + DATE_FORMATTER.format(withdrawDate);
+		String title = "";
 		BigDecimal withdrawAmount = BigDecimal.ZERO;
 		BigDecimal totalAddlTaxes = BigDecimal.ZERO;
 		BigDecimal totalWithdrawalIncludingTaxes = withdrawAmount;
@@ -432,6 +440,8 @@ public class PortfolioApp {
 		withdrawTransactions.sort(Comparator.comparing(PortfolioTransaction::getAmount).reversed());
 
 		BigDecimal netWithdrawalAmount = BigDecimal.ZERO;
+		// Sort for heading
+		withdrawTransactions.sort(Comparator.comparing(PortfolioTransaction::getDate));
 
 		for (PortfolioTransaction transaction : withdrawTransactions) {
 			withdrawAmount = withdrawAmount.add(transaction.getAmount());
@@ -450,11 +460,12 @@ public class PortfolioApp {
 				netWithdrawalAmount = netWithdrawalAmount
 						.add(transaction.getAmount().multiply(AFTER_TAXES_WITHDRAW_AMOUNT_PERCENTAGE));
 			}
-			title += "; " + transaction.getDescription();
+			title = title + "\n\t" + DATE_FORMATTER.format(transaction.getDate()) + " " + transaction.getDescription()
+					+ " Amount: " + CurrencyHelper.formatAsCurrencyString(transaction.getAmount());
 		}
 
 		totalWithdrawalIncludingTaxes = withdrawAmount.add(totalAddlTaxes);
-		title += " " + CurrencyHelper.formatAsCurrencyString(totalWithdrawalIncludingTaxes) + " Net: "
+		title += "\n\tTotal: " + CurrencyHelper.formatAsCurrencyString(totalWithdrawalIncludingTaxes) + " Net: "
 				+ CurrencyHelper.formatAsCurrencyString(netWithdrawalAmount);
 		System.out.println(title);
 
@@ -463,30 +474,31 @@ public class PortfolioApp {
 				fundWithdrawals);
 
 		// print spreadsheet
+		document.add(new Paragraph("Withdrawals").setBold().setFontSize(16));
 		portfolioService.printWithdrawalSpreadsheet(title, portfolio, withdrawAmount, totalWithdrawalIncludingTaxes,
 				withdrawals, document);
 
 	}
 
-	private void processPortfolioTransactionTransfer(List<PortfolioTransaction> transactions,
+	private void printPortfolioTransactionTransfer(List<PortfolioTransaction> transactions,
 			PortfolioService portfolioService, Document document, Portfolio portfolio) {
 
 		Map<String, BigDecimal> withdrawalMap = new LinkedHashMap<>();
 
 		String title = "";
-		LocalDate date = LocalDate.now();
-		transactions.sort(Comparator.comparing(PortfolioTransaction::getAmount).reversed());
+		// Sort for heading
+		transactions.sort(Comparator.comparing(PortfolioTransaction::getDate));
 
 		for (PortfolioTransaction transaction : transactions) {
 			withdrawalMap.put(transaction.getFundSymbol(), BigDecimal.ZERO.subtract(transaction.getAmount()));
-			title = transaction.getDescription();
-			date = transaction.getDate();
+			title = title + "\n\t" + DATE_FORMATTER.format(transaction.getDate()) + " " + transaction.getDescription()
+			+ " Amount: " + CurrencyHelper.formatAsCurrencyString(transaction.getAmount());
 		}
-		title = title + " Scheduled for " + DATE_FORMATTER.format(date);
 		System.out.println(title);
 
 		Map<String, BigDecimal> transfers = portfolioService.calculateFixedExpensesTransfer(withdrawalMap);
 
+		document.add(new Paragraph("Transfers").setTextAlignment(TextAlignment.CENTER).setBold().setFontSize(16));
 		portfolioService.printWithdrawalSpreadsheet(title, portfolio, BigDecimal.ZERO, BigDecimal.ZERO, transfers,
 				document);
 
