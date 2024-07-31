@@ -15,30 +15,31 @@ import javax.mail.internet.MimeBodyPart;
 import javax.mail.internet.MimeMessage;
 import javax.mail.internet.MimeMultipart;
 
-public class MailService {
-	
-	private final static String MAIL_HOST = "smtp.mail.yahoo.com";
-	private final static String YAHOO_MAIL_APP_PASSWORD = "hgcqlgrdhxdvgmjm";
-	private final static String MAIL_TO = "mavin14534@yahoo.com";
-	private final static String MAIL_FROM = "mavin14534@yahoo.com";
+import org.apache.log4j.LogManager;
+import org.apache.log4j.Logger;
 
+public class MailService {
+
+	protected static final Logger logger = LogManager.getLogger(MailService.class);
 
 	public static void sendMail(String subject, String textBody, File portfolioPdfFile) {
-		Properties properties = System.getProperties();
+		try {
 
-		properties.put("mail.smtp.host", MAIL_HOST);
-		properties.put("mail.smtp.port", "587");
-		properties.put("mail.smtp.starttls.enable", "true");
-		properties.put("mail.smtp.auth", "true");
+			Properties properties = System.getProperties();
 
-		Session session = Session.getInstance(properties, new javax.mail.Authenticator() {
-			protected PasswordAuthentication getPasswordAuthentication() {
-				return new PasswordAuthentication("mavin14534@yahoo.com", YAHOO_MAIL_APP_PASSWORD);
-			}
-		});
+			properties.put("mail.smtp.host", AppProperties.getProperty("mailHost"));
+			properties.put("mail.smtp.port", "587");
+			properties.put("mail.smtp.starttls.enable", "true");
+			properties.put("mail.smtp.auth", "true");
+
+			Session session = Session.getInstance(properties, new javax.mail.Authenticator() {
+				protected PasswordAuthentication getPasswordAuthentication() {
+					return new PasswordAuthentication(AppProperties.getProperty("yahooMailAppAccount"),
+							AppProperties.getProperty("yahooMailAppPassword"));
+				}
+			});
 
 //		session.setDebug(true);
-		try {
 			Multipart multipart = new MimeMultipart();
 			MimeBodyPart messageBodyPart = new MimeBodyPart();
 			messageBodyPart.setText(textBody, "utf-8", "html");
@@ -50,13 +51,13 @@ public class MailService {
 			MimeMessage message = new MimeMessage(session);
 			message.setContent(multipart);
 
-			message.setFrom(new InternetAddress(MAIL_FROM));
-			message.addRecipient(Message.RecipientType.TO, new InternetAddress(MAIL_TO));
+			message.setFrom(new InternetAddress(AppProperties.getProperty("mailFrom")));
+			message.addRecipient(Message.RecipientType.TO, new InternetAddress(AppProperties.getProperty("mailTo")));
 			message.setSubject(subject);
 
 			Transport.send(message);
 		} catch (MessagingException | IOException mex) {
-			mex.printStackTrace();
+			logger.error("Exception sending mail:  " + mex.getMessage(), mex);
 		}
 	}
 }

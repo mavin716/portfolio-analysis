@@ -10,6 +10,8 @@ import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
+import org.apache.log4j.LogManager;
+import org.apache.log4j.Logger;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -17,30 +19,31 @@ import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.wise.portfolio.fund.FundPriceHistory;
 import com.wise.portfolio.fund.PortfolioFund;
 import com.wise.portfolio.portfolio.Portfolio;
+import com.wise.portfolio.service.AppProperties;
 import com.wise.portfolio.service.PortfolioPriceHistory;
 
 public class AlphaVantageFundPriceService {
 
-	private static final String ALPHA_VANTAGE_URL = "https://www.alphavantage.co/query";
-//	private static final String ALPHA_VANTAGE_FUNCTION = "TIME_SERIES_MONTHLY";
-	private static final String ALPHA_VANTAGE_FUNCTION = "TIME_SERIES_DAILY";
-	private static final String ALPHA_VANTAGE_APIKEY = "85MODZ3M0IN6CT0R";
+
+	protected static final Logger logger = LogManager.getLogger(AlphaVantageFundPriceService.class);
 
 	public static boolean retrieveFundHistoryFromAlphaVantage(Portfolio portfolio, String symbol, boolean retry)
 			throws IOException {
 
-		System.out.println("Retrieve AV prices for:  " + portfolio.getFundName(symbol));
+		logger.debug("Retrieve prices from AlphaVantage API for:  " + portfolio.getFundName(symbol));
 		LocalDate earliestAlphaVantageDate = LocalDate.now();
 
 		BigDecimal closingPrice = BigDecimal.ZERO;
 		CloseableHttpClient httpclient = HttpClients.createDefault();
-		String url = ALPHA_VANTAGE_URL + "?function=" + ALPHA_VANTAGE_FUNCTION + "&outputsize=compact&symbol=" + symbol
-				+ "&apikey=" + ALPHA_VANTAGE_APIKEY + "&outputsize=full";
+		String url = AppProperties.getProperty("alphaVantageUrl") + "?function="
+				+ AppProperties.getProperty("alphaVantageFunction") + "&outputsize=compact&symbol=" + symbol
+				+ "&apikey=" + AppProperties.getProperty("alphaVantageApiKey") + "&outputsize=full";
 		try {
 			HttpGet httpget = new HttpGet(url);
 			HttpResponse httpresponse = httpclient.execute(httpget);
-			System.out.println(httpresponse.getStatusLine());
 			if (httpresponse.getStatusLine().getStatusCode() != 200) {
+				logger.error("Error retrieving prices for fund:  " + portfolio.getFundName(symbol) + " http response:  "
+						+ httpresponse.getStatusLine());
 				return false;
 			}
 
@@ -49,7 +52,7 @@ public class AlphaVantageFundPriceService {
 			while (sc.hasNext()) {
 				response.append(sc.nextLine());
 			}
-			System.out.println("response " + response.substring(0, response.length() > 80 ? 80 : response.length()));
+			logger.debug("response " + response.substring(0, response.length() > 80 ? 80 : response.length()));
 			sc.close();
 			httpclient.close();
 
@@ -58,15 +61,15 @@ public class AlphaVantageFundPriceService {
 			if (series == null || series.getMetadata() == null) {
 				boolean success = false;
 				if (retry) {
-					int tries = 3;
+					int tries = 2;
 					while (tries-- > 0 && !success) {
 						System.out.println("Sleep for 10 seconds and try again");
 						Thread.sleep(10000);
-						System.out.println("retries left:  " + tries);
+						logger.debug("retries left:  " + tries);
 						success = retrieveFundHistoryFromAlphaVantage(portfolio, symbol, false);
 					}
 					if (tries <= 0 && !success) {
-						System.out.println("Exhausted retries");
+						logger.warn("Exhausted retries");
 						return false;
 					}
 				}
@@ -83,7 +86,7 @@ public class AlphaVantageFundPriceService {
 					mostRecentDate = date;
 
 					fund.setCurrentPrice(closingPrice, mostRecentDate);
-					System.out.println(fund.getShortName() + "most recent date:  " + mostRecentDate);
+					logger.debug(fund.getShortName() + "most recent date:  " + mostRecentDate);
 				}
 
 				if (date.isBefore(earliestAlphaVantageDate)) {
@@ -101,7 +104,7 @@ public class AlphaVantageFundPriceService {
 				priceHistory.addAlphaVantagePrice(symbol, date, closingPrice);
 
 			}
-			System.out.println(fund.getShortName() + "oldest date:  " + earliestAlphaVantageDate);
+			logger.debug(fund.getShortName() + "oldest date:  " + earliestAlphaVantageDate);
 
 //			if (earliestAlphaVantageDate.isBefore(priceHistory.getOldestDate())) {
 //				priceHistory.setOldestDate(earliestAlphaVantageDate);
@@ -125,7 +128,7 @@ public class AlphaVantageFundPriceService {
 		try {
 			series = mapper.readValue(response.toString(), Series.class);
 		} catch (JsonProcessingException e) {
-			System.out.println("Exception processing http response:  " + e.getLocalizedMessage());
+			logger.error("Exception processing http response:  " + e.getLocalizedMessage(), e);
 		}
 		return series;
 	}

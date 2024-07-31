@@ -7,6 +7,23 @@ public class PortfolioTransaction {
 
 	String type;
 	String subType;
+	public PortfolioTransaction(PortfolioTransaction transaction) {
+		this.subType = transaction.subType;
+		this.type = transaction.type;
+		this.adjustForInflation = transaction.adjustForInflation;
+		this.amount = transaction.amount;
+		this.date = transaction.date;
+		this.description = transaction.description;
+		this.endRecurringDate = transaction.endRecurringDate;
+		this.isNetAmount = transaction.isNetAmount;
+		this.isRecurring = transaction.isRecurring;
+		this.recurringPeriod = transaction.recurringPeriod;
+		this.fundSymbol = transaction.fundSymbol;
+		
+	}
+	public PortfolioTransaction() {
+		// TODO Auto-generated constructor stub
+	}
 	public String getSubType() {
 		return subType;
 	}

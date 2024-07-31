@@ -10,6 +10,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.apache.log4j.LogManager;
+import org.apache.log4j.Logger;
 import org.jfree.chart.JFreeChart;
 import org.jfree.chart.axis.DateAxis;
 import org.jfree.chart.axis.NumberAxis;
@@ -29,8 +31,11 @@ import org.jfree.data.xy.IntervalXYDataset;
 import com.wise.portfolio.fund.FundPriceHistory;
 import com.wise.portfolio.fund.PortfolioFund;
 import com.wise.portfolio.portfolio.ManagedPortfolio;
+import com.wise.portfolio.service.PortfolioService;
 
 public class PortfolioFundsPerformanceGraph {
+
+	 protected static final Logger logger = LogManager.getLogger(PortfolioFundsPerformanceGraph.class);
 
 	private ManagedPortfolio portfolio;
 	private Map<String, java.awt.Color> fundPaints = new HashMap<>();
@@ -127,8 +132,8 @@ public class PortfolioFundsPerformanceGraph {
 							timeSeries.add(new Day(priceHistoryDate.getDayOfMonth(), priceHistoryDate.getMonthValue(),
 									priceHistoryDate.getYear()), fundPriceEntry.getValue());
 						} catch (Exception e) {
-							System.out.println(
-									"Exception adding alpha date " + priceHistoryDate + e.getLocalizedMessage());
+							logger.error(
+									"Exception adding alpha date " + priceHistoryDate + e.getLocalizedMessage(), e);
 						}
 					}
 				}

@@ -188,7 +188,7 @@ public class ManagedPortfolio extends Portfolio {
 		if (historicPrice == null) {
 			historicPrice = BigDecimal.ZERO;
 		}
-		Double historicalShares = priceHistory.getSharesByDate(fund, historicalDate, false);
+		Double historicalShares = priceHistory.getSharesByDate(fund, historicalDate);
 		if (historicalShares == null) {
 			historicalShares = (double) 0;
 		}
@@ -235,7 +235,7 @@ public class ManagedPortfolio extends Portfolio {
 		}
 
 		PortfolioPriceHistory priceHistory = getPriceHistory();
-		double shares = priceHistory.getSharesByDate(fund, date, false);
+		double shares = priceHistory.getSharesByDate(fund, date);
 		if (shares <= 0) {
 			return BigDecimal.ZERO;
 		}

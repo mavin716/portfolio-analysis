@@ -3,6 +3,7 @@ package com.wise.portfolio.vanguard;
 import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -17,33 +18,49 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import org.apache.log4j.LogManager;
+import org.apache.log4j.Logger;
+
 import com.wise.portfolio.fund.PortfolioFund;
 import com.wise.portfolio.portfolio.Portfolio;
 import com.wise.portfolio.service.PerformanceService;
 import com.wise.portfolio.service.PortfolioPriceHistory;
+import com.wise.portfolio.service.PortfolioService;
 
 public class VanguardPortfolioLoad {
-	
-	public VanguardPortfolioLoad(Portfolio portfolio, String basePath, String downloadFilenamePrefix, String currentDownloadFile) {
+
+	protected static final Logger logger = LogManager.getLogger(VanguardPortfolioLoad.class);
+
+//	public VanguardPortfolioLoad(Portfolio portfolio, String basePath, String downloadFilenamePrefix,
+//			String currentDownloadFile) {
+//		super();
+//		this.portfolio = portfolio;
+//		this.downloadFilenamePrefix = downloadFilenamePrefix;
+//		this.currentDownloadFile = currentDownloadFile;
+//		this.basePath = basePath;
+//	}
+	public VanguardPortfolioLoad() {
 		super();
-		this.portfolio = portfolio;
-		this.downloadFilenamePrefix = downloadFilenamePrefix;
-		this.currentDownloadFile = currentDownloadFile;
-		this.basePath = basePath;
 	}
-	private Portfolio portfolio;
-	private String downloadFilenamePrefix;
-	private String currentDownloadFile;
-	private String basePath;
-	
+
+//	private Portfolio portfolio;
+//	private String downloadFilenamePrefix;
+//	private String currentDownloadFile;
+//	private String basePath;
+
 	/**
+	 * @param currentDownloadFile2 
+	 * @param downloadFilenamePrefix2 
+	 * @param basePath2 
+	 * @param portfolio2 
 	 * @param currentDownloadFile
 	 * @param path                to find price history files
 	 * 
 	 * @throws IOException
 	 */
-	public void loadPortfolioDownloadFiles() throws IOException {
+	public static void loadPortfolioDownloadFiles(Portfolio portfolio, String basePath, String downloadFilenamePrefix, String currentDownloadFile) throws IOException {
 
+		logger.trace("loadPortfolioDownloadFiles");
 		PerformanceService.setPortfolio(portfolio);
 		PerformanceService.setPriceHistory(portfolio.getPriceHistory());
 
@@ -56,22 +73,14 @@ public class VanguardPortfolioLoad {
 			BigDecimal yesterdayWithdrawals = BigDecimal.ZERO;
 			PortfolioPriceHistory priceHistory = portfolio.getPriceHistory();
 			for (String filename : filenames) {
-				LocalDate date = getDownloadFileDate(filename, true);
+				logger.trace("load file:  " + filename);
 
-				if (date == null) {
-					// Not a valid download file
-					continue;
+				LocalDateTime dateTime = getDownloadFileCreationDate(filename, basePath);
+				LocalDate date = dateTime.toLocalDate();
+				if (dateTime.getHour() < 18) {
+					date = date.minusDays(1);
 				}
 
-				// TBD: analyze date to see if belongs to previous day
-				// for now subtract one day
-
-				// date = date.minus(1, ChronoUnit.DAYS);
-//				if (fileDates.contains(date)) {
-				// Use last file of the day, files before 6 will be dated the day before
-				// continue;
-//				}
-//				fileDates.add(date);
 				if (date.isBefore(earliestDate)) {
 					earliestDate = date;
 
@@ -100,7 +109,6 @@ public class VanguardPortfolioLoad {
 				}
 
 			}
-//			mostRecentSharePriceDay = earliestDate;
 		}
 
 //		if (portfolio.getPriceHistory().getMostRecentDay().isAfter(mostRecentSharePriceDay)) {
@@ -132,14 +140,22 @@ public class VanguardPortfolioLoad {
 		// Load current download file
 		// If current download file timestamp before 6pm, then the fund prices are from
 		// the previous day.
-		LocalDate currentDownloadFilePriceDate = LocalDate.now();
-		if (LocalTime.now().isBefore(LocalTime.of(18, 0))) {
-			currentDownloadFilePriceDate = currentDownloadFilePriceDate.minusDays(1);
+		File file = new File(basePath + "\\" + currentDownloadFile);
+
+		if (file.exists()) {
+//			LocalDate currentDownloadFilePriceDate = LocalDate.now();
+//			if (LocalTime.now().isBefore(LocalTime.of(18, 0))) {
+//				currentDownloadFilePriceDate = currentDownloadFilePriceDate.minusDays(1);
+//			}
+			logger.trace("Load current download file:  " + currentDownloadFile);
+			
+			LocalDateTime currentDownloadFilePriceDate = getDownloadFileCreationDate(currentDownloadFile, basePath);
+			loadPortfolioDownloadFile(portfolio, currentDownloadFilePriceDate.toLocalDate(), file.getAbsolutePath());
 		}
-		loadPortfolioDownloadFile(currentDownloadFilePriceDate, currentDownloadFile);
 
 	}
-	public void loadPortfolioDownloadFile(LocalDate date, String filename) {
+
+	public static void loadPortfolioDownloadFile(Portfolio portfolio, LocalDate date, String filename) {
 
 		try {
 			portfolio.getPriceHistory().loadPortfolioDownloadFile(portfolio, date, filename);
@@ -150,7 +166,7 @@ public class VanguardPortfolioLoad {
 
 	}
 
-	private LocalDate getDownloadFileDate(String filename, boolean adjust) {
+	private static LocalDateTime getDownloadFileCreationDate(String filename, String basePath) {
 
 		LocalDateTime fileDateTime = null;
 		LocalDate date = null;
@@ -165,22 +181,13 @@ public class VanguardPortfolioLoad {
 //			System.out.println("File creation date:   " + date.format(DATE_FORMATTER));
 //			System.out.println("File creation time:   " + date.format(TIME_FORMATTER));
 		} catch (Exception e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-			return LocalDate.now();
+			logger.error("Error reading file", e);
+			return LocalDateTime.now();
 		}
 
 		date = fileDateTime.toLocalDate();
-		if (adjust) {
-			LocalTime cutoffTime = LocalTime.of(18, 0);
-			if (fileDateTime.toLocalTime().isBefore(cutoffTime)) {
-				date = date.minusDays(1);
-//			System.out.println("Adjusted date:   " + date.format(DATE_FORMATTER));
-//			System.out.println("Adjusted time:   " + date.format(TIME_FORMATTER));
-			}
-		}
 
-		return date;
+		return fileDateTime;
 //		LocalDate fileNameDate = null;
 //		LocalTime fileNameTime = null;
 //		LocalDateTime fileNameDateTime = null;
@@ -218,7 +225,7 @@ public class VanguardPortfolioLoad {
 //		return fileNameDateTime;
 	}
 
-	public void updateDownloadFilenames(String downloadFilenamePrefix) {
+	public void updateDownloadFilenames(String downloadFilenamePrefix, String basePath) {
 
 		DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HHmmss.SSS");
 
@@ -227,7 +234,8 @@ public class VanguardPortfolioLoad {
 			List<String> filenames = stream.filter(p -> p.getFileName().toString().startsWith(downloadFilenamePrefix))
 					.map(p -> p.getFileName().toString()).sorted().collect(Collectors.toList());
 			for (String filename : filenames) {
-				LocalDate date = getDownloadFileDate(filename, false);
+				LocalDateTime dateTime = getDownloadFileCreationDate(filename, filename);
+				LocalDate date = dateTime.toLocalDate();
 
 				if (date == null) {
 					// Not a valid download file
@@ -245,7 +253,5 @@ public class VanguardPortfolioLoad {
 			e.printStackTrace();
 		}
 	}
-
-
 
 }

@@ -1,0 +1,55 @@
+2024-07-29 20:47:31 DEBUG running Withdrawal $225.00
+2024-07-29 20:47:31 DEBUG Fund:  Strategic Sm-Cap Eq  fund dev 0.2200%
+2024-07-29 20:47:31 DEBUG Fund:  Strategic Sm-Cap Eq New Fund Balance:  $19,977.97 New Fund Deviation:  0.2100%
+2024-07-29 20:47:31 DEBUG Fund:  Strategic Sm-Cap Eq running fund withdrawal amount $300.00
+2024-07-29 20:47:31 DEBUG running Withdrawal $300.00
+2024-07-29 20:47:31 DEBUG Fund:  Strategic Sm-Cap Eq  fund dev 0.2100%
+2024-07-29 20:47:31 DEBUG Fund:  Strategic Sm-Cap Eq New Fund Balance:  $19,902.97 New Fund Deviation:  0.2000%
+2024-07-29 20:47:31 DEBUG Fund:  Strategic Sm-Cap Eq running fund withdrawal amount $375.00
+2024-07-29 20:47:31 DEBUG running Withdrawal $375.00
+2024-07-29 20:47:31 DEBUG Fund:  Strategic Sm-Cap Eq  fund dev 0.2000%
+2024-07-29 20:47:31 DEBUG Fund:  Strategic Sm-Cap Eq New Fund Balance:  $19,827.97 New Fund Deviation:  0.1900%
+2024-07-29 20:47:31 DEBUG Fund:  Strategic Sm-Cap Eq running fund withdrawal amount $450.00
+2024-07-29 20:47:31 DEBUG running Withdrawal $450.00
+2024-07-29 20:47:31 DEBUG Fund:  Strategic Sm-Cap Eq  fund dev 0.1900%
+2024-07-29 20:47:31 DEBUG Fund:  Strategic Sm-Cap Eq New Fund Balance:  $19,752.97 New Fund Deviation:  0.1800%
+2024-07-29 20:47:31 DEBUG Fund:  Strategic Sm-Cap Eq running fund withdrawal amount $525.00
+2024-07-29 20:47:31 DEBUG running Withdrawal $525.00
+2024-07-29 20:47:31 DEBUG Fund:  Extended Mkt Idx Adm  fund dev 0.1959%
+2024-07-29 20:47:31 DEBUG Fund:  Extended Mkt Idx Adm New Fund Balance:  $30,843.29 New Fund Deviation:  0.1900%
+2024-07-29 20:47:31 DEBUG Fund:  Extended Mkt Idx Adm running fund withdrawal amount $75.00
+2024-07-29 20:47:31 DEBUG running Withdrawal $600.00
+2024-07-29 20:47:31 DEBUG Fund:  Strategic Sm-Cap Eq  fund dev 0.1800%
+2024-07-29 20:47:31 DEBUG Fund:  Strategic Sm-Cap Eq New Fund Balance:  $19,677.97 New Fund Deviation:  0.1700%
+2024-07-29 20:47:31 DEBUG Fund:  Strategic Sm-Cap Eq running fund withdrawal amount $600.00
+2024-07-29 20:47:31 DEBUG running Withdrawal $675.00
+2024-07-29 20:47:31 DEBUG Fund:  Extended Mkt Idx Adm  fund dev 0.1900%
+2024-07-29 20:47:31 DEBUG Fund:  Extended Mkt Idx Adm New Fund Balance:  $30,768.29 New Fund Deviation:  0.1800%
+2024-07-29 20:47:31 DEBUG Fund:  Extended Mkt Idx Adm running fund withdrawal amount $150.00
+2024-07-29 20:47:31 DEBUG running Withdrawal $750.00
+2024-07-29 20:47:31 DEBUG Fund:  Strategic Sm-Cap Eq  fund dev 0.1700%
+2024-07-29 20:47:31 DEBUG Fund:  Strategic Sm-Cap Eq New Fund Balance:  $19,602.97 New Fund Deviation:  0.1600%
+2024-07-29 20:47:31 DEBUG Fund:  Strategic Sm-Cap Eq running fund withdrawal amount $675.00
+2024-07-29 20:47:31 DEBUG running Withdrawal $825.00
+2024-07-29 20:47:31 DEBUG Fund:  Extended Mkt Idx Adm  fund dev 0.1800%
+2024-07-29 20:47:31 DEBUG Fund:  Extended Mkt Idx Adm New Fund Balance:  $30,693.29 New Fund Deviation:  0.1700%
+2024-07-29 20:47:31 DEBUG Fund:  Extended Mkt Idx Adm running fund withdrawal amount $225.00
+2024-07-29 20:47:31 DEBUG running Withdrawal $900.00
+2024-07-29 20:47:31 DEBUG Fund:  Strategic Sm-Cap Eq  fund dev 0.1600%
+2024-07-29 20:47:31 DEBUG Fund:  Strategic Sm-Cap Eq New Fund Balance:  $19,527.97 New Fund Deviation:  0.1500%
+2024-07-29 20:47:31 DEBUG Fund:  Strategic Sm-Cap Eq running fund withdrawal amount $750.00
+2024-07-29 20:47:31 DEBUG running Withdrawal $975.00
+2024-07-29 20:47:31 DEBUG Fund:  Extended Mkt Idx Adm  fund dev 0.1700%
+2024-07-29 20:47:31 DEBUG Fund:  Extended Mkt Idx Adm New Fund Balance:  $30,618.29 New Fund Deviation:  0.1600%
+2024-07-29 20:47:31 DEBUG Fund:  Extended Mkt Idx Adm running fund withdrawal amount $300.00
+2024-07-29 20:47:31 DEBUG running Withdrawal $1,050.00
+2024-07-29 20:47:31 DEBUG Fund:  Explorer Inv  fund dev 0.1614%
+2024-07-29 20:47:31 DEBUG Fund:  Explorer Inv New Fund Balance:  $37,957.52 New Fund Deviation:  0.1500%
+2024-07-29 20:47:31 DEBUG Fund:  Explorer Inv running fund withdrawal amount $75.00
+2024-07-29 20:47:31 DEBUG running Withdrawal $1,125.00
+2024-07-29 20:47:31 DEBUG Fund:  Strategic Sm-Cap Eq  fund dev 0.1500%
+2024-07-29 20:47:31 DEBUG Fund:  Strategic Sm-Cap Eq New Fund Balance:  $19,502.97 New Fund Deviation:  0.1500%
+2024-07-29 20:47:31 DEBUG Fund:  Strategic Sm-Cap Eq running fund withdrawal amount $775.00
+2024-07-29 20:47:31 DEBUG running Withdrawal $1,150.00
+2024-07-29 20:47:31 DEBUG total  withdrawal calculatedn from map:  $1,856.00
+2024-07-29 20:47:31 TRACE Print performance table

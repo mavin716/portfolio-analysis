@@ -24,7 +24,10 @@ import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.log4j.LogManager;
+import org.apache.log4j.Logger;
 
+import com.wise.portfolio.alphaVantage.AlphaVantageFundPriceService;
 import com.wise.portfolio.fund.Fund;
 import com.wise.portfolio.fund.FundPriceHistory;
 import com.wise.portfolio.fund.MutualFund.FundCategory;
@@ -32,6 +35,8 @@ import com.wise.portfolio.fund.PortfolioFund;
 import com.wise.portfolio.portfolio.Portfolio;
 
 public class PortfolioPriceHistory {
+
+	protected static final Logger logger = LogManager.getLogger(PortfolioPriceHistory.class);
 
 	public static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("MM/dd/yy");
 	public static final int CURRENCY_SCALE = 6;
@@ -135,6 +140,7 @@ public class PortfolioPriceHistory {
 
 	public void loadPortfolioDownloadFile(Portfolio portfolio, LocalDate date, String downloadFile) throws IOException {
 
+		logger.trace("Load download file:  " + downloadFile + " for date: " + date);
 		final int NUM_COLUMNS = 6;
 		final String HEADING = "Investment Name";
 
@@ -193,7 +199,7 @@ public class PortfolioPriceHistory {
 			try {
 				price = new BigDecimal(priceString);
 			} catch (Exception e) {
-				System.out.println("Exception converting price to decimal:  " + e.getMessage());
+				logger.warn("Exception converting price to decimal:  " + priceString + " file:  " + downloadFile);
 				continue;
 			}
 
@@ -227,7 +233,7 @@ public class PortfolioPriceHistory {
 						.filter(line -> line.size() == 14).collect(Collectors.toList());
 
 			} catch (Exception e) {
-				System.out.println("Invalid file:  " + downloadFile + "Exception: " + e.getMessage());
+				logger.error("Invalid file:  " + downloadFile + "Exception: " + e.getMessage());
 			}
 			if (currentFundsTransactions != null && currentFundsTransactions.size() > 0) {
 
@@ -258,7 +264,7 @@ public class PortfolioPriceHistory {
 							tradeDate = LocalDate.parse(fundTransaction.get(1),
 									DateTimeFormatter.ofPattern("yyyy-MM-dd"));
 						} catch (Exception e1) {
-							System.out.println("Exception processing transactions:  " + e);
+							logger.error("Exception processing transactions:  " + e);
 							continue;
 						}
 					}
@@ -305,7 +311,7 @@ public class PortfolioPriceHistory {
 				}
 			}
 		} catch (Exception e) {
-			System.out.println("Exception processing transactions:  " + e);
+			logger.error("Exception processing transactions:  ", e);
 		}
 //		portfolio.setFundMap(funds);
 
@@ -321,7 +327,7 @@ public class PortfolioPriceHistory {
 		List<List<String>> fundLines = readHistoryCSVFile(historyFilePath);
 		List<String> headingLine = fundLines.remove(0); // first line is headings
 		if (headingLine == null) {
-			System.out.println("WARNING:  empty file:  " + historyFile);
+			logger.warn("empty file:  " + historyFile);
 			return;
 		}
 
@@ -329,7 +335,7 @@ public class PortfolioPriceHistory {
 			int column = 0;
 			String symbol = fundValues.get(column++);
 			if (symbol == null) {
-				System.out.println("symbol is null");
+				logger.warn("symbol is null");
 				continue;
 			}
 			;
@@ -354,7 +360,7 @@ public class PortfolioPriceHistory {
 						price = new BigDecimal(priceString);
 					}
 				} catch (Exception e) {
-					System.out.print("Excetpion converting price string to decimal");
+					logger.error("Excetpion converting price string to decimal", e);
 
 				}
 
@@ -376,10 +382,11 @@ public class PortfolioPriceHistory {
 			return;
 		}
 
+
 		List<List<String>> fundLines = readHistoryCSVFile(historyFilePath);
 		List<String> headingLine = fundLines.remove(0); // first line is headings
 		if (headingLine == null) {
-			System.out.println("WARNING:  empty file:  " + historyFile);
+			logger.warn("empty file:  " + historyFile);
 			return;
 		}
 
@@ -387,7 +394,7 @@ public class PortfolioPriceHistory {
 			int column = 0;
 			String symbol = fundValues.get(column++);
 			if (symbol == null) {
-				System.out.println("symbol is null");
+				logger.warn("symbol is null");
 				continue;
 			}
 			;
@@ -412,7 +419,7 @@ public class PortfolioPriceHistory {
 						price = new BigDecimal(priceString);
 					}
 				} catch (Exception e) {
-					System.out.print("Excetpion converting price string to decimal");
+					logger.error("Excetpion converting price string to decimal", e);
 
 				}
 
@@ -431,7 +438,7 @@ public class PortfolioPriceHistory {
 		try (BufferedReader br = Files.newBufferedReader(historyFilePath, PortfolioService.INPUT_CHARSET)) {
 			fundLines = br.lines().map(line -> Arrays.asList(line.split(","))).collect(Collectors.toList());
 		} catch (Exception e) {
-			System.out.println("Exception processing lines from downloadfile: " + e);
+			logger.error("Exception processing lines from downloadfile: " + historyFilePath, e);
 		}
 		return fundLines;
 	}
@@ -446,7 +453,7 @@ public class PortfolioPriceHistory {
 		List<List<String>> fundLines = readHistoryCSVFile(sharesFilePath);
 		List<String> headingLine = fundLines.remove(0); // first line is headings
 		if (headingLine == null) {
-			System.out.println("WARNING:  empty file:  " + sharesFilePath.getFileName());
+			logger.warn("WARNING:  empty file:  " + sharesFilePath.getFileName());
 			return;
 		}
 
@@ -455,7 +462,7 @@ public class PortfolioPriceHistory {
 
 			String symbol = fundValues.get(column++);
 			if (symbol == null) {
-				System.out.println("symbol is null");
+				logger.warn("symbol is null");
 				continue;
 			}
 
@@ -673,15 +680,17 @@ public class PortfolioPriceHistory {
 		return value;
 	}
 
-	public Double getSharesByDate(Fund fund, LocalDate date, boolean isExactDate) {
+	public Double getSharesByDate(Fund fund, LocalDate date) {
 		Double value = (double) 0;
 
 		Map<LocalDate, Double> fundPriceMap = fundShares.get(fund.getSymbol());
 		if (fundPriceMap == null) {
 			return value;
 		}
+		
+		// Cannot be exact because don't always download file with shares
 		value = fundPriceMap.get(date);
-		if (value == null && !isExactDate) {
+		if (value == null) {
 			int tries = 60;
 			while (tries-- > 0) {
 				date = date.minus(1, ChronoUnit.DAYS);
@@ -702,7 +711,7 @@ public class PortfolioPriceHistory {
 		BigDecimal value = null;
 
 		BigDecimal price = getPriceByDate(fund, date, isExactDate);
-		Double shares = getSharesByDate(fund, date, isExactDate);
+		Double shares = getSharesByDate(fund, date);
 
 		if (price != null && shares != null && shares.compareTo((double) 0) > 0) {
 			value = price.multiply(new BigDecimal(shares));
@@ -719,7 +728,7 @@ public class PortfolioPriceHistory {
 			BigDecimal fundValue = BigDecimal.ZERO;
 
 			BigDecimal fundPrice = getPriceByDate(fund, date, isExactDate);
-			Double fundShares = getSharesByDate(fund, date, isExactDate);
+			Double fundShares = getSharesByDate(fund, date);
 
 			if (fundPrice != null && fundShares != null) {
 				fundValue = fundPrice.multiply(new BigDecimal(fundShares));
@@ -729,7 +738,7 @@ public class PortfolioPriceHistory {
 				while (tries-- > 0) {
 					date = date.minus(1, ChronoUnit.DAYS);
 					fundPrice = getPriceByDate(fund, date, isExactDate);
-					fundShares = getSharesByDate(fund, date, isExactDate);
+					fundShares = getSharesByDate(fund, date);
 					if (fundPrice != null && fundShares != null) {
 						fundValue = fundPrice.multiply(new BigDecimal(fundShares));
 						if (fundValue.compareTo(BigDecimal.ZERO) > 0) {
@@ -817,6 +826,12 @@ public class PortfolioPriceHistory {
 			fundsMinPriceMap.put(symbol, Pair.of(date, price));
 		}
 
+	}
+
+	public LocalDate getFundOldestDay(PortfolioFund fund) {
+		// TODO Auto-generated method stub
+		FundPriceHistory fundPriceHistory = alphaVantagePriceHistory.get(fund.getSymbol());
+		return fundPriceHistory.getOldestDate();
 	}
 
 }

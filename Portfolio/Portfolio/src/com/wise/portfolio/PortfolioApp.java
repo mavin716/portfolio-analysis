@@ -13,17 +13,16 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.Period;
 import java.time.format.DateTimeFormatter;
-import java.time.temporal.TemporalUnit;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.log4j.LogManager;
+import org.apache.log4j.Logger;
 
 import com.itextpdf.kernel.events.PdfDocumentEvent;
 import com.itextpdf.kernel.geom.PageSize;
@@ -34,45 +33,22 @@ import com.itextpdf.layout.element.Paragraph;
 import com.itextpdf.layout.property.HorizontalAlignment;
 import com.itextpdf.layout.property.TextAlignment;
 import com.wise.portfolio.alphaVantage.AlphaVantageFundPriceService;
-import com.wise.portfolio.fund.FundTransaction;
 import com.wise.portfolio.fund.PortfolioFund;
 import com.wise.portfolio.pdf.FooterHandler;
 import com.wise.portfolio.pdf.HeaderHandler;
 import com.wise.portfolio.portfolio.ManagedPortfolio;
 import com.wise.portfolio.portfolio.Portfolio;
 import com.wise.portfolio.portfolio.PortfolioTransaction;
+import com.wise.portfolio.service.AppProperties;
 import com.wise.portfolio.service.CurrencyHelper;
 import com.wise.portfolio.service.MailService;
 import com.wise.portfolio.service.PortfolioService;
 
 public class PortfolioApp {
 
-	// TODO need configuration file
-	private static final String DOWNLOAD_PATH = "C:\\Users\\mavin\\Downloads\\";
-//	private static final String CURRENT_DOWNLOAD_FILE_PATH = "C:\\Users\\mavin\\My Drive\\";
-	private static final String CURRENT_DOWNLOAD_FILE_PATH = "C:\\Users\\mavin\\Downloads\\";
+	protected static final Logger logger = LogManager.getLogger(PortfolioService.class);
 
 	public static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("MM/dd/yy");
-
-	private static final String DOWNLOAD_FILENAME_PREFIX = "ofxdownload";
-	private static final String CURRENT_DOWNLOAD_FILE = CURRENT_DOWNLOAD_FILE_PATH + DOWNLOAD_FILENAME_PREFIX + ".csv";
-	private static final String ALLOCATION_FILE = DOWNLOAD_PATH + "allocation.csv";
-	private static final String SCHEDULE_FILE = DOWNLOAD_PATH + "Schedule.csv";
-	private static final String ALPHA_VANTAGE_PRICE_HISTORY_FILENAME = "alphaVantagePriceHistory.csv";
-
-	private static final String FUND_SYMBOLS_MAP_FILE = "allocation.csv";
-	private static final String PORTFOLIO_PDF_FILE = "C:\\Users\\mavin\\Documents\\portfolio.pdf";
-
-	private static final BigDecimal FEDERAL_WITHOLD_TAXES_PERCENT = new BigDecimal(.12);
-	private static final BigDecimal STATE_WITHOLD_TAXES_PERCENT = new BigDecimal(.03);
-	private static final BigDecimal WITHOLD_TAXES_PERCENT = FEDERAL_WITHOLD_TAXES_PERCENT
-			.add(STATE_WITHOLD_TAXES_PERCENT);
-	private static final BigDecimal AFTER_TAXES_WITHDRAW_AMOUNT_PERCENTAGE = BigDecimal.ONE
-			.subtract(WITHOLD_TAXES_PERCENT);
-
-	private static final int RECENT_TRANSACTIONS_DAYS = 30;
-
-	private static final long PORTFOLIO_TRANSACTION_REPORT_WINDOW = 30;
 
 	public static void main(String[] args) {
 
@@ -92,44 +68,45 @@ public class PortfolioApp {
 
 		File portfolioPdfFile = null;
 		try {
+
+			String downloadPath = AppProperties.getProperty("downloadPath");
+			String currentDownloadFilename = AppProperties.getProperty("currentDownloadFilename");
+			String downloadFilenamePrefix = AppProperties.getProperty("downloadFilenamePrefix");
 			// Create the portfolio service
-			portfolioService = new PortfolioService(DOWNLOAD_PATH);
+			portfolioService = new PortfolioService(downloadPath);
 
 			// Create the portfolio
-			portfolio = portfolioService.createPortfolio(FUND_SYMBOLS_MAP_FILE);
+			portfolio = portfolioService.createPortfolio(AppProperties.getProperty("fundAllocationFileName"));
 
 			// Load history download files
-			portfolioService.loadPortfolioDownloadFiles(portfolio, DOWNLOAD_FILENAME_PREFIX, CURRENT_DOWNLOAD_FILE);
+			portfolioService.loadPortfolioDownloadFiles(portfolio, downloadFilenamePrefix, currentDownloadFilename);
 			// Used to change naming policy
 			// portfolioService.updateDownloadFilenames(portfolio,
 			// DOWNLOAD_FILENAME_PREFIX);
 
-			System.out.println("Load portfolio allocation");
-			portfolioService.loadFundAllocation(ALLOCATION_FILE);
+			String filePath = Paths.get(downloadPath, AppProperties.getProperty("fundAllocationFileName")).toString();
+			portfolioService.loadFundAllocation(filePath);
 
 			// Load price history via alphaVantage
 			// randomize order of funds because the number exceeds daily quota
-			portfolio.getFunds().parallelStream().filter(f -> !f.isClosed() && !f.isMMFund()).forEach(f -> {
+			portfolio.getFunds().parallelStream().filter(f -> !f.isMMFund()).forEach(f -> {
 				try {
 					AlphaVantageFundPriceService.retrieveFundHistoryFromAlphaVantage(portfolio, f.getSymbol(), false);
 				} catch (IOException e) {
-					System.out.println("Exception:  " + e.getMessage());
-					e.printStackTrace();
+					logger.error("Exception:  " + e.getMessage(), e);
 				}
 			});
 
-			System.out.println("Loading Alpha Vantage Price History File");
-			portfolio.getPriceHistory().loadAlphaPriceHistoryFile(portfolio, DOWNLOAD_PATH,
-					ALPHA_VANTAGE_PRICE_HISTORY_FILENAME);
+			portfolio.getPriceHistory().loadAlphaPriceHistoryFile(portfolio, downloadPath,
+					AppProperties.getProperty("alphaVantagePriceHistoryFilename"));
 
-			System.out.println("Load portfolio schedule");
-			portfolioService.loadPortfolioScheduleFile(SCHEDULE_FILE);
+			filePath = Paths.get(downloadPath, AppProperties.getProperty("scheduleFilename")).toString();
+			portfolioService.loadPortfolioScheduleFile(filePath);
 
-			System.out.println("Save Portfolio Data");
 			portfolioService.savePortfolioData();
 
 			// Overwrite PDF output file
-			portfolioPdfFile = new File(PORTFOLIO_PDF_FILE);
+			portfolioPdfFile = new File(AppProperties.getProperty("reportFilePath"));
 			portfolioPdfFile.delete();
 
 			PdfWriter writer = new PdfWriter(portfolioPdfFile);
@@ -147,9 +124,10 @@ public class PortfolioApp {
 			pdfDoc.addEventHandler(PdfDocumentEvent.END_PAGE, footerHandler);
 
 			// Process scheduled portfolio transactions
+			logger.info("Process scheduled transactions");
 			processScheduledPortfolioTransactions(document);
 
-			System.out.println("Print performance table");
+			logger.info("Print performance tables");
 			headerHandler.setHeader("performance table");
 			footerHandler.setFooter("* 10 yr return doesn't include income");
 			pdfDoc.addNewPage();
@@ -160,29 +138,32 @@ public class PortfolioApp {
 			pdfDoc.addNewPage();
 			portfolioService.printPortfolioPerformanceTable(document);
 
+			logger.info("Print portfolio transaction tables");
 			headerHandler.setHeader("Scheduled Transactions");
 			pdfDoc.addNewPage();
 			portfolioService.printScheduledTransactionsSpreadsheet("Scheduled Transactions",
 					portfolio.getPortfolioTransactions(), document);
 
+			Integer recentTransactionsDays = AppProperties.getPropertyAsInteger("recentTransactionsReportDays");
 			portfolioService.printRecentTransactionsSpreadsheet(
-					"Recent Transactions (" + RECENT_TRANSACTIONS_DAYS + " days)", RECENT_TRANSACTIONS_DAYS, portfolio,
+					"Recent Transactions (" + recentTransactionsDays + " days)", recentTransactionsDays, portfolio,
 					document);
 
 			portfolioService.printYTDDistributionsSpreadsheet("YTD Withdrawals", portfolio, document,
 					PortfolioService.getYtdDays());
 			portfolioService.printFutureWithdrawalsSpreadsheet("Future Withdrawals", portfolio, document,
-					FEDERAL_WITHOLD_TAXES_PERCENT, STATE_WITHOLD_TAXES_PERCENT);
+					getFederalTaxWithholdingPercentage(), getStateTaxWithholdingPercentage());
 
 			// Add price performance graphs,
-			System.out.println("Print graphs");
+			logger.info("Print graphs");
 			headerHandler.setHeader("balance line graph");
 			pdfDoc.addNewPage();
 			LocalDate endDate = LocalDate.now();
 			if (LocalTime.now().isBefore(LocalTime.of(18, 0))) {
 				endDate = endDate.minusDays(1);
 			}
-			LocalDate startDate = LocalDate.of(2020, 1, 1);
+			LocalDate startDate = LocalDate.now().minusYears(5);
+			startDate = startDate.withDayOfMonth(1);
 			Period period = Period.ofMonths(1);
 			portfolioService.printBalanceLineAndBarGraphs(document, pdfDoc, startDate, endDate, period);
 
@@ -289,11 +270,12 @@ public class PortfolioApp {
 			// portfolioService.printTrends(portfolio);
 
 			// Print ranking
-			System.out.println("Print ranking tables");
+			logger.info("Print ranking tables");
 			headerHandler.setHeader("Ranking");
 			pdfDoc.addNewPage();
 			portfolioService.printRanking(document);
 
+			logger.info("Print adjustment tables");
 			Map<String, BigDecimal> adjustments = portfolioService.calculateAdjustments();
 			pdfDoc.addNewPage();
 			String title = "Adjust portfolio";
@@ -302,15 +284,16 @@ public class PortfolioApp {
 
 			SimpleDateFormat fileNameFormatter = new SimpleDateFormat("yyyy-MM-dd'T'HHmmss.SSS");
 			// move latest file to dated file to make way for next download
-			String newFileName = DOWNLOAD_FILENAME_PREFIX + " - "
+			String newFileName = downloadFilenamePrefix + " - "
 					+ fileNameFormatter.format(new Date(System.currentTimeMillis())) + ".csv";
-			if (Files.exists(Paths.get(CURRENT_DOWNLOAD_FILE)) && !Files.exists(Paths.get(newFileName))) {
-				Files.move(Paths.get(CURRENT_DOWNLOAD_FILE), Paths.get(DOWNLOAD_PATH, newFileName));
+			if (Files.exists(Paths.get(downloadPath, currentDownloadFilename))
+					&& !Files.exists(Paths.get(newFileName))) {
+				Files.move(Paths.get(downloadPath, currentDownloadFilename), Paths.get(downloadPath, newFileName));
 			}
 
 			// Closing the document
 			document.close();
-			System.out.println("PDF Created");
+			logger.info("PDF Created");
 
 			String subject = "YEAH";
 			BigDecimal difference = getBalanceDifference();
@@ -324,11 +307,20 @@ public class PortfolioApp {
 			MailService.sendMail(subject, textBody, portfolioPdfFile);
 
 		} catch (Exception e) {
-			System.out.println("Exception e: " + e.getMessage());
-			e.printStackTrace();
+			logger.error("Exception e: " + e.getMessage(), e);
 		}
 		return portfolioPdfFile;
 
+	}
+
+	private BigDecimal getStateTaxWithholdingPercentage() {
+		BigDecimal percentage = AppProperties.getPropertyAsBigDecimal("stateTaxWithholdPercentage");
+		return percentage;
+	}
+
+	private BigDecimal getFederalTaxWithholdingPercentage() {
+		BigDecimal percentage = AppProperties.getPropertyAsBigDecimal("federalTaxWithholdPercentage");
+		return percentage;
 	}
 
 	private String generateReportTitle() {
@@ -383,35 +375,39 @@ public class PortfolioApp {
 			if (transactionDate.getDayOfWeek() == DayOfWeek.SUNDAY) {
 				transactionDate.plusDays(1);
 			}
-			if (today.isAfter(transactionDate.minusDays(PORTFOLIO_TRANSACTION_REPORT_WINDOW))) {
+			Integer recentTransactionsDays = AppProperties.getPropertyAsInteger("scheduleTransactionsReportWindow");
+			if (today.isAfter(transactionDate.minusDays(recentTransactionsDays))) {
 				if (transaction.getType().equalsIgnoreCase("Withdraw")) {
-					// TODO bundle 'like' withdrawals for same date
 					withdrawDate = transaction.getDate();
 					withdrawTransactions.add(transaction);
 				} else {
 					transferTransactions.add(transaction);
 				}
 			}
-			while (transaction.isRecurring() && !today.isBefore(transactionDate)) {
-				switch (transaction.getRecurringPeriod()) {
-				case "Month":
-					transactionDate = transactionDate.plusMonths(1);
-					break;
-				case "Year":
-					transactionDate = transactionDate.plusYears(1);
-					break;
-				default:
-					System.out.print("Unknown recurrng period:  " + transaction.getRecurringPeriod());
-					transactionDate = transactionDate.plusYears(99);
-					break;
+			if (transaction.isRecurring()) {
+				PortfolioTransaction updatedTransaction = new PortfolioTransaction(transaction);
+				while (!today.isBefore(transactionDate)) {
+
+					switch (transaction.getRecurringPeriod()) {
+					case "Month":
+						transactionDate = transactionDate.plusMonths(1);
+						break;
+					case "Year":
+						transactionDate = transactionDate.plusYears(1);
+						break;
+					default:
+						logger.error("Unknown recurrng period:  " + transaction.getRecurringPeriod());
+						transactionDate = transactionDate.plusYears(99);
+						break;
+					}
 				}
-				transaction.setDate(transactionDate);
-			}
-			if (transaction.getDate().isAfter(today)) {
-				updatedTransactions.add(transaction);
+				updatedTransaction.setDate(transactionDate);
+				updatedTransactions.add(updatedTransaction);
 			}
 		}
-		if (withdrawTransactions.size() > 0) {
+		if (withdrawTransactions.size() > 0)
+
+		{
 			// sorts by amount descending
 //			withdrawTransactions.sort(Comparator.comparing(PortfolioTransaction::getDate));
 			printPortfolioTransactionWithdraw(withdrawDate, withdrawTransactions, portfolioService, document,
@@ -421,7 +417,8 @@ public class PortfolioApp {
 			printPortfolioTransactionTransfer(transferTransactions, portfolioService, document, portfolio);
 		}
 		// update next run date
-		portfolioService.updatePortfolioSchedule(SCHEDULE_FILE, updatedTransactions);
+		portfolioService.updatePortfolioSchedule(AppProperties.getProperty("scheduleFilename"),
+				AppProperties.getProperty("downloadPath"), updatedTransactions);
 
 	}
 
@@ -443,6 +440,9 @@ public class PortfolioApp {
 		// Sort for heading
 		withdrawTransactions.sort(Comparator.comparing(PortfolioTransaction::getDate));
 
+		BigDecimal totalWithholdTaxesPercentage = getFederalTaxWithholdingPercentage()
+				.add(getStateTaxWithholdingPercentage());
+		BigDecimal afterTaxesPercentage = BigDecimal.ONE.subtract(totalWithholdTaxesPercentage);
 		for (PortfolioTransaction transaction : withdrawTransactions) {
 			withdrawAmount = withdrawAmount.add(transaction.getAmount());
 
@@ -454,11 +454,10 @@ public class PortfolioApp {
 				// to include taxes in selected fund, add to amount and set Is Net Amount to
 				// true
 				netWithdrawalAmount = netWithdrawalAmount.add(transaction.getAmount());
-				totalAddlTaxes = totalAddlTaxes
-						.add(transaction.getAmount().multiply(WITHOLD_TAXES_PERCENT).setScale(2, RoundingMode.HALF_UP));
+				totalAddlTaxes = totalAddlTaxes.add(transaction.getAmount().multiply(totalWithholdTaxesPercentage)
+						.setScale(2, RoundingMode.HALF_UP));
 			} else {
-				netWithdrawalAmount = netWithdrawalAmount
-						.add(transaction.getAmount().multiply(AFTER_TAXES_WITHDRAW_AMOUNT_PERCENTAGE));
+				netWithdrawalAmount = netWithdrawalAmount.add(transaction.getAmount().multiply(afterTaxesPercentage));
 			}
 			title = title + "\n\t" + DATE_FORMATTER.format(transaction.getDate()) + " " + transaction.getDescription()
 					+ " Amount: " + CurrencyHelper.formatAsCurrencyString(transaction.getAmount());
@@ -467,7 +466,7 @@ public class PortfolioApp {
 		totalWithdrawalIncludingTaxes = withdrawAmount.add(totalAddlTaxes);
 		title += "\n\tTotal: " + CurrencyHelper.formatAsCurrencyString(totalWithdrawalIncludingTaxes) + " Net: "
 				+ CurrencyHelper.formatAsCurrencyString(netWithdrawalAmount);
-		System.out.println(title);
+		logger.debug(title);
 
 		// Calculate withdrawals
 		Map<String, BigDecimal> withdrawals = portfolioService.calculateWithdrawal(totalWithdrawalIncludingTaxes,
@@ -492,9 +491,9 @@ public class PortfolioApp {
 		for (PortfolioTransaction transaction : transactions) {
 			withdrawalMap.put(transaction.getFundSymbol(), BigDecimal.ZERO.subtract(transaction.getAmount()));
 			title = title + "\n\t" + DATE_FORMATTER.format(transaction.getDate()) + " " + transaction.getDescription()
-			+ " Amount: " + CurrencyHelper.formatAsCurrencyString(transaction.getAmount());
+					+ " Amount: " + CurrencyHelper.formatAsCurrencyString(transaction.getAmount());
 		}
-		System.out.println(title);
+		logger.debug(title);
 
 		Map<String, BigDecimal> transfers = portfolioService.calculateFixedExpensesTransfer(withdrawalMap);
 

@@ -2,7 +2,9 @@ package com.wise.portfolio.service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 
 import com.wise.portfolio.fund.MutualFund.FundCategory;
@@ -52,13 +54,17 @@ public class PerformanceService {
 
 		BigDecimal value = new BigDecimal(0);
 
-//		if (!portfolio.getFund(symbol).isClosed()) {
-		BigDecimal historicalPrice = getClosestHistoricalPrice(symbol, date, 10);
-		double historicalShares = portfolioPriceHistory.getSharesByDate(portfolio.getFund(symbol), date, false);
-		if (historicalPrice != null && historicalShares > 0) {
-			value = historicalPrice.multiply(new BigDecimal(historicalShares)).setScale(2, RoundingMode.DOWN);
+		PortfolioFund fund = portfolio.getFund(symbol);
+		if (fund != null) {
+			BigDecimal historicalPrice = getClosestHistoricalPrice(symbol, date, 1);
+			if (historicalPrice != null) {
+
+				Double historicalShares = portfolioPriceHistory.getSharesByDate(fund, date);
+				if (historicalShares != null && historicalShares > 0) {
+					value = historicalPrice.multiply(new BigDecimal(historicalShares)).setScale(2, RoundingMode.DOWN);
+				}
+			}
 		}
-//		}
 
 		return value;
 	}
@@ -86,16 +92,24 @@ public class PerformanceService {
 		LocalDate firstOfYearDate = getFirstOfYearDate();
 		LocalDate firstOfLastYearDate = firstOfYearDate.minusYears(1);
 		LocalDate oneYearAgoDate = LocalDate.now().minusYears(1);
-		LocalDate threeYearAgoDate = LocalDate.now().minusYears(1);
+		LocalDate threeYearAgoDate = LocalDate.now().minusYears(3);
+		LocalDate previousDayDate = LocalDate.now().minusDays(1);
+		if (LocalDateTime.now().getHour() < 18) {
+			previousDayDate = previousDayDate.minusDays(1);
+		}
+		if (previousDayDate.getDayOfWeek().equals(DayOfWeek.SUNDAY)) {
+			previousDayDate = previousDayDate.minusDays(2);
+		}
+		if (previousDayDate.getDayOfWeek().equals(DayOfWeek.SATURDAY)) {
+			previousDayDate = previousDayDate.minusDays(1);
+		}
 
 		performanceData.setPortfolioCurrentValue(portfolio.getTotalValue());
 		for (PortfolioFund fund : portfolio.getFunds()) {
 
 			performanceData.setPortfolioPreviousDayValue(performanceData.getPortfolioPreviousDayValue()
-					.add(getValueByDate(fund.getSymbol(), LocalDate.now().minusDays(1))));
+					.add(getValueByDate(fund.getSymbol(), previousDayDate)));
 
-			performanceData.setPortfolioYtdWithdrawals(
-					performanceData.getPortfolioYtdWithdrawals().add(fund.getWithdrawalsUpToDate(firstOfYearDate)));
 			performanceData.setPortfolioYtdDividends(
 					performanceData.getPortfolioYtdDividends().add(fund.getDistributionsAfterDate(firstOfYearDate)));
 			performanceData.setPortfolioLastYearDividends(performanceData.getPortfolioLastYearDividends()
@@ -134,8 +148,8 @@ public class PerformanceService {
 
 		performanceData.setPortfolioPreviousDayValueChange(
 				portfolio.getTotalValue().subtract(performanceData.getPortfolioPreviousDayValue()));
-		performanceData
-				.setPortfolioYtdValueChange(portfolio.getTotalValue().add(performanceData.getPortfolioYtdWithdrawals())
+		performanceData.setPortfolioYtdValueChange(
+				portfolio.getTotalValue().add(performanceData.getPortfolioYtdWithdrawals().abs())
 						.subtract(performanceData.getPortfolioFirstOfYearValue()));
 
 		performanceData.setPortfolioYtdFederalWithholding(
@@ -149,22 +163,20 @@ public class PerformanceService {
 				.getStateWithholdingBetweenDates(firstOfLastYearDate, firstOfYearDate.minusDays(1));
 
 		// 1 year
-		BigDecimal historicalValue = performanceData.getPortfolioYearAgoValue()
-				.subtract(performanceData.getPortfolioYearAgoWithdrawals());
-		BigDecimal fundReturns = portfolio.getTotalValue().subtract(historicalValue).divide(historicalValue, 4,
-				RoundingMode.HALF_UP);
+		BigDecimal historicalValue = performanceData.getPortfolioYearAgoValue();
+		BigDecimal fundReturns = portfolio.getTotalValue().add(performanceData.getPortfolioYearAgoWithdrawals())
+				.subtract(historicalValue).divide(portfolio.getTotalValue(), 4, RoundingMode.HALF_UP);
 		performanceData.setPortfolioYearAgoReturns(fundReturns);
 
 		// 3 year
-		historicalValue = performanceData.getPortfolioThreeYearAgoValue()
-				.subtract(performanceData.getPortfolioThreeYearAgoWithdrawals());
-		fundReturns = portfolio.getTotalValue().subtract(historicalValue).divide(historicalValue, 4,
-				RoundingMode.HALF_UP);
+		historicalValue = performanceData.getPortfolioThreeYearAgoValue();
+		fundReturns = portfolio.getTotalValue().add(performanceData.getPortfolioThreeYearAgoWithdrawals())
+				.subtract(historicalValue).divide(historicalValue, 4, RoundingMode.HALF_UP);
 
 		try {
 			double rate = PortfolioService.calculateAnnualizedReturn(fundReturns, 3);
 			performanceData.setPortfolioThreeYearsAgoReturns(new BigDecimal(rate));
-			
+
 		} catch (Exception e) {
 			e.printStackTrace();
 			System.out.println(e.getMessage());
