@@ -1,0 +1,12 @@
+2024-07-31 16:15:21,588 INFO  [PortfolioService] - Portfolio value as of 2024-07-31T16:15:21.581: $737,921.93
+2024-07-31 16:15:21,893 INFO  [PortfolioService] - Process scheduled transactions
+2024-07-31 16:15:22,187 INFO  [PortfolioService] - Print performance tables
+2024-07-31 16:15:29,381 INFO  [PortfolioService] - Print portfolio transaction tables
+2024-07-31 16:15:29,480 INFO  [PortfolioService] - Print graphs
+2024-07-31 16:15:29,534 WARN  [PortfolioService] - startBalance is ZERO???? for date:  2019-07-01
+2024-07-31 16:15:33,666 WARN  [PortfolioService] - fund shares history is null for Vanguard Growth and Income Fund Investor Shares VGNPX
+2024-07-31 16:15:34,921 WARN  [PortfolioService] - fund shares history is null for Vanguard Long-Term Bond Index Fund VBLTX
+2024-07-31 16:15:37,223 WARN  [PortfolioService] - fund shares history is null for Vanguard Total International Bond Index Fund Investor Shares VTIBX
+2024-07-31 16:15:39,087 INFO  [PortfolioService] - Print ranking tables
+2024-07-31 16:15:51,542 INFO  [PortfolioService] - Print adjustment tables
+2024-07-31 16:15:52,581 INFO  [PortfolioService] - PDF Created

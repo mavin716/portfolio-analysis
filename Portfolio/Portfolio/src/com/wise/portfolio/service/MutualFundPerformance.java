@@ -77,6 +77,9 @@ public class MutualFundPerformance {
 				return (double) 0;
 			}
 			BigDecimal currentSharePrice = portfolioFund.getCurrentPrice();
+			if (currentSharePrice.compareTo(BigDecimal.ZERO) == 0) {
+				return (double) 0;
+			}
 			BigDecimal priceDifference = currentSharePrice.subtract(historicalPrice);
 			Double rate = priceDifference
 					.divide(currentSharePrice, PortfolioService.CURRENCY_SCALE, RoundingMode.HALF_UP).doubleValue();

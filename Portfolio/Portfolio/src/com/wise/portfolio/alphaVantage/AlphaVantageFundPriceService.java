@@ -27,7 +27,7 @@ public class AlphaVantageFundPriceService {
 
 	protected static final Logger logger = LogManager.getLogger(AlphaVantageFundPriceService.class);
 
-	public static boolean retrieveFundHistoryFromAlphaVantage(Portfolio portfolio, String symbol, boolean retry)
+	public static boolean retrieveFundPriceHistoryFromAlphaVantage(Portfolio portfolio, String symbol, boolean retry)
 			throws IOException {
 
 		logger.debug("Retrieve prices from AlphaVantage API for:  " + portfolio.getFundName(symbol));
@@ -66,13 +66,14 @@ public class AlphaVantageFundPriceService {
 						System.out.println("Sleep for 10 seconds and try again");
 						Thread.sleep(10000);
 						logger.debug("retries left:  " + tries);
-						success = retrieveFundHistoryFromAlphaVantage(portfolio, symbol, false);
+						success = retrieveFundPriceHistoryFromAlphaVantage(portfolio, symbol, false);
 					}
 					if (tries <= 0 && !success) {
 						logger.warn("Exhausted retries");
 						return false;
 					}
 				}
+				logger.warn("Unsuccessful "  + portfolio.getFund(symbol).getShortName() + " response:  " + response.toString());
 				return success;
 			}
 			LocalDate mostRecentDate = null;

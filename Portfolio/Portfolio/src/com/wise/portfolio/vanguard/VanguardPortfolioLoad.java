@@ -3,7 +3,6 @@ package com.wise.portfolio.vanguard;
 import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -11,6 +10,7 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -25,7 +25,6 @@ import com.wise.portfolio.fund.PortfolioFund;
 import com.wise.portfolio.portfolio.Portfolio;
 import com.wise.portfolio.service.PerformanceService;
 import com.wise.portfolio.service.PortfolioPriceHistory;
-import com.wise.portfolio.service.PortfolioService;
 
 public class VanguardPortfolioLoad {
 
@@ -49,16 +48,17 @@ public class VanguardPortfolioLoad {
 //	private String basePath;
 
 	/**
-	 * @param currentDownloadFile2 
-	 * @param downloadFilenamePrefix2 
-	 * @param basePath2 
-	 * @param portfolio2 
+	 * @param currentDownloadFile2
+	 * @param downloadFilenamePrefix2
+	 * @param basePath2
+	 * @param portfolio2
 	 * @param currentDownloadFile
-	 * @param path                to find price history files
+	 * @param path                    to find price history files
 	 * 
 	 * @throws IOException
 	 */
-	public static void loadPortfolioDownloadFiles(Portfolio portfolio, String basePath, String downloadFilenamePrefix, String currentDownloadFile) throws IOException {
+	public static void loadPortfolioDownloadFiles(Portfolio portfolio, String basePath, String downloadFilenamePrefix,
+			String currentDownloadFile) throws IOException {
 
 		logger.trace("loadPortfolioDownloadFiles");
 		PerformanceService.setPortfolio(portfolio);
@@ -73,12 +73,13 @@ public class VanguardPortfolioLoad {
 			BigDecimal yesterdayWithdrawals = BigDecimal.ZERO;
 			PortfolioPriceHistory priceHistory = portfolio.getPriceHistory();
 			for (String filename : filenames) {
-				logger.trace("load file:  " + filename);
 
 				LocalDateTime dateTime = getDownloadFileCreationDate(filename, basePath);
 				LocalDate date = dateTime.toLocalDate();
+				logger.debug("load file:  " + filename + " file date: " + dateTime);
 				if (dateTime.getHour() < 18) {
 					date = date.minusDays(1);
+					logger.debug("load file:  " + filename + " adjusted file date: " + date);
 				}
 
 				if (date.isBefore(earliestDate)) {
@@ -147,9 +148,15 @@ public class VanguardPortfolioLoad {
 //			if (LocalTime.now().isBefore(LocalTime.of(18, 0))) {
 //				currentDownloadFilePriceDate = currentDownloadFilePriceDate.minusDays(1);
 //			}
-			logger.trace("Load current download file:  " + currentDownloadFile);
-			
+
 			LocalDateTime currentDownloadFilePriceDate = getDownloadFileCreationDate(currentDownloadFile, basePath);
+			logger.debug("Load current download file:  " + currentDownloadFile + " file date:  "
+					+ currentDownloadFilePriceDate);
+			if (currentDownloadFilePriceDate.toLocalTime().isBefore(LocalTime.of(18, 0))) {
+				currentDownloadFilePriceDate = currentDownloadFilePriceDate.minusDays(1);
+				logger.debug("Load current download file:  " + currentDownloadFile + " adjusted file date:  "
+						+ currentDownloadFilePriceDate);
+			}
 			loadPortfolioDownloadFile(portfolio, currentDownloadFilePriceDate.toLocalDate(), file.getAbsolutePath());
 		}
 
@@ -160,8 +167,7 @@ public class VanguardPortfolioLoad {
 		try {
 			portfolio.getPriceHistory().loadPortfolioDownloadFile(portfolio, date, filename);
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+			logger.error("Exception loading download file:  " + filename, e);
 		}
 
 	}
@@ -174,8 +180,10 @@ public class VanguardPortfolioLoad {
 		try {
 			BasicFileAttributes attr = Files.readAttributes(file.toPath(), BasicFileAttributes.class);
 
+			ZoneId systemZone = ZoneId.systemDefault(); // my timezone
+			ZoneOffset currentOffsetForMyZone = systemZone.getRules().getOffset(LocalDateTime.now());
 			fileDateTime = LocalDateTime.ofEpochSecond(attr.creationTime().to(TimeUnit.SECONDS), 0,
-					ZoneOffset.of("-5"));
+					currentOffsetForMyZone);
 
 			// time = LocalTime.ofNanoOfDay(attr.creationTime().to(TimeUnit.NANOSECONDS));
 //			System.out.println("File creation date:   " + date.format(DATE_FORMATTER));

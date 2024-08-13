@@ -15,14 +15,20 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.stream.Collectors;
 
+import org.apache.log4j.LogManager;
+import org.apache.log4j.Logger;
+
 import com.wise.portfolio.fund.FundTransaction;
 import com.wise.portfolio.fund.MutualFund.FundCategory;
 import com.wise.portfolio.fund.PortfolioFund;
+import com.wise.portfolio.service.CurrencyHelper;
 import com.wise.portfolio.service.MutualFundPerformance;
 import com.wise.portfolio.service.PortfolioPriceHistory;
 
 public class ManagedPortfolio extends Portfolio {
 
+	protected static final Logger logger = LogManager.getLogger(ManagedPortfolio.class);
+	private static final BigDecimal MINIMUM_BUFFER = new BigDecimal(500);
 	private Map<String, Map<FundCategory, BigDecimal>> desiredFundAllocationMaps = new HashMap<>();
 	private List<PortfolioTransaction> portfolioScheduledTransactions = new ArrayList<>();
 
@@ -83,7 +89,7 @@ public class ManagedPortfolio extends Portfolio {
 			// $500 to override fundTargetPercentage
 			BigDecimal targetValue = totalPortfolioValueAfterAdjustment.multiply(fundTargetPercentage);
 			if (targetValue.compareTo(fund.getMinimumAmount()) < 0) {
-				fundTargetPercentage = fund.getMinimumAmount().add(new BigDecimal(1000))
+				fundTargetPercentage = fund.getMinimumAmount().add(MINIMUM_BUFFER)
 						.divide(totalPortfolioValueAfterAdjustment, 6, RoundingMode.HALF_DOWN);
 			}
 		}
@@ -134,7 +140,7 @@ public class ManagedPortfolio extends Portfolio {
 		if (fund.getMinimumAmount() != null) {
 			if (fundTargetValue.compareTo(fund.getMinimumAmount()) < 0) {
 				// Don't withdrawal all of the excess
-				fundTargetPercentage = fund.getMinimumAmount().add(new BigDecimal(1000)).divide(totalAfterWithdrawal, 5,
+				fundTargetPercentage = fund.getMinimumAmount().add(MINIMUM_BUFFER).divide(totalAfterWithdrawal, 5,
 						RoundingMode.HALF_DOWN);
 			}
 		}
@@ -197,7 +203,7 @@ public class ManagedPortfolio extends Portfolio {
 		return historicalValue;
 	}
 
-	public BigDecimal getClosestHistoricalPrice(PortfolioFund fund, LocalDate date, int days) {
+	public BigDecimal getClosestHistoricalPrice(PortfolioFund fund, LocalDate date, int window) {
 
 		PortfolioPriceHistory priceHistory = getPriceHistory();
 		BigDecimal historicalPrice = priceHistory.getPriceByDate(fund, date, true);
@@ -205,7 +211,7 @@ public class ManagedPortfolio extends Portfolio {
 			return historicalPrice;
 		}
 		int tries = 0;
-		while (tries++ < days) {
+		while (tries++ < window) {
 
 			historicalPrice = priceHistory.getPriceByDate(fund, date.minusDays(tries), true);
 			if (historicalPrice != null) {
@@ -230,23 +236,39 @@ public class ManagedPortfolio extends Portfolio {
 
 	public BigDecimal getValueByDate(PortfolioFund fund, LocalDate date) {
 
-		if (fund.isClosed()) {
-			return BigDecimal.ZERO;
-		}
-
 		PortfolioPriceHistory priceHistory = getPriceHistory();
 		double shares = priceHistory.getSharesByDate(fund, date);
 		if (shares <= 0) {
-			return BigDecimal.ZERO;
+			logger.trace("Shares is zero for fund:  " + fund.getName() + " for date:  " + date);
+			if (fund.getOldFund(this) != null) {
+				PortfolioFund oldFund = fund.getOldFund(this);
+				BigDecimal oldFundValue = getValueByDate(oldFund, date);
+				logger.trace("value for old fund:  " + oldFund.getName() + " for date:  " + date + " value: "
+						+ CurrencyHelper.formatAsCurrencyString(oldFundValue));
+				return oldFundValue;
+			} else {
+				return BigDecimal.ZERO;
+			}
+
 		}
 
 		BigDecimal price = priceHistory.getPriceByDate(fund, date, false);
 		if (price != null) {
-			return price.multiply(new BigDecimal(shares));
+			BigDecimal value = price.multiply(new BigDecimal(shares));
+			return value;
 		} else {
-			System.out.println("Price is null for fund:  " + fund.getName() + " for date:  " + date);
-			return BigDecimal.ZERO;
+			logger.debug("Price is null for fund:  " + fund.getName() + " for date:  " + date);
+			if (fund.getOldFund(this) != null) {
+				PortfolioFund oldFund = fund.getOldFund(this);
+				BigDecimal oldFundValue = getValueByDate(oldFund, date);
+				logger.trace("value for old fund:  " + oldFund.getName() + " for date:  " + date + " value: "
+						+ CurrencyHelper.formatAsCurrencyString(oldFundValue));
+				return oldFundValue;
+			} else {
+				return BigDecimal.ZERO;
+			}
 		}
+
 	}
 
 	public BigDecimal getTargetValue(String fundSymbol) {
@@ -312,6 +334,19 @@ public class ManagedPortfolio extends Portfolio {
 //				.filter(fund -> fund.getWithdrawalsUpToDate(historicalDate).reduce(BigDecimal.ZERO, BigDecimal::add));
 
 		return withdrawals;
+	}
+
+	public BigDecimal getValueByDate(LocalDate graphDate, List<String> fundSymbols) {
+		BigDecimal totalValueByDate = getFundMap().values().stream().filter(f -> fundSymbols.contains(f.getSymbol()))
+				.map(f -> getValueByDate(f, graphDate)).filter(value -> value != null)
+				.reduce(new BigDecimal(0, MathContext.DECIMAL32), (total, fundValue) -> total = total.add(fundValue))
+				.setScale(2, RoundingMode.UP);
+		return totalValueByDate;
+	}
+
+	public List<PortfolioFund> getFunds(List<String> fundSymbols) {
+		return getFunds().stream().filter(fund -> fundSymbols.contains(fund.getSymbol())).sorted()
+				.collect(Collectors.toList());
 	}
 
 }

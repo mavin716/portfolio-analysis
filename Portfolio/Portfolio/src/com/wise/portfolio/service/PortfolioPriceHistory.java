@@ -17,8 +17,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
@@ -27,7 +27,6 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 
-import com.wise.portfolio.alphaVantage.AlphaVantageFundPriceService;
 import com.wise.portfolio.fund.Fund;
 import com.wise.portfolio.fund.FundPriceHistory;
 import com.wise.portfolio.fund.MutualFund.FundCategory;

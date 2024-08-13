@@ -10,10 +10,12 @@ import java.text.NumberFormat;
 import java.text.SimpleDateFormat;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.Period;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.LinkedHashMap;
@@ -49,6 +51,7 @@ public class PortfolioApp {
 	protected static final Logger logger = LogManager.getLogger(PortfolioService.class);
 
 	public static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("MM/dd/yy");
+	public static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("MM/dd/yy hh:mm");
 
 	public static void main(String[] args) {
 
@@ -79,32 +82,45 @@ public class PortfolioApp {
 			portfolio = portfolioService.createPortfolio(AppProperties.getProperty("fundAllocationFileName"));
 
 			// Load history download files
+			logger.info("Load download files");
 			portfolioService.loadPortfolioDownloadFiles(portfolio, downloadFilenamePrefix, currentDownloadFilename);
 			// Used to change naming policy
 			// portfolioService.updateDownloadFilenames(portfolio,
 			// DOWNLOAD_FILENAME_PREFIX);
 
+			logger.info("Load fund allocations");
 			String filePath = Paths.get(downloadPath, AppProperties.getProperty("fundAllocationFileName")).toString();
 			portfolioService.loadFundAllocation(filePath);
 
 			// Load price history via alphaVantage
-			// randomize order of funds because the number exceeds daily quota
-			portfolio.getFunds().parallelStream().filter(f -> !f.isMMFund()).forEach(f -> {
+			logger.info("Retrieve price history from AlphaVantage");
+			List<PortfolioFund> fundList = portfolio.getFunds();
+			// randomize order of funds to compensate for daily quota 25
+			Collections.shuffle(fundList);
+			fundList.parallelStream().filter(f -> !f.isMMFund() && !f.isClosed()).forEach(f -> {
 				try {
-					AlphaVantageFundPriceService.retrieveFundHistoryFromAlphaVantage(portfolio, f.getSymbol(), false);
+					AlphaVantageFundPriceService.retrieveFundPriceHistoryFromAlphaVantage(portfolio, f.getSymbol(),
+							false);
 				} catch (IOException e) {
-					logger.error("Exception:  " + e.getMessage(), e);
+					logger.error("Exception retrieving prices from Alpha Vantage:  " + e.getMessage(), e);
 				}
 			});
 
+			logger.info("Load alpha vantage history files");
 			portfolio.getPriceHistory().loadAlphaPriceHistoryFile(portfolio, downloadPath,
 					AppProperties.getProperty("alphaVantagePriceHistoryFilename"));
 
+			logger.info("Load scheduled transactions");
 			filePath = Paths.get(downloadPath, AppProperties.getProperty("scheduleFilename")).toString();
 			portfolioService.loadPortfolioScheduleFile(filePath);
 
+			logger.info("Save portfolio data");
 			portfolioService.savePortfolioData();
 
+			BigDecimal difference = getBalanceDifference();
+			String changeText = "Change:  " + NumberFormat.getCurrencyInstance().format(difference);
+			logger.info("Portfolio value as of " + DATE_TIME_FORMATTER.format(LocalDateTime.now()) + ": "
+					+ CurrencyHelper.formatAsCurrencyString(portfolio.getTotalValue()) + " change: " + changeText);
 			// Overwrite PDF output file
 			portfolioPdfFile = new File(AppProperties.getProperty("reportFilePath"));
 			portfolioPdfFile.delete();
@@ -115,7 +131,7 @@ public class PortfolioApp {
 			Document document = new Document(pdfDoc, PageSize.LEDGER);
 			document.setMargins(30f, 10f, 30f, 10f);
 
-			document.add(new Paragraph(generateReportTitle()).setFontSize(14)
+			document.add(new Paragraph(generateReportTitle()).setFontSize(20).setBold()
 					.setHorizontalAlignment(HorizontalAlignment.CENTER));
 
 			HeaderHandler headerHandler = new HeaderHandler();
@@ -166,6 +182,9 @@ public class PortfolioApp {
 			startDate = startDate.withDayOfMonth(1);
 			Period period = Period.ofMonths(1);
 			portfolioService.printBalanceLineAndBarGraphs(document, pdfDoc, startDate, endDate, period);
+
+			headerHandler.setHeader("balance line graph by Category");
+			portfolioService.printBalanceLinebyCategory(document, pdfDoc, startDate, endDate, period);
 
 			pdfDoc.addNewPage();
 			startDate = LocalDate.now().minusYears(1);
@@ -296,7 +315,6 @@ public class PortfolioApp {
 			logger.info("PDF Created");
 
 			String subject = "YEAH";
-			BigDecimal difference = getBalanceDifference();
 			if (difference.compareTo(BigDecimal.ZERO) < 0) {
 				subject = "NOOO";
 			} else if (difference.compareTo(BigDecimal.ZERO) == 0) {
@@ -329,7 +347,8 @@ public class PortfolioApp {
 		String changeText = "Change:  " + NumberFormat.getCurrencyInstance().format(difference);
 
 		String title = "Report run at " + LocalDate.now().format(DateTimeFormatter.ofPattern("MM/dd/yy")) + " "
-				+ LocalTime.now().format(DateTimeFormatter.ofPattern("hh:mm a")) + " " + changeText;
+				+ LocalTime.now().format(DateTimeFormatter.ofPattern("hh:mm a")) + " Balance:  "
+				+ NumberFormat.getCurrencyInstance().format(portfolio.getTotalValue()) + " " + changeText;
 		return title;
 	}
 
@@ -408,8 +427,6 @@ public class PortfolioApp {
 		if (withdrawTransactions.size() > 0)
 
 		{
-			// sorts by amount descending
-//			withdrawTransactions.sort(Comparator.comparing(PortfolioTransaction::getDate));
 			printPortfolioTransactionWithdraw(withdrawDate, withdrawTransactions, portfolioService, document,
 					portfolio);
 		}
@@ -424,19 +441,16 @@ public class PortfolioApp {
 
 	private void printPortfolioTransactionWithdraw(LocalDate withdrawDate,
 			List<PortfolioTransaction> withdrawTransactions, PortfolioService portfolioService, Document document,
-			Portfolio portfolio2) {
-
-		Portfolio portfolio = portfolioService.getPortfolio();
+			Portfolio portfolio) {
 
 		String title = "";
-		BigDecimal withdrawAmount = BigDecimal.ZERO;
+		BigDecimal netWithdrawalAmount = BigDecimal.ZERO;
 		BigDecimal totalAddlTaxes = BigDecimal.ZERO;
-		BigDecimal totalWithdrawalIncludingTaxes = withdrawAmount;
+		BigDecimal totalWithdrawalIncludingTaxes = BigDecimal.ZERO;
 		List<Pair<String, BigDecimal>> fundWithdrawals = new ArrayList<>();
 
 		withdrawTransactions.sort(Comparator.comparing(PortfolioTransaction::getAmount).reversed());
 
-		BigDecimal netWithdrawalAmount = BigDecimal.ZERO;
 		// Sort for heading
 		withdrawTransactions.sort(Comparator.comparing(PortfolioTransaction::getDate));
 
@@ -444,7 +458,7 @@ public class PortfolioApp {
 				.add(getStateTaxWithholdingPercentage());
 		BigDecimal afterTaxesPercentage = BigDecimal.ONE.subtract(totalWithholdTaxesPercentage);
 		for (PortfolioTransaction transaction : withdrawTransactions) {
-			withdrawAmount = withdrawAmount.add(transaction.getAmount());
+//			withdrawAmount = withdrawAmount.add(transaction.getAmount());
 
 			if (transaction.getFundSymbol() != null && transaction.getFundSymbol().length() > 0) {
 				fundWithdrawals.add(Pair.of(transaction.getFundSymbol(), transaction.getAmount()));
@@ -453,17 +467,27 @@ public class PortfolioApp {
 				// add in taxes which will be distributed across portfolio
 				// to include taxes in selected fund, add to amount and set Is Net Amount to
 				// true
+				BigDecimal taxes = transaction.getAmount().multiply(afterTaxesPercentage).setScale(2,
+						RoundingMode.HALF_UP);
 				netWithdrawalAmount = netWithdrawalAmount.add(transaction.getAmount());
-				totalAddlTaxes = totalAddlTaxes.add(transaction.getAmount().multiply(totalWithholdTaxesPercentage)
-						.setScale(2, RoundingMode.HALF_UP));
+				totalAddlTaxes = totalAddlTaxes.add(taxes);
+				logger.debug("Net transaction, net amount:  " + transaction.getAmount() + " taxes: "
+						+ CurrencyHelper.formatAsCurrencyString(taxes) + " total:  "
+						+ CurrencyHelper.formatAsCurrencyString(transaction.getAmount().add(taxes)));
 			} else {
-				netWithdrawalAmount = netWithdrawalAmount.add(transaction.getAmount().multiply(afterTaxesPercentage));
+				BigDecimal taxes = transaction.getAmount().multiply(totalWithholdTaxesPercentage);
+				BigDecimal netAmount = transaction.getAmount().subtract(taxes);
+				netWithdrawalAmount = netWithdrawalAmount.add(netAmount);
+				totalAddlTaxes = totalAddlTaxes.add(taxes);
+				logger.debug("Net transaction, net amount:  " + netAmount + " taxes: "
+						+ CurrencyHelper.formatAsCurrencyString(taxes) + " total:  "
+						+ CurrencyHelper.formatAsCurrencyString(transaction.getAmount()));
 			}
 			title = title + "\n\t" + DATE_FORMATTER.format(transaction.getDate()) + " " + transaction.getDescription()
 					+ " Amount: " + CurrencyHelper.formatAsCurrencyString(transaction.getAmount());
 		}
 
-		totalWithdrawalIncludingTaxes = withdrawAmount.add(totalAddlTaxes);
+		totalWithdrawalIncludingTaxes = netWithdrawalAmount.add(totalAddlTaxes);
 		title += "\n\tTotal: " + CurrencyHelper.formatAsCurrencyString(totalWithdrawalIncludingTaxes) + " Net: "
 				+ CurrencyHelper.formatAsCurrencyString(netWithdrawalAmount);
 		logger.debug(title);
@@ -474,8 +498,8 @@ public class PortfolioApp {
 
 		// print spreadsheet
 		document.add(new Paragraph("Withdrawals").setBold().setFontSize(16));
-		portfolioService.printWithdrawalSpreadsheet(title, portfolio, withdrawAmount, totalWithdrawalIncludingTaxes,
-				withdrawals, document);
+		portfolioService.printWithdrawalSpreadsheet(title, portfolio, netWithdrawalAmount,
+				totalWithdrawalIncludingTaxes, withdrawals, document);
 
 	}
 

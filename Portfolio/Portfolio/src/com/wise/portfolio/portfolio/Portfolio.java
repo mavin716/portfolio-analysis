@@ -7,13 +7,14 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TreeMap;
 
+import com.wise.portfolio.fund.FundTransaction;
 import com.wise.portfolio.fund.MutualFund.FundCategory;
 import com.wise.portfolio.fund.PortfolioFund;
-import com.wise.portfolio.fund.FundTransaction;
 import com.wise.portfolio.service.PortfolioPriceHistory;
 
 public class Portfolio {
@@ -219,8 +220,8 @@ public class Portfolio {
 		return fundSymbolNameMap.get(fundSymbol);
 	}
 
-	public Collection<PortfolioFund> getFunds() {
-		return this.getFundMap().values();
+	public List<PortfolioFund> getFunds() {
+		return new ArrayList<PortfolioFund>(getFundMap().values());
 	}
 
 }

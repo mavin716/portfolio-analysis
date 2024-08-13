@@ -1,0 +1,11 @@
+2024-07-31 08:09:49,185 INFO  [PortfolioService] - Process scheduled transactions
+2024-07-31 08:09:50,974 INFO  [PortfolioService] - Print performance tables
+2024-07-31 08:10:17,064 INFO  [PortfolioService] - Print portfolio transaction tables
+2024-07-31 08:10:17,525 INFO  [PortfolioService] - Print graphs
+2024-07-31 08:10:17,646 WARN  [PortfolioService] - startBalance is ZERO???? for date:  2019-07-01
+2024-07-31 08:10:37,623 WARN  [PortfolioService] - fund shares history is null for Vanguard Growth and Income Fund Investor Shares VGNPX
+2024-07-31 08:10:41,624 WARN  [PortfolioService] - fund shares history is null for Vanguard Long-Term Bond Index Fund VBLTX
+2024-07-31 08:10:48,972 WARN  [PortfolioService] - fund shares history is null for Vanguard Total International Bond Index Fund Investor Shares VTIBX
+2024-07-31 08:10:54,523 INFO  [PortfolioService] - Print ranking tables
+2024-07-31 08:11:26,624 INFO  [PortfolioService] - Print adjustment tables
+2024-07-31 08:11:29,546 INFO  [PortfolioService] - PDF Created

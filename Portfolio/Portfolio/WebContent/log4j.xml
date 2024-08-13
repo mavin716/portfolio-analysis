@@ -22,9 +22,19 @@
 		</layout>
 	</appender>
 
+   <appender name="file" class="org.apache.log4j.FileAppender">
+        <param name="file" value="C:\\Users\\mavin\\My Drive\\mylogfile.log" />
+        <param name="append" value="false" />
+        <param name="threshold" value="debug" />
+        <layout class="org.apache.log4j.PatternLayout">
+            <param name="ConversionPattern" value="%d{ISO8601} %-5p [%c{1}] - %m%n" />
+        </layout>
+    </appender>
+    
 	<logger name="com.wise.portfolio">
-		<level value="INFO" />
+		<level value="DEBUG" />
 		<appender-ref ref="console" />
+		<appender-ref ref="file" />
 	</logger>
 
 
