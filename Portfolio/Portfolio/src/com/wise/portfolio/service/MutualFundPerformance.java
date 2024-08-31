@@ -5,7 +5,6 @@ import java.math.RoundingMode;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.time.Period;
 import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.Map;
@@ -17,6 +16,7 @@ import com.wise.portfolio.fund.FundPriceHistory;
 import com.wise.portfolio.fund.MutualFund.FundCategory;
 import com.wise.portfolio.fund.PortfolioFund;
 import com.wise.portfolio.portfolio.Portfolio;
+import com.wise.portfolio.price.PortfolioPriceHistory;
 
 /**
  * MutualFundPerformance encapsulates fund performance into class for use by

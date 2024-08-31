@@ -19,7 +19,6 @@ import org.jfree.chart.axis.ValueAxis;
 import org.jfree.chart.plot.XYPlot;
 import org.jfree.chart.renderer.xy.ClusteredXYBarRenderer;
 import org.jfree.chart.renderer.xy.StandardXYBarPainter;
-import org.jfree.chart.renderer.xy.XYItemRenderer;
 import org.jfree.chart.renderer.xy.XYLineAndShapeRenderer;
 import org.jfree.chart.util.ShapeUtils;
 import org.jfree.data.time.Day;
@@ -31,7 +30,6 @@ import org.jfree.data.xy.IntervalXYDataset;
 import com.wise.portfolio.fund.FundPriceHistory;
 import com.wise.portfolio.fund.PortfolioFund;
 import com.wise.portfolio.portfolio.ManagedPortfolio;
-import com.wise.portfolio.service.PortfolioService;
 
 public class PortfolioFundsPerformanceGraph {
 
@@ -67,8 +65,8 @@ public class PortfolioFundsPerformanceGraph {
 
 		List<TimeSeriesCollection> datasets = new ArrayList<>();
 
-		datasets.add(createFundPriceHistoryDataset(fundSynbols, startDate, endDate, 10, includeMovingAverage));
-		List<XYItemRenderer> renderers = new ArrayList<>();
+		datasets.addAll(createFundPriceHistoryDatasets(fundSynbols, startDate, endDate, 5, includeMovingAverage));
+		List<XYLineAndShapeRenderer> renderers = new ArrayList<>();
 		XYLineAndShapeRenderer renderer = new XYLineAndShapeRenderer();
 		renderer.setDefaultShapesVisible(false);
 		renderers.add(renderer);
@@ -80,14 +78,14 @@ public class PortfolioFundsPerformanceGraph {
 		// barRenderer.setShadowVisible(false);
 		// renderers.add(renderer);
 
-		JFreeChart lineChart = createTimeSeriesChart(title, null, null, datasets, renderers, null, true, true, false);
+		JFreeChart lineChart = createTimeSeriesChart(title, datasets, renderers, null, true, true, false);
 		return lineChart;
 	}
 
-	private TimeSeriesCollection createFundPriceHistoryDataset(List<String> fundSynbols, LocalDate startDate,
+	private List<TimeSeriesCollection> createFundPriceHistoryDatasets(List<String> fundSynbols, LocalDate startDate,
 			LocalDate endDate, int years, boolean includeMovingAverage) {
-		TimeSeriesCollection dataset = new TimeSeriesCollection();
 
+		List<TimeSeriesCollection> datasets = new ArrayList<>();
 		for (String symbol : fundSynbols) {
 			PortfolioFund fund = portfolio.getFund(symbol);
 
@@ -117,57 +115,62 @@ public class PortfolioFundsPerformanceGraph {
 							priceHistoryDate.getYear()), fundPriceEntry.getValue());
 
 				}
-				dataset.addSeries(timeSeries);
-			}
+				priceHistory = portfolio.getPriceHistory().getAlphaVantagePriceHistory().get(symbol);
+				if (priceHistory != null) {
 
-			priceHistory = portfolio.getPriceHistory().getAlphaVantagePriceHistory().get(symbol);
-			if (priceHistory != null) {
+					for (Entry<LocalDate, BigDecimal> fundPriceEntry : priceHistory.getFundPricesMap().entrySet()) {
+						LocalDate priceHistoryDate = fundPriceEntry.getKey();
 
-				for (Entry<LocalDate, BigDecimal> fundPriceEntry : priceHistory.getFundPricesMap().entrySet()) {
-					LocalDate priceHistoryDate = fundPriceEntry.getKey();
-
-					if (priceHistoryDate.isAfter(LocalDate.now().minusYears(years))
-							&& priceHistoryDate.isBefore(firstVanguardPriceDate)) {
-						try {
-							timeSeries.add(new Day(priceHistoryDate.getDayOfMonth(), priceHistoryDate.getMonthValue(),
-									priceHistoryDate.getYear()), fundPriceEntry.getValue());
-						} catch (Exception e) {
-							logger.error(
-									"Exception adding alpha date " + priceHistoryDate + e.getLocalizedMessage(), e);
+						if (priceHistoryDate.isAfter(LocalDate.now().minusYears(years))
+								&& priceHistoryDate.isBefore(firstVanguardPriceDate)) {
+							try {
+								timeSeries.add(new Day(priceHistoryDate.getDayOfMonth(), priceHistoryDate.getMonthValue(),
+										priceHistoryDate.getYear()), fundPriceEntry.getValue());
+							} catch (Exception e) {
+								logger.error(
+										"Exception adding alpha date " + priceHistoryDate + e.getLocalizedMessage(), e);
+							}
 						}
 					}
 				}
+				TimeSeriesCollection dataset = new TimeSeriesCollection();
+				dataset.addSeries(timeSeries);
+				if (includeMovingAverage) {
+					dataset.addSeries(MovingAverage.createMovingAverage(timeSeries, symbol + " MA", 50, 0));
+					dataset.addSeries(MovingAverage.createMovingAverage(timeSeries, symbol + " 10DayMA", 10, 0));
+				}
+				datasets.add(dataset);
 			}
 
-			if (includeMovingAverage) {
-				dataset.addSeries(MovingAverage.createMovingAverage(timeSeries, symbol + " MA", 50, 0));
-				dataset.addSeries(MovingAverage.createMovingAverage(timeSeries, symbol + " 10DayMA", 10, 0));
-			}
+
 		}
-		return dataset;
+		return datasets;
 	}
 
-	public JFreeChart createTimeSeriesChart(String title, String timeAxisLabel, String valueAxisLabel,
-			List<TimeSeriesCollection> datasets, List<XYItemRenderer> renderers,
+	public JFreeChart createTimeSeriesChart(String title, 
+			List<TimeSeriesCollection> datasets, List<XYLineAndShapeRenderer> renderers,
 			IntervalXYDataset withdrawalIntervalDataset, boolean legend, boolean tooltips, boolean urls) {
 
 		XYPlot plot = new XYPlot();
 
+		ValueAxis dateAxis = new DateAxis();
 		// reduce the default margins
-		ValueAxis dateAxis = new DateAxis(timeAxisLabel);
 		dateAxis.setLowerMargin(0.02);
 		dateAxis.setUpperMargin(0.02);
 		plot.setDomainAxis(dateAxis);
 
+		// Configure the renderer - @TODO simplify since this is customized for graph type
 		for (int datasetIndex = 0; datasetIndex < datasets.size(); datasetIndex++) {
 			TimeSeriesCollection timeSeriesCollection = datasets.get(datasetIndex);
 
-			XYItemRenderer renderer;
+			XYLineAndShapeRenderer renderer;
 			if (renderers != null & renderers.size() > datasetIndex) {
 				renderer = renderers.get(datasetIndex);
 			} else {
 				renderer = new XYLineAndShapeRenderer();
+				renderer.setDefaultShapesVisible(false);
 			}
+			
 			plot.setRenderer(datasetIndex, renderer);
 
 			// note: use first series because moving average uses Float
@@ -175,12 +178,14 @@ public class PortfolioFundsPerformanceGraph {
 			boolean isCurrencyFormat = timeSeriesCollection.getSeries(0).getDataItem(0)
 					.getValue() instanceof BigDecimal;
 			NumberFormat currencyInstance = NumberFormat.getCurrencyInstance();
+			currencyInstance.setMaximumFractionDigits(0);
 
+			String key = "";
 			for (int seriesIndex = 0; seriesIndex < timeSeriesCollection.getSeries().size(); seriesIndex++) {
 				java.awt.Color seriesColor = null;
 
 				TimeSeries series = timeSeriesCollection.getSeries(seriesIndex);
-				String key = (String) series.getKey();
+				 key = (String) series.getKey();
 				int indexOfSpace = key.indexOf(' ');
 				String symbol = key;
 				String extra = "";
@@ -191,7 +196,7 @@ public class PortfolioFundsPerformanceGraph {
 				if (symbol != null) {
 					PortfolioFund fund = portfolio.getFund(symbol);
 					if (fund != null) {
-						series.setKey(fund.getShortName() + " " + extra);
+						series.setKey(fund.getShortName() + " (" + fund.getSymbol() + ") " + extra);
 						seriesColor = fundPaints.get(symbol);
 						if (extra.contains("MA")) {
 							seriesColor = seriesColor.darker();
@@ -236,7 +241,7 @@ public class PortfolioFundsPerformanceGraph {
 
 			plot.setDataset(datasetIndex, timeSeriesCollection);
 
-			NumberAxis valueAxis = new NumberAxis(valueAxisLabel);
+			NumberAxis valueAxis = new NumberAxis(key);
 			if (isStdDeviationDataset) {
 				valueAxis.setAutoRangeIncludesZero(true); // override default
 			} else {
@@ -245,7 +250,6 @@ public class PortfolioFundsPerformanceGraph {
 			if (isCurrencyFormat) {
 				valueAxis.setNumberFormatOverride(currencyInstance);
 			}
-
 			plot.setRangeAxis(datasetIndex, valueAxis);
 
 			// Map the data to the appropriate axis
@@ -255,9 +259,6 @@ public class PortfolioFundsPerformanceGraph {
 		ClusteredXYBarRenderer barRenderer = new ClusteredXYBarRenderer();
 		barRenderer.setUseYInterval(true);
 		barRenderer.setShadowVisible(false);
-//		barRenderer.setDrawBarOutline(true);
-
-//		barRenderer.setDefaultOutlinePaint(java.awt.Color.BLACK);
 		barRenderer.setDefaultFillPaint(java.awt.Color.BLACK);
 		barRenderer.setDefaultItemLabelPaint(java.awt.Color.BLACK);
 		barRenderer.setSeriesFillPaint(0, java.awt.Color.BLACK);
@@ -275,39 +276,6 @@ public class PortfolioFundsPerformanceGraph {
 
 		return chart;
 
-	}
-
-	private List<TimeSeriesCollection> createFundPriceHistoryDatasets(List<String> fundSynbols, LocalDate startDate,
-			LocalDate endDate) {
-
-		List<TimeSeriesCollection> datasets = new ArrayList<TimeSeriesCollection>();
-
-		for (String symbol : fundSynbols) {
-
-			TimeSeriesCollection dataset = new TimeSeriesCollection();
-			PortfolioFund fund = portfolio.getFund(symbol);
-			TimeSeries timeSeries = new TimeSeries(fund.getShortName());
-			for (Entry<LocalDate, BigDecimal> fundPriceEntry : portfolio.getPriceHistory().getVanguardPriceHistory()
-					.get(symbol).getFundPricesMap().entrySet()) {
-
-				LocalDate priceHistoryDate = fundPriceEntry.getKey();
-				if (startDate != null) {
-					if (priceHistoryDate.isBefore(startDate)) {
-						continue;
-					}
-				}
-				if (endDate != null) {
-					if (priceHistoryDate.isAfter(endDate)) {
-						continue;
-					}
-				}
-				timeSeries.add(new Day(priceHistoryDate.getDayOfMonth(), priceHistoryDate.getMonthValue(),
-						priceHistoryDate.getYear()), fundPriceEntry.getValue());
-			}
-			dataset.addSeries(timeSeries);
-			datasets.add(dataset);
-		}
-		return datasets;
 	}
 
 }

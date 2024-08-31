@@ -21,9 +21,9 @@ import org.apache.log4j.Logger;
 import com.wise.portfolio.fund.FundTransaction;
 import com.wise.portfolio.fund.MutualFund.FundCategory;
 import com.wise.portfolio.fund.PortfolioFund;
+import com.wise.portfolio.price.PortfolioPriceHistory;
 import com.wise.portfolio.service.CurrencyHelper;
 import com.wise.portfolio.service.MutualFundPerformance;
-import com.wise.portfolio.service.PortfolioPriceHistory;
 
 public class ManagedPortfolio extends Portfolio {
 
@@ -31,6 +31,7 @@ public class ManagedPortfolio extends Portfolio {
 	private static final BigDecimal MINIMUM_BUFFER = new BigDecimal(500);
 	private Map<String, Map<FundCategory, BigDecimal>> desiredFundAllocationMaps = new HashMap<>();
 	private List<PortfolioTransaction> portfolioScheduledTransactions = new ArrayList<>();
+	private Map<String, List<PortfolioTransaction>> projectedScenarios = new HashMap<>();
 
 	public List<PortfolioTransaction> getPortfolioTransactions() {
 
@@ -41,6 +42,22 @@ public class ManagedPortfolio extends Portfolio {
 			}
 		});
 		return portfolioScheduledTransactions;
+
+	}
+	public void addScenario(String scenario, List<PortfolioTransaction> scheduledTransactions) {
+		projectedScenarios.put(scenario, scheduledTransactions);
+	}
+
+	public List<PortfolioTransaction> getScenarioScheduledTransactions(String scenario) {
+
+		List<PortfolioTransaction> scenarioTransactions = projectedScenarios.get(scenario);
+		Collections.sort(scenarioTransactions, new Comparator<PortfolioTransaction>() {
+			@Override
+			public int compare(PortfolioTransaction o1, PortfolioTransaction o2) {
+				return o1.getDate().compareTo(o2.getDate());
+			}
+		});
+		return scenarioTransactions;
 
 	}
 
@@ -227,8 +244,8 @@ public class ManagedPortfolio extends Portfolio {
 
 	public BigDecimal getTotalValueByDate(LocalDate date) {
 
-		BigDecimal totalValueByDate = getFundMap().values().stream().map(f -> getValueByDate(f, date))
-				.filter(x -> x != null)
+		BigDecimal totalValueByDate = getFundMap().values().stream().filter(f -> !f.isClosed())
+				.map(f -> getValueByDate(f, date)).filter(x -> x != null)
 				.reduce(new BigDecimal(0, MathContext.DECIMAL32), (total, fundValue) -> total = total.add(fundValue))
 				.setScale(2, RoundingMode.UP);
 		return totalValueByDate;
@@ -239,12 +256,11 @@ public class ManagedPortfolio extends Portfolio {
 		PortfolioPriceHistory priceHistory = getPriceHistory();
 		double shares = priceHistory.getSharesByDate(fund, date);
 		if (shares <= 0) {
-			logger.trace("Shares is zero for fund:  " + fund.getName() + " for date:  " + date);
-			if (fund.getOldFund(this) != null) {
-				PortfolioFund oldFund = fund.getOldFund(this);
+			if (fund.getOldFund() != null) {
+				PortfolioFund oldFund = fund.getOldFund();
 				BigDecimal oldFundValue = getValueByDate(oldFund, date);
-				logger.trace("value for old fund:  " + oldFund.getName() + " for date:  " + date + " value: "
-						+ CurrencyHelper.formatAsCurrencyString(oldFundValue));
+//				logger.trace("value for old fund:  " + oldFund.getName() + " for date:  " + date + " value: "
+//						+ CurrencyHelper.formatAsCurrencyString(oldFundValue));
 				return oldFundValue;
 			} else {
 				return BigDecimal.ZERO;
@@ -258,8 +274,8 @@ public class ManagedPortfolio extends Portfolio {
 			return value;
 		} else {
 			logger.debug("Price is null for fund:  " + fund.getName() + " for date:  " + date);
-			if (fund.getOldFund(this) != null) {
-				PortfolioFund oldFund = fund.getOldFund(this);
+			if (fund.getOldFund() != null) {
+				PortfolioFund oldFund = fund.getOldFund();
 				BigDecimal oldFundValue = getValueByDate(oldFund, date);
 				logger.trace("value for old fund:  " + oldFund.getName() + " for date:  " + date + " value: "
 						+ CurrencyHelper.formatAsCurrencyString(oldFundValue));

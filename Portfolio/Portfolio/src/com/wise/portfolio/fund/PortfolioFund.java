@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TreeMap;
 
+import com.wise.portfolio.portfolio.ManagedPortfolio;
 import com.wise.portfolio.portfolio.Portfolio;
 
 public class PortfolioFund extends MutualFund {
@@ -56,14 +57,14 @@ public class PortfolioFund extends MutualFund {
 		this.isFixedExpensesAccount = fixedExpensesAccount;
 	}
 
-	public PortfolioFund getOldFund(Portfolio portfolio) {
+	public PortfolioFund getOldFund() {
 		if (oldFundSymbol != null && oldFund == null) {
 			oldFund = portfolio.getFund(oldFundSymbol);
 		}
 		return oldFund;
 	}
 
-	public void setLinkedFundSymbol(String linkedFundSymbol) {
+	public void setOldFundSymbol(String linkedFundSymbol) {
 		this.oldFundSymbol = linkedFundSymbol;
 	}
 
@@ -86,6 +87,7 @@ public class PortfolioFund extends MutualFund {
 	protected Map<LocalDate, Collection<FundTransaction>> withdrawals = new TreeMap<>();
 	protected Map<LocalDate, Collection<FundTransaction>> exchanges = new TreeMap<>();
 	protected Map<LocalDate, Collection<FundTransaction>> shareConversions = new TreeMap<>();
+	private ManagedPortfolio portfolio;
 
 	public double getShares() {
 		return shares;
@@ -465,6 +467,11 @@ public class PortfolioFund extends MutualFund {
 			}
 		}
 		return amount;
+	}
+
+	public void setPortfolio(ManagedPortfolio portfolio) {
+		this.portfolio = portfolio;
+		
 	}
 
 }

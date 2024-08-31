@@ -25,6 +25,7 @@ import java.util.Map;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
+import org.jfree.data.time.TimeSeriesCollection;
 
 import com.itextpdf.kernel.events.PdfDocumentEvent;
 import com.itextpdf.kernel.geom.PageSize;
@@ -88,6 +89,15 @@ public class PortfolioApp {
 			// portfolioService.updateDownloadFilenames(portfolio,
 			// DOWNLOAD_FILENAME_PREFIX);
 
+			SimpleDateFormat fileNameFormatter = new SimpleDateFormat("yyyy-MM-dd'T'HHmmss.SSS");
+			// move latest file to dated file to make way for next download
+			String newFileName = downloadFilenamePrefix + " - "
+					+ fileNameFormatter.format(new Date(System.currentTimeMillis())) + ".csv";
+			if (Files.exists(Paths.get(downloadPath, currentDownloadFilename))
+					&& !Files.exists(Paths.get(newFileName))) {
+				Files.move(Paths.get(downloadPath, currentDownloadFilename), Paths.get(downloadPath, newFileName));
+			}
+
 			logger.info("Load fund allocations");
 			String filePath = Paths.get(downloadPath, AppProperties.getProperty("fundAllocationFileName")).toString();
 			portfolioService.loadFundAllocation(filePath);
@@ -113,6 +123,18 @@ public class PortfolioApp {
 			logger.info("Load scheduled transactions");
 			filePath = Paths.get(downloadPath, AppProperties.getProperty("scheduleFilename")).toString();
 			portfolioService.loadPortfolioScheduleFile(filePath);
+
+			logger.info("Load scenarios");
+			String[] scenarios = null;
+			String property = AppProperties.getProperty("projectedScenario");
+			if (property != null) {
+				scenarios = property.split(",");
+			}
+			for (String scenario : scenarios) {
+				logger.debug("Load scenario:  " + scenario);
+				filePath = Paths.get(downloadPath, scenario+".csv").toString();
+				portfolioService.loadPortfolioScheduleScenarioFile(scenario, filePath);				
+			}
 
 			logger.info("Save portfolio data");
 			portfolioService.savePortfolioData();
@@ -184,12 +206,12 @@ public class PortfolioApp {
 			portfolioService.printBalanceLineAndBarGraphs(document, pdfDoc, startDate, endDate, period);
 
 			headerHandler.setHeader("balance line graph by Category");
+			period = Period.ofDays(1);
 			portfolioService.printBalanceLinebyCategory(document, pdfDoc, startDate, endDate, period);
 
 			pdfDoc.addNewPage();
-			startDate = LocalDate.now().minusYears(1);
-			startDate = startDate.withDayOfMonth(1);
-			period = Period.ofMonths(1);
+			startDate = LocalDate.now().minusYears(1).withDayOfMonth(1);
+			period = Period.ofDays(7);
 			portfolioService.printBalanceLineAndBarGraphs(document, pdfDoc, startDate, endDate, period);
 
 			pdfDoc.addNewPage();
@@ -197,8 +219,15 @@ public class PortfolioApp {
 			period = Period.ofDays(1);
 			portfolioService.printBalanceLineAndBarGraphs(document, pdfDoc, startDate, endDate, period);
 
+			// Projected Balance per schedule
 			pdfDoc.addNewPage();
-			portfolioService.printProjectedBalanceLineGraphs(document, pdfDoc, Period.ofMonths(1));
+			portfolioService.printProjectedBalanceLineGraphs(document, pdfDoc, null, Period.ofMonths(1));
+
+			// Projected Balance for schedule against scenarios
+			pdfDoc.addNewPage();
+			for (String scenario : scenarios) {
+				portfolioService.printProjectedBalanceLineGraphs(document, pdfDoc, scenario, Period.ofMonths(1));
+			}
 
 			pdfDoc.addNewPage();
 			for (PortfolioFund fund : portfolio.getFunds()) {
@@ -294,21 +323,12 @@ public class PortfolioApp {
 			pdfDoc.addNewPage();
 			portfolioService.printRanking(document);
 
-			logger.info("Print adjustment tables");
-			Map<String, BigDecimal> adjustments = portfolioService.calculateAdjustments();
-			pdfDoc.addNewPage();
-			String title = "Adjust portfolio";
-			portfolioService.printWithdrawalSpreadsheet(title, portfolio, BigDecimal.ZERO, BigDecimal.ZERO, adjustments,
-					document);
-
-			SimpleDateFormat fileNameFormatter = new SimpleDateFormat("yyyy-MM-dd'T'HHmmss.SSS");
-			// move latest file to dated file to make way for next download
-			String newFileName = downloadFilenamePrefix + " - "
-					+ fileNameFormatter.format(new Date(System.currentTimeMillis())) + ".csv";
-			if (Files.exists(Paths.get(downloadPath, currentDownloadFilename))
-					&& !Files.exists(Paths.get(newFileName))) {
-				Files.move(Paths.get(downloadPath, currentDownloadFilename), Paths.get(downloadPath, newFileName));
-			}
+//			logger.info("Print adjustment tables");
+//			Map<String, BigDecimal> adjustments = portfolioService.calculateAdjustments();
+//			pdfDoc.addNewPage();
+//			String title = "Adjust portfolio";
+//			portfolioService.printWithdrawalSpreadsheet(title, portfolio, BigDecimal.ZERO, BigDecimal.ZERO, adjustments,
+//					document);
 
 			// Closing the document
 			document.close();
@@ -372,6 +392,7 @@ public class PortfolioApp {
 		}
 
 		BigDecimal currentTotalValue = portfolio.getTotalValueByDate(lastBusinessDay);
+		BigDecimal currentValue = portfolio.getTotalValue();
 		BigDecimal previousTotalValue = portfolio.getTotalValueByDate(previousBusinessDay);
 		BigDecimal difference = currentTotalValue.subtract(previousTotalValue);
 		return difference;

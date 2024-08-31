@@ -5,11 +5,11 @@ import java.math.RoundingMode;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.temporal.ChronoUnit;
 
 import com.wise.portfolio.fund.MutualFund.FundCategory;
 import com.wise.portfolio.fund.PortfolioFund;
 import com.wise.portfolio.portfolio.Portfolio;
+import com.wise.portfolio.price.PortfolioPriceHistory;
 
 public class PerformanceService {
 

@@ -19,8 +19,8 @@ import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.wise.portfolio.fund.FundPriceHistory;
 import com.wise.portfolio.fund.PortfolioFund;
 import com.wise.portfolio.portfolio.Portfolio;
+import com.wise.portfolio.price.PortfolioPriceHistory;
 import com.wise.portfolio.service.AppProperties;
-import com.wise.portfolio.service.PortfolioPriceHistory;
 
 public class AlphaVantageFundPriceService {
 

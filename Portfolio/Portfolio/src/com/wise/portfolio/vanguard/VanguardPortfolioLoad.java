@@ -23,8 +23,8 @@ import org.apache.log4j.Logger;
 
 import com.wise.portfolio.fund.PortfolioFund;
 import com.wise.portfolio.portfolio.Portfolio;
+import com.wise.portfolio.price.PortfolioPriceHistory;
 import com.wise.portfolio.service.PerformanceService;
-import com.wise.portfolio.service.PortfolioPriceHistory;
 
 public class VanguardPortfolioLoad {
 
@@ -76,10 +76,10 @@ public class VanguardPortfolioLoad {
 
 				LocalDateTime dateTime = getDownloadFileCreationDate(filename, basePath);
 				LocalDate date = dateTime.toLocalDate();
-				logger.debug("load file:  " + filename + " file date: " + dateTime);
+				logger.trace("load file:  " + filename + " file date: " + dateTime);
 				if (dateTime.getHour() < 18) {
 					date = date.minusDays(1);
-					logger.debug("load file:  " + filename + " adjusted file date: " + date);
+					logger.trace("load file:  " + filename + " adjusted file date: " + date);
 				}
 
 				if (date.isBefore(earliestDate)) {

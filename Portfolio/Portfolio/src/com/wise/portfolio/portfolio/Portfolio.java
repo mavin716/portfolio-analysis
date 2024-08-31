@@ -15,7 +15,7 @@ import java.util.TreeMap;
 import com.wise.portfolio.fund.FundTransaction;
 import com.wise.portfolio.fund.MutualFund.FundCategory;
 import com.wise.portfolio.fund.PortfolioFund;
-import com.wise.portfolio.service.PortfolioPriceHistory;
+import com.wise.portfolio.price.PortfolioPriceHistory;
 
 public class Portfolio {
 

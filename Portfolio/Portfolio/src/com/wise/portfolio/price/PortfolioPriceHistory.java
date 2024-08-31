@@ -1,4 +1,4 @@
-package com.wise.portfolio.service;
+package com.wise.portfolio.price;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -32,6 +32,7 @@ import com.wise.portfolio.fund.FundPriceHistory;
 import com.wise.portfolio.fund.MutualFund.FundCategory;
 import com.wise.portfolio.fund.PortfolioFund;
 import com.wise.portfolio.portfolio.Portfolio;
+import com.wise.portfolio.service.PortfolioService;
 
 public class PortfolioPriceHistory {
 
@@ -59,7 +60,6 @@ public class PortfolioPriceHistory {
 	public TreeMap<String, FundPriceHistory> getAlphaVantagePriceHistory() {
 		return alphaVantagePriceHistory;
 	}
-
 
 	private Map<String, Map<LocalDate, Double>> fundShares = new TreeMap<>();
 //	private Map<String, Map<LocalDate, BigDecimal>> fundPrices = new TreeMap<>();
@@ -381,7 +381,6 @@ public class PortfolioPriceHistory {
 			return;
 		}
 
-
 		List<List<String>> fundLines = readHistoryCSVFile(historyFilePath);
 		List<String> headingLine = fundLines.remove(0); // first line is headings
 		if (headingLine == null) {
@@ -676,6 +675,11 @@ public class PortfolioPriceHistory {
 
 		}
 
+		if (value == null) {
+			if (fund.getOldFund() != null) {
+				return getPriceByDate(fund.getOldFund(), date, isExactDate);
+			}
+		}
 		return value;
 	}
 
@@ -686,7 +690,7 @@ public class PortfolioPriceHistory {
 		if (fundPriceMap == null) {
 			return value;
 		}
-		
+
 		// Cannot be exact because don't always download file with shares
 		value = fundPriceMap.get(date);
 		if (value == null) {
